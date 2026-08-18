@@ -1,0 +1,12 @@
+{
+  "gameId": "NsVEZxJn5LXN1LEMbTWn",
+  "relativePathToDistFolder": "dist",
+  "usesPreloader": false,
+  "orientation": "portrait",
+  "keywords": [
+    "loot",
+    "roguelite",
+    "dungeon-crawler"
+  ],
+  "kitId": null
+}

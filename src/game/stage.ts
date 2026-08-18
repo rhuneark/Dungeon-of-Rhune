@@ -19,6 +19,11 @@
  */
 import { Container, type Application } from 'pixi.js';
 
+/** The scene contract: every createXxxScene(app, stage) returns one of these. */
+export interface Scene {
+    destroy(): void;
+}
+
 /**
  * ADAPT: the game's design width, in units. 720 is a good default for
  * portrait (art assets sized against a 720-wide layout look right at 2x DPR

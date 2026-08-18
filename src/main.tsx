@@ -5,6 +5,8 @@ import App from './ui/App.tsx';
 import { store } from './state/store.ts';
 import { initSdk, registerLifecycles, sdkReady } from './sdk/runSdk.ts';
 import { warmAssets } from './assets/preload.ts';
+import { loadGame, saveGame } from './game/systems/save.ts';
+import { ensureStarterKit } from './game/systems/starterKit.ts';
 import './styles/app.css';
 
 /**
@@ -17,10 +19,13 @@ async function boot() {
     //    Resolves even if init fails (local dev outside the RUN host).
     await initSdk();
 
-    // 2. ADAPT: load persisted progress (RundotGameAPI.storage) before first
-    //    render, so the first screen can reflect real progress instead of
-    //    popping in after a beat. If the game is localized, restore the
-    //    language here too — before any UI renders.
+    // 2. Load persisted progress (inventory, equipped gear, tier unlocks,
+    //    currency) before first render. A brand-new save gets a starter
+    //    hammer + boots so floor 1 isn't unwinnable with empty hands.
+    const loaded = await loadGame();
+    const withStarterKit = ensureStarterKit(loaded);
+    store.patch({ save: withStarterKit });
+    if (withStarterKit !== loaded) void saveGame(withStarterKit);
 
     // 3. Mount React. `phase` starts at 'loading', so this paints the
     //    loading screen (progress bar at 0%).
@@ -58,10 +63,10 @@ async function boot() {
         onPause: () => store.patch({ paused: true }),
         onResume: () => store.patch({ paused: false }),
         onSleep: async () => {
-            // ADAPT: flush the save here (guarded — never let it throw).
+            await saveGame(store.get().save);
         },
         onQuit: async () => {
-            // ADAPT: same flush — but treat onSleep as the reliable one.
+            await saveGame(store.get().save);
         },
     });
 

@@ -1,6 +1,6 @@
 /**
  * Screen router. One phase visible at a time; the 'playing' phase stacks the
- * React HUD above the Pixi canvas.
+ * React HUD + panel overlays above the Pixi canvas.
  *
  * #app-frame (styled in styles/app.css) is the device frame: a centered
  * portrait column that fills phones edge-to-edge and letterboxes on desktop.
@@ -10,6 +10,8 @@ import { useStore } from '../state/store.ts';
 import LoadingScreen from './LoadingScreen.tsx';
 import MainMenu from './MainMenu.tsx';
 import Hud from './Hud.tsx';
+import Panels from './Panels.tsx';
+import Toasts from './Toasts.tsx';
 import GameCanvas from '../game/GameCanvas.tsx';
 
 export default function App() {
@@ -22,6 +24,8 @@ export default function App() {
                 <div className="absolute inset-0">
                     <GameCanvas />
                     <Hud />
+                    <Toasts />
+                    <Panels />
                 </div>
             )}
         </div>

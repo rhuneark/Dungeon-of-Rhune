@@ -1,7 +1,7 @@
 {
-    "name": "run-template-2d-pixi-react",
+    "name": "dungeon-of-rhune",
     "version": "1.0.0",
-    "description": "Pixi.js v8 + React 19 + Tailwind v4 + Vite + TypeScript template for RUN.game",
+    "description": "You're an idiot with a legendary hammer standing in a swarm of nonsense monsters that auto-die around you.",
     "private": true,
     "type": "module",
     "scripts": {

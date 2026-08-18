@@ -8,26 +8,60 @@
  * store every frame re-renders React every frame.
  */
 import { useSyncExternalStore } from 'react';
+import { defaultSaveData, type ItemInstance, type RhuneInstance, type SaveData } from '../game/data/types.ts';
 
-/** The UI-facing app state. ADAPT: extend alongside the initial state below. */
+export type Phase = 'loading' | 'menu' | 'playing';
+export type Location = 'hub' | 'dungeon';
+export type PanelId = 'inventory' | 'equipment' | 'statue' | 'portal' | 'death' | null;
+
+export interface RunHud {
+    floor: number;
+    hp: number;
+    maxHp: number;
+    kills: number;
+    killsNeeded: number;
+}
+
+export interface Toast {
+    id: number;
+    text: string;
+}
+
+/** The UI-facing app state. */
 export interface AppState {
-    /** 'loading' → 'menu' → 'playing' (ADAPT: add your own screens/phases) */
-    phase: 'loading' | 'menu' | 'playing';
+    /** 'loading' → 'menu' → 'playing' */
+    phase: Phase;
     /** 0..1 progress of the critical-asset warm during 'loading' */
     loadProgress: number;
     /** Set by the host's onPause/onResume lifecycle hooks */
     paused: boolean;
-    /** ADAPT: demo HUD value — replace with your game's UI-facing state */
-    score: number;
+    /** Which sub-scene GameCanvas mounts while phase === 'playing' */
+    location: Location;
+    /** Which React overlay panel is open, if any */
+    panel: PanelId;
+    /** The whole persisted save blob: inventory, equipped gear, tier progress, currency */
+    save: SaveData;
+    /** Live HUD numbers for the current dungeon run, null while in the hub */
+    run: RunHud | null;
+    /** Summary shown on the death panel */
+    deathSummary: { floor: number } | null;
+    toasts: Toast[];
 }
 
 const listeners = new Set<() => void>();
+
+let toastSeq = 0;
 
 let state: AppState = {
     phase: 'loading',
     loadProgress: 0,
     paused: false,
-    score: 0,
+    location: 'hub',
+    panel: null,
+    save: defaultSaveData(),
+    run: null,
+    deathSummary: null,
+    toasts: [],
 };
 
 export const store = {
@@ -42,6 +76,17 @@ export const store = {
         listeners.add(l);
         return () => listeners.delete(l);
     },
+    pushToast(text: string): void {
+        toastSeq += 1;
+        const toast = { id: toastSeq, text };
+        state = { ...state, toasts: [...state.toasts, toast] };
+        for (const l of listeners) l();
+        setTimeout(() => store.dismissToast(toast.id), 3200);
+    },
+    dismissToast(id: number): void {
+        state = { ...state, toasts: state.toasts.filter((t) => t.id !== id) };
+        for (const l of listeners) l();
+    },
 };
 
 /**
@@ -54,3 +99,5 @@ export function useStore<T = AppState>(
 ): T {
     return useSyncExternalStore(store.subscribe, () => selector(state));
 }
+
+export type { SaveData, ItemInstance, RhuneInstance };

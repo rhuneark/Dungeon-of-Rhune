@@ -1,46 +1,85 @@
 /**
  * React ↔ Pixi boundary. React owns WHEN the game exists (mount/unmount with
- * the 'playing' phase); Pixi owns everything inside the canvas. No React
- * state flows in per-frame — game → UI communication goes through the store.
+ * the 'playing' phase) and WHICH sub-scene is active (hub vs dungeon, via
+ * store.location). No React state flows in per-frame — game → UI
+ * communication goes through the store.
  *
- * StrictMode-safe: dev double-mount is handled by the `disposed` flag (the
- * first mount's async init resolves, sees it was cancelled, and destroys its
- * app before the second mount's app appears).
+ * Re-keying the effect on `location` recreates the whole Pixi Application on
+ * every hub<->dungeon transition — the same StrictMode-safe teardown pattern
+ * the template already uses for menu<->playing, just applied one level
+ * deeper. Transitions happen a few times per session, not per frame, so the
+ * WebGL context churn is cheap relative to the simplicity it buys.
  */
 import { useEffect, useRef } from 'react';
 import type { Application } from 'pixi.js';
 import { createPixiApp } from './pixiApp.ts';
 import { createStage, type Stage } from './stage.ts';
-import { createDemoScene, type Scene } from './demoScene.ts';
+import { createHubScene } from './scenes/hubScene.ts';
+import { createDungeonScene } from './scenes/dungeonScene.ts';
+import type { Scene } from './stage.ts';
 import { store, useStore } from '../state/store.ts';
+import { aggregateStats } from './systems/inventory.ts';
+import {
+    dungeonSceneRef,
+    enterDungeon,
+    onDeath,
+    onFloorCleared,
+    onRunFloorChange,
+    onRunHpChange,
+    onRunKillsChange,
+} from './dungeonController.ts';
+
+function mountSceneFor(location: 'hub' | 'dungeon', app: Application, stage: Stage): Scene {
+    if (location === 'hub') {
+        return createHubScene(app, stage, {
+            onOpenChest: () => store.patch({ panel: 'inventory' }),
+            onOpenRack: () => store.patch({ panel: 'equipment' }),
+            onOpenStatue: () => store.patch({ panel: 'statue' }),
+            onOpenPortal: () => store.patch({ panel: 'portal' }),
+            onEnterDungeon: enterDungeon,
+        });
+    }
+
+    const { save } = store.get();
+    const { stats, weapons } = aggregateStats(save);
+    const dungeon = createDungeonScene(app, stage, {
+        tier: save.selectedTier,
+        stats,
+        weapons,
+        onHpChange: onRunHpChange,
+        onFloorChange: onRunFloorChange,
+        onKillsChange: onRunKillsChange,
+        onFloorCleared,
+        onDeath,
+    });
+    dungeonSceneRef.current = dungeon;
+    return dungeon;
+}
 
 export default function GameCanvas() {
     const hostRef = useRef<HTMLDivElement | null>(null);
     const appRef = useRef<Application | null>(null);
     const paused = useStore((s) => s.paused);
+    const location = useStore((s) => s.location);
 
     useEffect(() => {
         let disposed = false;
         let scene: Scene | null = null;
         let stage: Stage | null = null;
         (async () => {
-            // hostRef is always attached by the time the effect runs.
             const app = await createPixiApp(hostRef.current!);
             if (disposed) {
                 app.destroy({ removeView: true }, { children: true });
                 return;
             }
             appRef.current = app;
-            // Design-resolution stage: scenes position in design units, not
-            // pixels, so layout is proportional on every device (stage.ts).
             stage = createStage(app);
-            // ADAPT: replace the demo scene with the real game scene.
-            scene = createDemoScene(app, stage);
-            // Respect a pause that landed while the canvas was initializing.
+            scene = mountSceneFor(location, app, stage);
             if (store.get().paused) app.ticker.stop();
         })();
         return () => {
             disposed = true;
+            dungeonSceneRef.current = null;
             try { scene?.destroy(); } catch { /* scene already torn down */ }
             try { stage?.destroy(); } catch { /* stage already torn down */ }
             if (appRef.current) {
@@ -48,7 +87,7 @@ export default function GameCanvas() {
                 appRef.current = null;
             }
         };
-    }, []);
+    }, [location]);
 
     // Host lifecycle pause/resume → freeze/unfreeze the whole ticker.
     useEffect(() => {
@@ -56,7 +95,7 @@ export default function GameCanvas() {
         if (!app) return;
         if (paused) app.ticker.stop();
         else app.ticker.start();
-    }, [paused]);
+    }, [paused, location]);
 
     return <div ref={hostRef} className="absolute inset-0" />;
 }

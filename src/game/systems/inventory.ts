@@ -1,9 +1,9 @@
-import type { GearSlot, ItemInstance, RhuneInstance, SaveData, StatBlock } from '../data/types.ts';
+import type { GearSlot, ItemInstance, SaveData, StatBlock } from '../data/types.ts';
 import { slotAcceptsKind } from '../data/types.ts';
 import { getBaseType } from '../data/baseTypes.ts';
 import { AFFIX_POOLS } from '../data/affixes.ts';
 import { RARITIES } from '../data/rarity.ts';
-import { getRhuneDef } from '../data/rhunes.ts';
+import { resolveEquippedRhunes, statModContribution, type ResolvedRhune } from './rhuneRuntime.ts';
 
 /** Base combat stats before any gear/rhunes are applied. */
 export const BASE_PLAYER_STATS: Required<StatBlock> = {
@@ -15,8 +15,18 @@ export const BASE_PLAYER_STATS: Required<StatBlock> = {
     moveSpeed: 220,
     armor: 0,
     critChance: 0.05,
+    critDamage: 0,
     lifesteal: 0,
     magnetRadius: 50,
+    projectileCount: 0,
+    pierce: 0,
+    thorns: 0,
+    dodgeChance: 0,
+    damageReduction: 0,
+    fireDamage: 0,
+    iceDamage: 0,
+    lightningDamage: 0,
+    poisonDamage: 0,
 };
 
 export function findAffixDef(affixId: string) {
@@ -39,23 +49,20 @@ export function itemStats(item: ItemInstance): Partial<StatBlock> {
     return out;
 }
 
-export function rhuneStats(rhune: RhuneInstance): Partial<StatBlock> {
-    const def = getRhuneDef(rhune.rhuneDefId);
-    const mult = RARITIES[rhune.rarity].valueMult;
-    return { [def.stat]: def.baseValue * mult } as Partial<StatBlock>;
-}
-
 /** A hand-slot weapon ready to drive an attack loop in the dungeon scene. */
 export interface EquippedWeapon {
     slot: 'hand1' | 'hand2';
     item: ItemInstance;
     role: NonNullable<ReturnType<typeof getBaseType>['role']>;
+    element: NonNullable<ReturnType<typeof getBaseType>['element']>;
     stats: Partial<StatBlock>;
 }
 
 export interface AggregateResult {
     stats: Required<StatBlock>;
     weapons: EquippedWeapon[];
+    /** Non-statMod rhunes (procs/trails/amps/auras) for dungeonScene's rhune runtime. */
+    rhunes: ResolvedRhune[];
 }
 
 /** Sum base stats + every equipped item + every socketed rhune into final player stats. */
@@ -75,16 +82,14 @@ export function aggregateStats(save: SaveData): AggregateResult {
         if (slot === 'hand1' || slot === 'hand2') {
             const base = getBaseType(item.baseTypeId);
             if (base.role && base.role !== 'shield') {
-                weapons.push({ slot, item, role: base.role, stats: s });
+                weapons.push({ slot, item, role: base.role, element: base.element ?? 'physical', stats: s });
             }
         }
     }
 
-    for (const rhuneId of save.equippedRhunes) {
-        if (!rhuneId) continue;
-        const rhune = save.rhunes.find((r) => r.instanceId === rhuneId);
-        if (!rhune) continue;
-        const s = rhuneStats(rhune);
+    const resolvedRhunes = resolveEquippedRhunes(save);
+    for (const resolved of resolvedRhunes) {
+        const s = statModContribution(resolved);
         for (const [k, v] of Object.entries(s)) {
             (stats as any)[k] = ((stats as any)[k] ?? 0) + (v as number);
         }
@@ -92,7 +97,9 @@ export function aggregateStats(save: SaveData): AggregateResult {
 
     stats.critChance = Math.min(stats.critChance, 0.75);
     stats.lifesteal = Math.min(stats.lifesteal, 0.5);
-    return { stats, weapons };
+    stats.dodgeChance = Math.min(stats.dodgeChance, 0.6);
+    stats.damageReduction = Math.min(stats.damageReduction, 0.75);
+    return { stats, weapons, rhunes: resolvedRhunes };
 }
 
 export function canEquip(item: ItemInstance, slot: GearSlot): boolean {

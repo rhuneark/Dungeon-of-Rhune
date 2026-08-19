@@ -56,6 +56,14 @@ export function onFloorCleared(floor: number, loot: { items: ItemInstance[]; rhu
     }
 }
 
+/** Rhune of the Vulture etc — a proc-earned currency drop mid-run. No toast (can fire often); the HUD currency count reflects it once back in the hub. */
+export function onCurrencyEarned(amount: number): void {
+    const { save } = store.get();
+    const nextSave = { ...save, currency: save.currency + amount };
+    store.patch({ save: nextSave });
+    void saveGame(nextSave);
+}
+
 export function onDeath(floorReached: number, elapsedSeconds: number, totalKills: number): void {
     const { save } = store.get();
     const nextSave = recordRunEnd(save, save.selectedTier, floorReached, elapsedSeconds, totalKills);

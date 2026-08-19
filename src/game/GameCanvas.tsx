@@ -22,6 +22,7 @@ import { aggregateStats } from './systems/inventory.ts';
 import {
     dungeonSceneRef,
     enterDungeon,
+    onCurrencyEarned,
     onDeath,
     onFloorCleared,
     onRunFloorChange,
@@ -42,16 +43,18 @@ function mountSceneFor(location: 'hub' | 'dungeon', app: Application, stage: Sta
     }
 
     const { save } = store.get();
-    const { stats, weapons } = aggregateStats(save);
+    const { stats, weapons, rhunes } = aggregateStats(save);
     const dungeon = createDungeonScene(app, stage, {
         tier: save.selectedTier,
         stats,
         weapons,
+        rhunes,
         onHpChange: onRunHpChange,
         onFloorChange: onRunFloorChange,
         onKillsChange: onRunKillsChange,
         onFloorCleared,
         onDeath,
+        onCurrencyEarned,
     });
     dungeonSceneRef.current = dungeon;
     return dungeon;

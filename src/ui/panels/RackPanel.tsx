@@ -92,7 +92,17 @@ export default function RackPanel() {
                                 damage: stats.damage,
                                 fireRate: stats.fireRate,
                                 critChance: stats.critChance,
+                                critDamage: stats.critDamage,
                                 lifesteal: stats.lifesteal,
+                                thorns: stats.thorns,
+                                dodgeChance: stats.dodgeChance,
+                                damageReduction: stats.damageReduction,
+                                projectileCount: stats.projectileCount,
+                                pierce: stats.pierce,
+                                fireDamage: stats.fireDamage,
+                                iceDamage: stats.iceDamage,
+                                lightningDamage: stats.lightningDamage,
+                                poisonDamage: stats.poisonDamage,
                             }}
                         />
                         <div className="text-xs text-white/70">{STAT_LABELS.maxHp} {stats.maxHp}</div>

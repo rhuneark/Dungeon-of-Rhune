@@ -5,12 +5,14 @@ import { RARITIES } from '../../game/data/rarity.ts';
 import { getBaseType } from '../../game/data/baseTypes.ts';
 import { getRhuneDef } from '../../game/data/rhunes.ts';
 import { itemDisplayName } from '../../game/data/nameGen.ts';
-import { itemStats, rhuneStats } from '../../game/systems/inventory.ts';
+import { itemStats } from '../../game/systems/inventory.ts';
+import { describeRhuneEffect } from '../../game/systems/rhuneRuntime.ts';
+
+const PERCENT_STATS = new Set(['critChance', 'critDamage', 'lifesteal', 'dodgeChance', 'damageReduction']);
 
 function formatStatLine(stat: string, value: number): string {
     const label = STAT_LABELS[stat as keyof typeof STAT_LABELS] ?? stat;
-    const isPercentish = stat === 'critChance' || stat === 'lifesteal';
-    const formatted = isPercentish ? `${Math.round(value * 100)}%` : Number(value.toFixed(1)).toString();
+    const formatted = PERCENT_STATS.has(stat) ? `${Math.round(value * 100)}%` : Number(value.toFixed(1)).toString();
     return `${label} +${formatted}`;
 }
 
@@ -64,7 +66,6 @@ export function ItemCard({
 export function RhuneCard({ rhune, equippedIn, children }: { rhune: RhuneInstance; equippedIn?: number | null; children?: ReactNode }) {
     const rarity = RARITIES[rhune.rarity];
     const def = getRhuneDef(rhune.rhuneDefId);
-    const stats = rhuneStats(rhune);
     return (
         <div className="rounded-xl border p-3" style={{ borderColor: rarity.hex + '55', backgroundColor: rarity.hex + '14' }}>
             <div className="text-sm font-bold" style={{ color: rarity.hex }}>
@@ -75,9 +76,7 @@ export function RhuneCard({ rhune, equippedIn, children }: { rhune: RhuneInstanc
                 {equippedIn != null && equippedIn >= 0 ? ` · socketed (${equippedIn + 1})` : ''}
             </div>
             <p className="mt-1 text-xs italic text-white/50">{def.description}</p>
-            <div className="mt-1.5 space-y-0.5">
-                <ItemStatLines stats={stats} />
-            </div>
+            <div className="mt-1.5 text-xs font-bold text-white/80">{describeRhuneEffect(def, rhune.rarity)}</div>
             {children && <div className="mt-3 flex gap-2">{children}</div>}
         </div>
     );

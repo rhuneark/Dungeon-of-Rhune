@@ -154,6 +154,9 @@ export interface SaveData {
     selectedTier: number;
     unlockedTiers: number[];
     bestFloorByTier: Record<number, number>;
+    stats: {
+        lifetimeKills: number;
+    };
 }
 
 export function emptyEquipped(): Record<GearSlot, string | null> {
@@ -180,5 +183,6 @@ export function defaultSaveData(): SaveData {
         selectedTier: 1,
         unlockedTiers: [1],
         bestFloorByTier: {},
+        stats: { lifetimeKills: 0 },
     };
 }

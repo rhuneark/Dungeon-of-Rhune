@@ -8,7 +8,7 @@ import { TIERS, getTier } from '../data/tiers.ts';
 import type { SaveData } from '../data/types.ts';
 
 /** floorReached = the floor the player was ON when the run ended (died or exited). */
-export function recordRunEnd(save: SaveData, tier: number, floorReached: number, elapsedSeconds = 0): SaveData {
+export function recordRunEnd(save: SaveData, tier: number, floorReached: number, elapsedSeconds = 0, totalKills = 0): SaveData {
     const clearedFloors = Math.max(0, floorReached - 1);
     const prevBest = save.bestFloorByTier[tier] ?? 0;
     const bestFloorByTier = { ...save.bestFloorByTier, [tier]: Math.max(prevBest, clearedFloors) };
@@ -21,7 +21,12 @@ export function recordRunEnd(save: SaveData, tier: number, floorReached: number,
     }
 
     void reportRunEnd(tier, bestFloorByTier[tier], clearedFloors, elapsedSeconds);
-    return { ...save, bestFloorByTier, unlockedTiers };
+    return {
+        ...save,
+        bestFloorByTier,
+        unlockedTiers,
+        stats: { ...save.stats, lifetimeKills: save.stats.lifetimeKills + totalKills },
+    };
 }
 
 // The leaderboard API rejects durations outside [10, 3600] seconds.

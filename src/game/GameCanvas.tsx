@@ -33,9 +33,10 @@ function mountSceneFor(location: 'hub' | 'dungeon', app: Application, stage: Sta
     if (location === 'hub') {
         return createHubScene(app, stage, {
             onOpenChest: () => store.patch({ panel: 'inventory' }),
-            onOpenRack: () => store.patch({ panel: 'equipment' }),
+            onOpenRack: () => store.patch({ panel: 'rack' }),
             onOpenStatue: () => store.patch({ panel: 'statue' }),
             onOpenPortal: () => store.patch({ panel: 'portal' }),
+            onOpenBlacksmith: () => store.patch({ panel: 'blacksmith' }),
             onEnterDungeon: enterDungeon,
         });
     }

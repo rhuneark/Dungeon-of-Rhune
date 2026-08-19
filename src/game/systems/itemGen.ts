@@ -11,7 +11,7 @@ function makeInstanceId(prefix: string): string {
     return `${prefix}_${Date.now().toString(36)}_${uidCounter}_${Math.floor(Math.random() * 1e6).toString(36)}`;
 }
 
-function randRange(min: number, max: number): number {
+export function randRange(min: number, max: number): number {
     return min + Math.random() * (max - min);
 }
 
@@ -37,7 +37,11 @@ function rollKind(): ItemKind {
 }
 
 export function rollItem(tier: number, forcedRarity?: Rarity): ItemInstance {
-    const kind = rollKind();
+    return rollItemOfKind(rollKind(), tier, forcedRarity);
+}
+
+/** Roll an item of a specific kind (used by the Blacksmith's craft-new-item option). */
+export function rollItemOfKind(kind: ItemKind, tier: number, forcedRarity?: Rarity): ItemInstance {
     const pool = baseTypesForSlotKind(kind);
     const base = pool[Math.floor(Math.random() * pool.length)];
     return rollSpecificItem(base.id, tier, forcedRarity);

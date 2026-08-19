@@ -15,6 +15,9 @@ import { rollFloorLoot } from '../systems/itemGen.ts';
 import { RARITIES } from '../data/rarity.ts';
 import { itemDisplayName } from '../data/nameGen.ts';
 import { getRhuneDef } from '../data/rhunes.ts';
+import { WORLD_WIDTH, WORLD_HEIGHT } from '../world.ts';
+import { createCamera } from '../camera.ts';
+import { createInputTracker, pointerMoveDirection } from '../input.ts';
 
 export interface DungeonRunState {
     floor: number;
@@ -23,6 +26,7 @@ export interface DungeonRunState {
     kills: number;
     killsNeeded: number;
     elapsedSeconds: number;
+    totalKills: number;
 }
 
 export interface DungeonSceneOptions {
@@ -33,7 +37,7 @@ export interface DungeonSceneOptions {
     onFloorChange(floor: number): void;
     onKillsChange(kills: number, needed: number): void;
     onFloorCleared(floor: number, loot: { items: ItemInstance[]; rhunes: RhuneInstance[] }): void;
-    onDeath(floorReached: number, elapsedSeconds: number): void;
+    onDeath(floorReached: number, elapsedSeconds: number, totalKills: number): void;
 }
 
 export interface DungeonScene extends Scene {
@@ -74,12 +78,12 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
     const world = new Container();
     stage.root.addChild(world);
 
-    const margin = 40;
+    const margin = 60;
     const bounds = () => ({
         minX: margin,
-        maxX: stage.width - margin,
+        maxX: WORLD_WIDTH - margin,
         minY: margin,
-        maxY: stage.designHeight() - margin,
+        maxY: WORLD_HEIGHT - margin,
     });
 
     // Arena backdrop — cheap flat fill re-drawn on resize.
@@ -103,8 +107,8 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
     const hammerG = new Graphics().roundRect(-4, -34, 8, 26, 3).fill(0xd97706);
     playerLayer.addChild(hammerG, playerG);
     const player = {
-        x: stage.width / 2,
-        y: stage.designHeight() / 2,
+        x: WORLD_WIDTH / 2,
+        y: WORLD_HEIGHT / 2,
         hp: opts.stats.maxHp,
         maxHp: opts.stats.maxHp,
         invuln: 0,
@@ -112,63 +116,12 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
     };
     playerLayer.position.set(player.x, player.y);
 
-    // --- joystick input (mouse or touch, single scheme) ---
-    let dragging = false;
-    let originX = 0;
-    let originY = 0;
-    let dirX = 0;
-    let dirY = 0;
-    const STICK_RADIUS = 70;
-
-    const stickBg = new Graphics().circle(0, 0, STICK_RADIUS).fill({ color: 0xffffff, alpha: 0.08 });
-    const stickKnob = new Graphics().circle(0, 0, 28).fill({ color: 0xffffff, alpha: 0.22 });
-    stickBg.visible = false;
-    stickKnob.visible = false;
-    world.addChild(stickBg, stickKnob);
-
-    app.stage.eventMode = 'static';
-    app.stage.hitArea = app.screen;
-    const toLocal = (globalX: number, globalY: number) => {
-        const s = stage.scale();
-        return { x: globalX / s, y: globalY / s };
-    };
-    const onPointerDown = (e: any) => {
-        dragging = true;
-        const p = toLocal(e.global.x, e.global.y);
-        originX = p.x;
-        originY = p.y;
-        dirX = 0;
-        dirY = 0;
-        stickBg.visible = true;
-        stickKnob.visible = true;
-        stickBg.position.set(originX, originY);
-        stickKnob.position.set(originX, originY);
-    };
-    const onPointerMove = (e: any) => {
-        if (!dragging) return;
-        const p = toLocal(e.global.x, e.global.y);
-        let dx = p.x - originX;
-        let dy = p.y - originY;
-        const dist = Math.hypot(dx, dy) || 1;
-        const clamped = Math.min(dist, STICK_RADIUS);
-        dx = (dx / dist) * clamped;
-        dy = (dy / dist) * clamped;
-        stickKnob.position.set(originX + dx, originY + dy);
-        const norm = clamped / STICK_RADIUS;
-        dirX = (dx / (clamped || 1)) * norm;
-        dirY = (dy / (clamped || 1)) * norm;
-    };
-    const onPointerUp = () => {
-        dragging = false;
-        dirX = 0;
-        dirY = 0;
-        stickBg.visible = false;
-        stickKnob.visible = false;
-    };
-    app.stage.on('pointerdown', onPointerDown);
-    app.stage.on('pointermove', onPointerMove);
-    app.stage.on('pointerup', onPointerUp);
-    app.stage.on('pointerupoutside', onPointerUp);
+    // --- input + camera ---
+    // Hold anywhere (mouse or touch) and the player walks toward the current
+    // pointer position — no drag origin, so it doesn't matter where on
+    // screen you first press. Keyboard (WASD/arrows) works alongside it.
+    const input = createInputTracker(app);
+    const camera = createCamera(stage, WORLD_WIDTH, WORLD_HEIGHT);
 
     // --- layers ---
     const enemyLayer = new Container();
@@ -188,6 +141,7 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
     let phase: 'combat' | 'looting' | 'transition' | 'dead' = 'combat';
     let transitionTimer = 0;
     let elapsedSeconds = 0;
+    let totalKills = 0;
 
     // Floating damage numbers / melee swing rings run their own short-lived
     // ticker callbacks outside the main tick loop — track them so destroy()
@@ -268,6 +222,7 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
             enemy.g.destroy();
             enemies = enemies.filter((e) => e !== enemy);
             kills += 1;
+            totalKills += 1;
             opts.onKillsChange(kills, killsNeeded);
         }
     }
@@ -369,12 +324,18 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
         if (phase === 'dead') return;
         elapsedSeconds += dt;
 
-        // Movement (clamped to arena bounds).
+        // Movement: keyboard first, pointer-hold overrides when active (clamped to world bounds).
         const b = bounds();
+        const playerScreen = camera.worldToScreen(player.x, player.y);
+        const pointerDir = pointerMoveDirection(input.pointer, playerScreen);
+        const kbDir = input.keyboardDir();
+        const dirX = pointerDir ? pointerDir.x : kbDir.x;
+        const dirY = pointerDir ? pointerDir.y : kbDir.y;
         player.x = Math.min(Math.max(player.x + dirX * opts.stats.moveSpeed * dt, b.minX), b.maxX);
         player.y = Math.min(Math.max(player.y + dirY * opts.stats.moveSpeed * dt, b.minY), b.maxY);
         playerLayer.position.set(player.x, player.y);
         if (dirX !== 0 || dirY !== 0) hammerG.rotation = Math.atan2(dirY, dirX) + Math.PI / 2;
+        camera.update(player.x, player.y, dt);
 
         if (player.invuln > 0) player.invuln -= dt;
         if (player.hitFlash > 0) {
@@ -402,7 +363,7 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
                     opts.onHpChange(player.hp, player.maxHp);
                     if (player.hp <= 0) {
                         phase = 'dead';
-                        opts.onDeath(floor, elapsedSeconds);
+                        opts.onDeath(floor, elapsedSeconds, totalKills);
                         return;
                     }
                 }
@@ -488,15 +449,13 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
             app.ticker.remove(tick);
             for (const cb of transientTickers) app.ticker.remove(cb);
             transientTickers.clear();
-            app.stage.off('pointerdown', onPointerDown);
-            app.stage.off('pointermove', onPointerMove);
-            app.stage.off('pointerup', onPointerUp);
-            app.stage.off('pointerupoutside', onPointerUp);
+            input.destroy();
+            camera.destroy();
             offResize();
             world.destroy({ children: true });
         },
         getState(): DungeonRunState {
-            return { floor, hp: player.hp, maxHp: player.maxHp, kills, killsNeeded, elapsedSeconds };
+            return { floor, hp: player.hp, maxHp: player.maxHp, kills, killsNeeded, elapsedSeconds, totalKills };
         },
     };
 }

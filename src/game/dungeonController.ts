@@ -56,9 +56,9 @@ export function onFloorCleared(floor: number, loot: { items: ItemInstance[]; rhu
     }
 }
 
-export function onDeath(floorReached: number, elapsedSeconds: number): void {
+export function onDeath(floorReached: number, elapsedSeconds: number, totalKills: number): void {
     const { save } = store.get();
-    const nextSave = recordRunEnd(save, save.selectedTier, floorReached, elapsedSeconds);
+    const nextSave = recordRunEnd(save, save.selectedTier, floorReached, elapsedSeconds, totalKills);
     dungeonSceneRef.current = null;
     store.patch({
         save: nextSave,
@@ -78,7 +78,7 @@ export function requestExitToHub(): void {
         return;
     }
     const runState = scene.getState();
-    const nextSave = recordRunEnd(save, save.selectedTier, runState.floor, runState.elapsedSeconds);
+    const nextSave = recordRunEnd(save, save.selectedTier, runState.floor, runState.elapsedSeconds, runState.totalKills);
     dungeonSceneRef.current = null;
     store.patch({ save: nextSave, run: null, location: 'hub', panel: null });
     void saveGame(nextSave);

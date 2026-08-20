@@ -50,7 +50,6 @@ const PREFIXES = [
     'Ergonomically Incorrect',
     'Locally Sourced',
     'Chronically Online',
-    'Terms-and-Conditions',
     'Barely Sanctioned',
 ];
 

@@ -62,13 +62,23 @@ export const RARITIES: Record<Rarity, RarityDef> = {
     },
 };
 
-export function rollRarity(weights: Record<Rarity, number>): Rarity {
+/** How much the `luck` stat boosts each rarity's weight — bigger payoff at the top end. */
+const LUCK_RARITY_BOOST: Record<Rarity, number> = {
+    common: 0,
+    uncommon: 0.25,
+    rare: 0.5,
+    epic: 0.9,
+    legendary: 1.4,
+};
+
+export function rollRarity(weights: Record<Rarity, number>, luck = 0): Rarity {
     const entries = Object.entries(weights) as [Rarity, number][];
-    const total = entries.reduce((sum, [, w]) => sum + w, 0);
+    const adjusted = entries.map(([rarity, weight]) => [rarity, weight * (1 + luck * LUCK_RARITY_BOOST[rarity])] as [Rarity, number]);
+    const total = adjusted.reduce((sum, [, w]) => sum + w, 0);
     let roll = Math.random() * total;
-    for (const [rarity, weight] of entries) {
+    for (const [rarity, weight] of adjusted) {
         roll -= weight;
         if (roll <= 0) return rarity;
     }
-    return entries[entries.length - 1][0];
+    return adjusted[adjusted.length - 1][0];
 }

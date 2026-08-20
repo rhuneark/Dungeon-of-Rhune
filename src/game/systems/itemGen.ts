@@ -36,21 +36,21 @@ function rollKind(): ItemKind {
     return entries[0][0];
 }
 
-export function rollItem(tier: number, forcedRarity?: Rarity): ItemInstance {
-    return rollItemOfKind(rollKind(), tier, forcedRarity);
+export function rollItem(tier: number, forcedRarity?: Rarity, luck = 0): ItemInstance {
+    return rollItemOfKind(rollKind(), tier, forcedRarity, luck);
 }
 
 /** Roll an item of a specific kind (used by the Blacksmith's craft-new-item option). */
-export function rollItemOfKind(kind: ItemKind, tier: number, forcedRarity?: Rarity): ItemInstance {
+export function rollItemOfKind(kind: ItemKind, tier: number, forcedRarity?: Rarity, luck = 0): ItemInstance {
     const pool = baseTypesForSlotKind(kind);
     const base = pool[Math.floor(Math.random() * pool.length)];
-    return rollSpecificItem(base.id, tier, forcedRarity);
+    return rollSpecificItem(base.id, tier, forcedRarity, luck);
 }
 
 /** Roll an instance of a known base type (used for starter kits / guaranteed drops). */
-export function rollSpecificItem(baseTypeId: string, tier: number, forcedRarity?: Rarity): ItemInstance {
+export function rollSpecificItem(baseTypeId: string, tier: number, forcedRarity?: Rarity, luck = 0): ItemInstance {
     const tierDef = getTier(tier);
-    const rarity = forcedRarity ?? rollRarity(tierDef.lootWeights);
+    const rarity = forcedRarity ?? rollRarity(tierDef.lootWeights, luck);
     const base = BASE_TYPES.find((b) => b.id === baseTypeId);
     if (!base) throw new Error(`Unknown base type: ${baseTypeId}`);
 
@@ -63,10 +63,12 @@ export function rollSpecificItem(baseTypeId: string, tier: number, forcedRarity?
     }
 
     const mult = RARITIES[rarity].valueMult;
-    const affixes = chosen.map((def) => ({
-        affixId: def.id,
-        value: Number((randRange(def.min, def.max) * mult).toFixed(def.isPercent || def.max < 1 ? 3 : 1)),
-    }));
+    const affixes = chosen.map((def) => {
+        if (def.kind === 'proc') {
+            return { affixId: def.id, value: Number(Math.min(0.9, randRange(def.chanceMin, def.chanceMax) * mult).toFixed(3)) };
+        }
+        return { affixId: def.id, value: Number((randRange(def.min, def.max) * mult).toFixed(def.isPercent || def.max < 1 ? 3 : 1)) };
+    });
 
     return {
         instanceId: makeInstanceId('item'),
@@ -77,9 +79,9 @@ export function rollSpecificItem(baseTypeId: string, tier: number, forcedRarity?
     };
 }
 
-export function rollRhune(tier: number, forcedRarity?: Rarity): RhuneInstance {
+export function rollRhune(tier: number, forcedRarity?: Rarity, luck = 0): RhuneInstance {
     const tierDef = getTier(tier);
-    const rarity = forcedRarity ?? rollRarity(tierDef.lootWeights);
+    const rarity = forcedRarity ?? rollRarity(tierDef.lootWeights, luck);
     const def = RHUNES[Math.floor(Math.random() * RHUNES.length)];
     return {
         instanceId: makeInstanceId('rhune'),
@@ -89,13 +91,13 @@ export function rollRhune(tier: number, forcedRarity?: Rarity): RhuneInstance {
 }
 
 /** Roll a small floor-clear loot batch: 1-3 drops, richer at deeper tiers. */
-export function rollFloorLoot(tier: number, floor: number): { items: ItemInstance[]; rhunes: RhuneInstance[] } {
+export function rollFloorLoot(tier: number, floor: number, luck = 0): { items: ItemInstance[]; rhunes: RhuneInstance[] } {
     const dropCount = 1 + Math.floor(Math.random() * 2) + (floor % 5 === 0 ? 1 : 0);
     const items: ItemInstance[] = [];
     const rhunes: RhuneInstance[] = [];
     for (let i = 0; i < dropCount; i++) {
-        if (Math.random() < 0.22) rhunes.push(rollRhune(tier));
-        else items.push(rollItem(tier));
+        if (Math.random() < 0.22) rhunes.push(rollRhune(tier, undefined, luck));
+        else items.push(rollItem(tier, undefined, luck));
     }
     return { items, rhunes };
 }

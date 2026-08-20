@@ -6,15 +6,17 @@
  * onPause, or the Menu button) pauses everything here too.
  *
  * Damage is computed per-element (base weapon element + any flat elemental
- * stat adds), each independently scaled by equipped elementAmp Rhunes, then
- * summed and crit-multiplied. Weapon hits (not DOT ticks or procs) roll
- * onHitStatus Rhunes to apply status effects; enemy deaths roll onKill
- * Rhunes; moveTrail Rhunes drop hazard zones while the player moves; aura
- * Rhunes continuously refresh a status on anything nearby.
+ * stat adds + temporary elementBoost procs), each independently scaled by
+ * equipped elementAmp Rhunes, then summed and crit-multiplied. Two proc
+ * systems layer on top of gear stats: Rhune effects (rhuneRuntime.ts) and
+ * item proc affixes (procAffixRuntime.ts, "X% chance on hit to..."). Both
+ * hook the same trigger points here — onHit/onCrit (weapon attacks only,
+ * not DOT ticks or proc-dealt damage), onKill, onBeingHit (contact damage
+ * taken), onMove (throttled), and onFloorClear.
  */
 import { Container, Graphics, Text, type Application, type Ticker } from 'pixi.js';
 import type { Stage, Scene } from '../stage.ts';
-import type { Element, ItemInstance, RhuneInstance, StatBlock, StatusType } from '../data/types.ts';
+import type { Element, ItemInstance, ProcEffect, RhuneInstance, StatBlock, StatusType } from '../data/types.ts';
 import { ELEMENT_COLOR } from '../data/types.ts';
 import type { EquippedWeapon } from '../systems/inventory.ts';
 import { ENEMIES, pickEnemy } from '../data/enemies.ts';
@@ -37,6 +39,7 @@ import {
     type ResolvedRhune,
     type StatusApplication,
 } from '../systems/rhuneRuntime.ts';
+import { rollProcAffixes, scaleProcEffect, type ResolvedProcAffix } from '../systems/procAffixRuntime.ts';
 
 export interface DungeonRunState {
     floor: number;
@@ -53,6 +56,7 @@ export interface DungeonSceneOptions {
     stats: Required<StatBlock>;
     weapons: EquippedWeapon[];
     rhunes: ResolvedRhune[];
+    procAffixes: ResolvedProcAffix[];
     onHpChange(hp: number, maxHp: number): void;
     onFloorChange(floor: number): void;
     onKillsChange(kills: number, needed: number): void;
@@ -98,6 +102,8 @@ interface Projectile {
     life: number;
     pierceRemaining: number;
     hitIds: Set<EnemyEntity>;
+    source: DamageSource;
+    splashRadius: number;
 }
 
 interface LootOrb {
@@ -121,6 +127,12 @@ interface Hazard {
     g: Graphics;
 }
 
+interface ElementBoost {
+    element: Element;
+    amount: number;
+    remaining: number;
+}
+
 const STATUS_TINT: Record<StatusType, number> = {
     burn: 0xf97316,
     poison: 0x4ade80,
@@ -129,6 +141,7 @@ const STATUS_TINT: Record<StatusType, number> = {
     stun: 0xe5e7eb,
 };
 const STATUS_TINT_PRIORITY: StatusType[] = ['stun', 'burn', 'poison', 'shock', 'slow'];
+const ON_MOVE_PROC_INTERVAL = 0.5;
 
 export function createDungeonScene(app: Application, stage: Stage, opts: DungeonSceneOptions): DungeonScene {
     const tierDef = getTier(opts.tier);
@@ -140,6 +153,9 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
     const auraConfigs = getAuraConfigs(opts.rhunes);
     const moveTrailTimers = moveTrailConfigs.map(() => 0);
     const auraTimers: number[] = auraConfigs.map(() => 0);
+    let onMoveProcTimer = 0;
+    let elementBoosts: ElementBoost[] = [];
+    let revivedThisFloor = false;
 
     const margin = 60;
     const bounds = () => ({
@@ -248,6 +264,7 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
     function spawnFloorEnemies(f: number) {
         killsNeeded = spawnCountForFloor(f);
         kills = 0;
+        revivedThisFloor = false;
         opts.onKillsChange(kills, killsNeeded);
         const mult = statMultForFloor(f);
         const b = bounds();
@@ -297,7 +314,13 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
         }
     }
 
-    /** Base damage (already element-tagged) + flat elemental stat adds, each independently amplified, crit applied once to the total. */
+    function healPlayer(amount: number) {
+        if (amount <= 0) return;
+        player.hp = Math.min(player.maxHp, player.hp + amount);
+        opts.onHpChange(player.hp, player.maxHp);
+    }
+
+    /** Base damage (already element-tagged) + flat elemental stat adds + temp elementBoosts, each independently amplified, crit applied once to the total. */
     function computeHitDamage(baseDamage: number, weaponElement: Element): { total: number; crit: boolean } {
         const crit = Math.random() < opts.stats.critChance;
         const components: Partial<Record<Element, number>> = {};
@@ -306,37 +329,97 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
         if (opts.stats.iceDamage) components.ice = (components.ice ?? 0) + opts.stats.iceDamage;
         if (opts.stats.lightningDamage) components.lightning = (components.lightning ?? 0) + opts.stats.lightningDamage;
         if (opts.stats.poisonDamage) components.poison = (components.poison ?? 0) + opts.stats.poisonDamage;
+        if (opts.stats.arcaneDamage) components.arcane = (components.arcane ?? 0) + opts.stats.arcaneDamage;
+        for (const boost of elementBoosts) components[boost.element] = (components[boost.element] ?? 0) + boost.amount;
         let total = 0;
         for (const [el, val] of Object.entries(components)) total += (val as number) * elementAmp(el as Element);
         if (crit) total *= 1.8 + opts.stats.critDamage;
         return { total, crit };
     }
 
-    function spawnExplosion(x: number, y: number, radius: number) {
-        const ring = new Graphics().circle(x, y, radius).fill({ color: 0xf97316, alpha: 0.35 }).circle(x, y, radius).stroke({ width: 3, color: 0xfbbf24, alpha: 0.8 });
+    function spawnExplosion(x: number, y: number, radius: number, element: Element) {
+        const color = ELEMENT_COLOR[element];
+        const ring = new Graphics().circle(x, y, radius).fill({ color, alpha: 0.35 }).circle(x, y, radius).stroke({ width: 3, color: 0xfbbf24, alpha: 0.8 });
         fxLayer.addChild(ring);
         fadeAndDestroy(ring, 0.25);
     }
 
-    function handleOnKillProcs(deadEnemy: EnemyEntity) {
-        const procs = rollOnKillProcs(opts.rhunes);
-        for (const proc of procs) {
-            if (proc.result === 'explosion') {
-                const radius = 90;
-                spawnExplosion(deadEnemy.x, deadEnemy.y, radius);
+    function spawnProjectileBurst(x: number, y: number, count: number, damage: number, element: Element, source: DamageSource) {
+        for (let i = 0; i < count; i++) {
+            const angle = (Math.PI * 2 * i) / count + Math.random() * 0.6;
+            const speed = 380;
+            const g = new Graphics().circle(0, 0, 5).fill(ELEMENT_COLOR[element]);
+            g.position.set(x, y);
+            projectileLayer.addChild(g);
+            projectiles.push({
+                x,
+                y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                damage,
+                crit: false,
+                g,
+                life: 1.5,
+                pierceRemaining: 1,
+                hitIds: new Set(),
+                source,
+                splashRadius: 0,
+            });
+        }
+    }
+
+    /** Executes one already-rarity-scaled proc effect (Rhune onKill result or item proc affix). */
+    function executeProcEffect(effect: ProcEffect, originX: number, originY: number, target: EnemyEntity | null) {
+        switch (effect.kind) {
+            case 'statusApply':
+                if (target) applyStatus(target, { status: effect.status, magnitude: effect.magnitude, duration: effect.duration });
+                break;
+            case 'projectileBurst':
+                spawnProjectileBurst(originX, originY, effect.count, effect.damage, effect.element, 'proc');
+                break;
+            case 'heal':
+                healPlayer(effect.amount);
+                break;
+            case 'elementBoost':
+                elementBoosts.push({ element: effect.element, amount: effect.amount, remaining: effect.duration });
+                break;
+            case 'explosion':
+                spawnExplosion(originX, originY, effect.radius, effect.element);
                 for (const other of [...enemies]) {
-                    if (Math.hypot(other.x - deadEnemy.x, other.y - deadEnemy.y) <= radius) {
+                    if (Math.hypot(other.x - originX, other.y - originY) <= effect.radius) {
+                        damageEnemy(other, effect.damage, false, 'proc');
+                    }
+                }
+                break;
+            case 'currency':
+                opts.onCurrencyEarned(effect.amount);
+                break;
+        }
+    }
+
+    function runItemProcs(cause: Parameters<typeof rollProcAffixes>[1], originX: number, originY: number, target: EnemyEntity | null) {
+        for (const fired of rollProcAffixes(opts.procAffixes, cause)) {
+            executeProcEffect(scaleProcEffect(fired.effect, fired.rarityMult), originX, originY, target);
+        }
+    }
+
+    function handleOnKillProcs(deadEnemy: EnemyEntity) {
+        for (const proc of rollOnKillProcs(opts.rhunes)) {
+            if (proc.result === 'explosion') {
+                spawnExplosion(deadEnemy.x, deadEnemy.y, 90, 'physical');
+                for (const other of [...enemies]) {
+                    if (Math.hypot(other.x - deadEnemy.x, other.y - deadEnemy.y) <= 90) {
                         damageEnemy(other, proc.magnitude, false, 'proc');
                     }
                 }
             } else if (proc.result === 'currency') {
-                const amount = Math.max(1, Math.round(proc.magnitude));
-                opts.onCurrencyEarned(amount);
+                opts.onCurrencyEarned(Math.max(1, Math.round(proc.magnitude)));
             } else if (proc.result === 'heal') {
-                player.hp = Math.min(player.maxHp, player.hp + proc.magnitude);
-                opts.onHpChange(player.hp, player.maxHp);
+                healPlayer(proc.magnitude);
             }
         }
+        runItemProcs('onKill', deadEnemy.x, deadEnemy.y, null);
+        if (opts.stats.healOnKill > 0) healPlayer(opts.stats.healOnKill);
     }
 
     function damageEnemy(enemy: EnemyEntity, amount: number, crit: boolean, source: DamageSource) {
@@ -344,12 +427,20 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
         const finalAmount = amount * enemy.shockMult;
         enemy.hp -= finalAmount;
         floatingText(enemy.x, enemy.y - enemy.radius - 6, crit ? `${Math.round(finalAmount)}!` : `${Math.round(finalAmount)}`, crit ? 0xfbbf24 : 0xffffff);
-        if (finalAmount > 0 && opts.stats.lifesteal > 0) {
-            player.hp = Math.min(player.maxHp, player.hp + finalAmount * opts.stats.lifesteal);
-            opts.onHpChange(player.hp, player.maxHp);
-        }
+        if (finalAmount > 0 && opts.stats.lifesteal > 0) healPlayer(finalAmount * opts.stats.lifesteal);
         if (source === 'weapon') {
             for (const application of rollOnHitStatuses(opts.rhunes, crit)) applyStatus(enemy, application);
+            runItemProcs('onHit', enemy.x, enemy.y, enemy);
+            if (crit) runItemProcs('onCrit', enemy.x, enemy.y, enemy);
+            if (opts.stats.knockback > 0 && !enemy.dead) {
+                const b = bounds();
+                const dx = enemy.x - player.x;
+                const dy = enemy.y - player.y;
+                const d = Math.hypot(dx, dy) || 1;
+                enemy.x = Math.min(Math.max(enemy.x + (dx / d) * opts.stats.knockback, b.minX), b.maxX);
+                enemy.y = Math.min(Math.max(enemy.y + (dy / d) * opts.stats.knockback, b.minY), b.maxY);
+                enemy.g.position.set(enemy.x, enemy.y);
+            }
         }
         if (enemy.hp <= 0) {
             enemy.dead = true;
@@ -421,6 +512,8 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
                 life: 2,
                 pierceRemaining: pierceCount,
                 hitIds: new Set(),
+                source: 'weapon',
+                splashRadius: opts.stats.splashRadius,
             });
         }
     }
@@ -444,7 +537,7 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
     }
 
     function spawnFloorLoot(f: number) {
-        const roll = rollFloorLoot(opts.tier, f);
+        const roll = rollFloorLoot(opts.tier, f, opts.stats.luck);
         lastFloorLoot = roll;
         const b = bounds();
         const drops: { color: number; name: string }[] = [
@@ -496,6 +589,13 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
         if (phase === 'dead') return;
         elapsedSeconds += dt;
 
+        elementBoosts = elementBoosts.filter((b) => {
+            b.remaining -= dt;
+            return b.remaining > 0;
+        });
+
+        if (opts.stats.regen > 0 && player.hp < player.maxHp) healPlayer(opts.stats.regen * dt);
+
         // Movement: keyboard first, pointer-hold overrides when active (clamped to world bounds).
         const b = bounds();
         const playerScreen = camera.worldToScreen(player.x, player.y);
@@ -527,6 +627,13 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
                     spawnHazard(cfg);
                 }
             });
+
+            // Item proc affixes that trigger while moving, throttled so it isn't a per-frame roll.
+            onMoveProcTimer -= dt;
+            if (isMoving && onMoveProcTimer <= 0) {
+                onMoveProcTimer = ON_MOVE_PROC_INTERVAL;
+                runItemProcs('onMove', player.x, player.y, null);
+            }
 
             // Hazards: tick lifetime, fade, apply status to anything standing in them.
             hazards = hazards.filter((hz) => {
@@ -588,7 +695,7 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
 
                 if (dist <= e.radius + 18 && player.invuln <= 0) {
                     const def = ENEMIES.find((d) => d.id === e.defId)!;
-                    player.invuln = 0.6;
+                    player.invuln = 0.6 + opts.stats.invulnDuration;
                     if (Math.random() < opts.stats.dodgeChance) {
                         floatingText(player.x, player.y - 30, 'Dodge!', 0x38bdf8);
                     } else {
@@ -598,10 +705,18 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
                         player.hitFlash = 0.2;
                         opts.onHpChange(player.hp, player.maxHp);
                         if (opts.stats.thorns > 0) damageEnemy(e, opts.stats.thorns, false, 'thorns');
+                        runItemProcs('onBeingHit', player.x, player.y, e);
                         if (player.hp <= 0) {
-                            phase = 'dead';
-                            opts.onDeath(floor, elapsedSeconds, totalKills);
-                            return;
+                            if (!revivedThisFloor && Math.random() < opts.stats.reviveChance) {
+                                revivedThisFloor = true;
+                                player.hp = 1;
+                                opts.onHpChange(player.hp, player.maxHp);
+                                floatingText(player.x, player.y - 40, 'Revived!', 0xfbbf24);
+                            } else {
+                                phase = 'dead';
+                                opts.onDeath(floor, elapsedSeconds, totalKills);
+                                return;
+                            }
                         }
                     }
                 }
@@ -628,8 +743,17 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
                 for (const e of enemies) {
                     if (p.hitIds.has(e)) continue;
                     if (Math.hypot(e.x - p.x, e.y - p.y) <= e.radius + 6) {
-                        damageEnemy(e, p.damage, p.crit, 'weapon');
+                        damageEnemy(e, p.damage, p.crit, p.source);
                         p.hitIds.add(e);
+                        if (p.splashRadius > 0) {
+                            for (const other of [...enemies]) {
+                                if (other === e || p.hitIds.has(other)) continue;
+                                if (Math.hypot(other.x - e.x, other.y - e.y) <= p.splashRadius) {
+                                    damageEnemy(other, p.damage * 0.6, false, 'proc');
+                                    p.hitIds.add(other);
+                                }
+                            }
+                        }
                         p.pierceRemaining -= 1;
                         if (p.pierceRemaining <= 0) {
                             p.g.destroy();
@@ -671,6 +795,8 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
                 return true;
             });
             if (allGone) {
+                if (opts.stats.floorHealPct > 0) healPlayer(player.maxHp * opts.stats.floorHealPct);
+                runItemProcs('onFloorClear', player.x, player.y, null);
                 opts.onFloorCleared(floor, lastFloorLoot);
                 beginTransition();
             }

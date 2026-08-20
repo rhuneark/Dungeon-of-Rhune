@@ -6,7 +6,7 @@
 import type { ItemInstance, ItemKind, SaveData } from '../data/types.ts';
 import { RARITIES } from '../data/rarity.ts';
 import { randRange, rollItemOfKind } from './itemGen.ts';
-import { findAffixDef } from './inventory.ts';
+import { findAffixDef } from '../data/affixes.ts';
 
 export function rerollCost(item: ItemInstance): number {
     return Math.max(5, RARITIES[item.rarity].salvageValue * 3);
@@ -25,7 +25,10 @@ export function rerollItem(save: SaveData, itemId: string): SaveData {
         affixes: item.affixes.map((rolled) => {
             const def = findAffixDef(rolled.affixId);
             if (!def) return rolled;
-            const value = Number((randRange(def.min, def.max) * mult).toFixed(def.isPercent || def.max < 1 ? 3 : 1));
+            const value =
+                def.kind === 'proc'
+                    ? Number(Math.min(0.9, randRange(def.chanceMin, def.chanceMax) * mult).toFixed(3))
+                    : Number((randRange(def.min, def.max) * mult).toFixed(def.isPercent || def.max < 1 ? 3 : 1));
             return { affixId: rolled.affixId, value };
         }),
     };

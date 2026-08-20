@@ -82,6 +82,16 @@ export interface StatBlock {
     iceDamage?: number; // flat bonus damage, dealt as its own 'ice' component
     lightningDamage?: number; // flat bonus damage, dealt as its own 'lightning' component
     poisonDamage?: number; // flat bonus damage, dealt as its own 'poison' component
+    arcaneDamage?: number; // flat bonus damage, dealt as its own 'arcane' component
+    healOnKill?: number; // flat HP restored per kill
+    reviveChance?: number; // 0..1 chance to survive a lethal hit at 1 HP, once per floor
+    luck?: number; // nudges floor-loot rarity weights toward rare+
+    salvageBonus?: number; // 0..1 bonus salvage currency from items/Rhunes
+    floorHealPct?: number; // 0..1 fraction of max HP restored on floor clear
+    invulnDuration?: number; // bonus seconds added to post-hit invulnerability
+    knockback?: number; // design units enemies are pushed back on hit
+    regen?: number; // HP restored per second
+    splashRadius?: number; // design units — ranged hits also damage enemies in this radius
 }
 
 export const STAT_LABELS: Record<keyof StatBlock, string> = {
@@ -105,6 +115,16 @@ export const STAT_LABELS: Record<keyof StatBlock, string> = {
     iceDamage: 'Ice Damage',
     lightningDamage: 'Lightning Damage',
     poisonDamage: 'Poison Damage',
+    arcaneDamage: 'Arcane Damage',
+    healOnKill: 'Heal on Kill',
+    reviveChance: 'Revive Chance',
+    luck: 'Luck',
+    salvageBonus: 'Salvage Bonus',
+    floorHealPct: 'Floor-Clear Heal',
+    invulnDuration: 'Invulnerability',
+    knockback: 'Knockback',
+    regen: 'HP Regen',
+    splashRadius: 'Splash Radius',
 };
 
 export interface BaseTypeDef {
@@ -122,7 +142,8 @@ export interface BaseTypeDef {
     color: number;
 }
 
-export interface AffixDef {
+export interface StatAffixDef {
+    kind: 'stat';
     id: string;
     stat: keyof StatBlock;
     label: string;
@@ -131,8 +152,39 @@ export interface AffixDef {
     isPercent?: boolean;
 }
 
+/** What triggers a proc affix. Mirrors Rhune hooks but lives on gear instead. */
+export type ProcCause = 'onHit' | 'onCrit' | 'onKill' | 'onMove' | 'onBeingHit' | 'onFloorClear';
+
+/**
+ * What a proc affix does when it fires. Base magnitudes here scale with the
+ * item's rarity the same way procAffixRuntime.ts scales Rhune effects.
+ */
+export type ProcEffect =
+    | { kind: 'statusApply'; status: StatusType; magnitude: number; duration: number }
+    /** "Throw N daggers/axes" — a burst of small projectiles from the player toward random nearby directions. */
+    | { kind: 'projectileBurst'; count: number; damage: number; element: Element }
+    | { kind: 'heal'; amount: number }
+    /** Temporary buff to one elemental damage stat — "increase [dmg type] by X" for a few seconds. */
+    | { kind: 'elementBoost'; element: Element; amount: number; duration: number }
+    | { kind: 'explosion'; damage: number; radius: number; element: Element }
+    | { kind: 'currency'; amount: number };
+
+/** "X% chance on [cause] to [effect]" — the out-there proc affixes gear itself can roll. */
+export interface ProcAffixDef {
+    kind: 'proc';
+    id: string;
+    label: string;
+    cause: ProcCause;
+    chanceMin: number;
+    chanceMax: number;
+    effect: ProcEffect;
+}
+
+export type AffixDef = StatAffixDef | ProcAffixDef;
+
 export interface RolledAffix {
     affixId: string;
+    /** Rolled stat bonus (stat affixes) or rolled proc chance 0..1 (proc affixes). */
     value: number;
 }
 

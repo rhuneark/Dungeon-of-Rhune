@@ -4,9 +4,11 @@ import { STAT_LABELS } from '../../game/data/types.ts';
 import { RARITIES } from '../../game/data/rarity.ts';
 import { getBaseType } from '../../game/data/baseTypes.ts';
 import { getRhuneDef } from '../../game/data/rhunes.ts';
+import { findAffixDef } from '../../game/data/affixes.ts';
 import { itemDisplayName } from '../../game/data/nameGen.ts';
 import { itemStats } from '../../game/systems/inventory.ts';
 import { describeRhuneEffect } from '../../game/systems/rhuneRuntime.ts';
+import { describeProcAffix } from '../../game/systems/procAffixRuntime.ts';
 
 const PERCENT_STATS = new Set(['critChance', 'critDamage', 'lifesteal', 'dodgeChance', 'damageReduction']);
 
@@ -42,6 +44,10 @@ export function ItemCard({
     const rarity = RARITIES[item.rarity];
     const base = getBaseType(item.baseTypeId);
     const stats = itemStats(item);
+    const procLines = item.affixes
+        .map((rolled) => findAffixDef(rolled.affixId))
+        .filter((def) => def?.kind === 'proc')
+        .map((def) => describeProcAffix(def!, item.rarity));
     return (
         <div className="rounded-xl border p-3" style={{ borderColor: rarity.hex + '55', backgroundColor: rarity.hex + '14' }}>
             <div className="flex items-center justify-between gap-2">
@@ -57,6 +63,11 @@ export function ItemCard({
             </div>
             <div className="mt-1.5 space-y-0.5">
                 <ItemStatLines stats={stats} />
+                {procLines.map((line, i) => (
+                    <div key={i} className="text-xs font-bold text-white/80">
+                        {line}
+                    </div>
+                ))}
             </div>
             {children && <div className="mt-3 flex gap-2">{children}</div>}
         </div>

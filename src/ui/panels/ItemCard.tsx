@@ -56,7 +56,7 @@ export function ItemCard({
                         {itemDisplayName(item)}
                     </div>
                     <div className="text-[11px] uppercase tracking-wide text-white/40">
-                        {rarity.label} · {base.kind}
+                        {rarity.label} · {base?.kind ?? 'unknown'}
                         {equippedIn ? ` · equipped (${equippedIn})` : ''}
                     </div>
                 </div>
@@ -80,14 +80,20 @@ export function RhuneCard({ rhune, equippedIn, children }: { rhune: RhuneInstanc
     return (
         <div className="rounded-xl border p-3" style={{ borderColor: rarity.hex + '55', backgroundColor: rarity.hex + '14' }}>
             <div className="text-sm font-bold" style={{ color: rarity.hex }}>
-                {def.name}
+                {def?.name ?? 'Unknown Rhune'}
             </div>
             <div className="text-[11px] uppercase tracking-wide text-white/40">
                 {rarity.label} · Rhune
                 {equippedIn != null && equippedIn >= 0 ? ` · socketed (${equippedIn + 1})` : ''}
             </div>
-            <p className="mt-1 text-xs italic text-white/50">{def.description}</p>
-            <div className="mt-1.5 text-xs font-bold text-white/80">{describeRhuneEffect(def, rhune.rarity)}</div>
+            {def ? (
+                <>
+                    <p className="mt-1 text-xs italic text-white/50">{def.description}</p>
+                    <div className="mt-1.5 text-xs font-bold text-white/80">{describeRhuneEffect(def, rhune.rarity)}</div>
+                </>
+            ) : (
+                <p className="mt-1 text-xs italic text-white/50">This Rhune no longer exists — salvage it.</p>
+            )}
             {children && <div className="mt-3 flex gap-2">{children}</div>}
         </div>
     );

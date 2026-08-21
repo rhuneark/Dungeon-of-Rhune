@@ -26,7 +26,9 @@ export function resolveEquippedRhunes(save: SaveData): ResolvedRhune[] {
         if (!rhuneId) continue;
         const instance = save.rhunes.find((r) => r.instanceId === rhuneId);
         if (!instance) continue;
-        out.push({ instance, def: getRhuneDef(instance.rhuneDefId), rarityMult: RARITIES[instance.rarity].valueMult });
+        const def = getRhuneDef(instance.rhuneDefId);
+        if (!def) continue; // stale id from a since-renamed/removed Rhune — treat as not equipped
+        out.push({ instance, def, rarityMult: RARITIES[instance.rarity].valueMult });
     }
     return out;
 }

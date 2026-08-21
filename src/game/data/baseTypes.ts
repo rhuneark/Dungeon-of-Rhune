@@ -128,10 +128,13 @@ export const BASE_TYPES: BaseTypeDef[] = [
     { id: 'talisman', name: 'Talisman', kind: 'jewelry', baseStats: { lifesteal: 0.02, maxHp: 6 }, affixPoolId: 'jewelry', color: 0x4338ca },
 ];
 
-export function getBaseType(id: string): BaseTypeDef {
-    const bt = BASE_TYPES.find((b) => b.id === id);
-    if (!bt) throw new Error(`Unknown base type: ${id}`);
-    return bt;
+/**
+ * Never throws: the base-type roster can change over time, and a save can
+ * carry an item rolled under an older roster. Callers must handle
+ * `undefined` (treat the item as inert / filter it out) rather than crash.
+ */
+export function getBaseType(id: string): BaseTypeDef | undefined {
+    return BASE_TYPES.find((b) => b.id === id);
 }
 
 export function baseTypesForSlotKind(kind: BaseTypeDef['kind']): BaseTypeDef[] {

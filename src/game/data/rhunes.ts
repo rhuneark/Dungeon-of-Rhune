@@ -166,8 +166,11 @@ export const RHUNES: RhuneDef[] = [
     },
 ];
 
-export function getRhuneDef(id: string): RhuneDef {
-    const r = RHUNES.find((x) => x.id === id);
-    if (!r) throw new Error(`Unknown rhune: ${id}`);
-    return r;
+/**
+ * Never throws: content gets renamed/rebalanced over time, and a save can
+ * carry a Rhune instance rolled under an older roster. Callers must handle
+ * `undefined` (skip that Rhune's contribution) rather than crash the run.
+ */
+export function getRhuneDef(id: string): RhuneDef | undefined {
+    return RHUNES.find((x) => x.id === id);
 }

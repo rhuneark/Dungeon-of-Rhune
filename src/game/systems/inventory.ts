@@ -1,4 +1,4 @@
-import type { GearSlot, ItemInstance, SaveData, StatBlock } from '../data/types.ts';
+import type { GearSlot, ItemInstance, SaveData, StatBlock, WeaponRole, Element } from '../data/types.ts';
 import { slotAcceptsKind } from '../data/types.ts';
 import { getBaseType } from '../data/baseTypes.ts';
 import { findAffixDef } from '../data/affixes.ts';
@@ -43,6 +43,7 @@ export const BASE_PLAYER_STATS: Required<StatBlock> = {
 /** Flat stat contribution of one item instance: base stats + rolled STAT affixes (proc affixes are behavioral, not summed here). */
 export function itemStats(item: ItemInstance): Partial<StatBlock> {
     const base = getBaseType(item.baseTypeId);
+    if (!base) return {}; // stale/removed base type — item contributes nothing rather than crashing
     const out: Partial<StatBlock> = { ...base.baseStats };
     for (const rolled of item.affixes) {
         const def = findAffixDef(rolled.affixId);
@@ -56,8 +57,8 @@ export function itemStats(item: ItemInstance): Partial<StatBlock> {
 export interface EquippedWeapon {
     slot: 'hand1' | 'hand2';
     item: ItemInstance;
-    role: NonNullable<ReturnType<typeof getBaseType>['role']>;
-    element: NonNullable<ReturnType<typeof getBaseType>['element']>;
+    role: WeaponRole;
+    element: Element;
     stats: Partial<StatBlock>;
 }
 
@@ -88,7 +89,7 @@ export function aggregateStats(save: SaveData): AggregateResult {
         }
         if (slot === 'hand1' || slot === 'hand2') {
             const base = getBaseType(item.baseTypeId);
-            if (base.role && base.role !== 'shield') {
+            if (base?.role && base.role !== 'shield') {
                 weapons.push({ slot, item, role: base.role, element: base.element ?? 'physical', stats: s });
             }
         }
@@ -112,6 +113,7 @@ export function aggregateStats(save: SaveData): AggregateResult {
 
 export function canEquip(item: ItemInstance, slot: GearSlot): boolean {
     const base = getBaseType(item.baseTypeId);
+    if (!base) return false; // stale/removed base type — item can't be equipped anywhere
     return slotAcceptsKind(slot, base.kind);
 }
 
@@ -171,6 +173,7 @@ export function isRhuneEquipped(save: SaveData, rhuneId: string): number {
 /** v1 UX default: pick a sensible open slot rather than prompting the player to choose. */
 export function autoEquipSlot(save: SaveData, item: ItemInstance): GearSlot {
     const base = getBaseType(item.baseTypeId);
+    if (!base) return 'head'; // stale/removed base type — canEquip() will reject the actual equip anyway
     if (base.kind === 'hand') return save.equipped.hand1 ? 'hand2' : 'hand1';
     if (base.kind === 'jewelry') return save.equipped.jewelry1 ? 'jewelry2' : 'jewelry1';
     return base.kind as GearSlot;

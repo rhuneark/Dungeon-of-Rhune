@@ -5,9 +5,32 @@
  * the game — fall back to a fresh SaveData and keep playing.
  */
 import RundotGameAPI from '@series-inc/rundot-game-sdk/api';
-import { defaultSaveData, type SaveData } from '../data/types.ts';
+import { defaultSaveData, type GearSlot, type SaveData } from '../data/types.ts';
+import { getBaseType } from '../data/baseTypes.ts';
+import { getRhuneDef } from '../data/rhunes.ts';
 
 const SAVE_KEY = 'dor_save_v1';
+
+/**
+ * Content (base types, Rhunes) gets renamed/removed as the game evolves, but
+ * old saves can still reference those ids. Drop orphaned items/rhunes and
+ * clear any equip slot pointing at them so stale ids never reach a lookup
+ * that expects them to exist.
+ */
+function sanitizeSave(save: SaveData): SaveData {
+    const items = save.items.filter((item) => getBaseType(item.baseTypeId) !== undefined);
+    const rhunes = save.rhunes.filter((rhune) => getRhuneDef(rhune.rhuneDefId) !== undefined);
+    const itemIds = new Set(items.map((i) => i.instanceId));
+    const rhuneIds = new Set(rhunes.map((r) => r.instanceId));
+
+    const equipped = { ...save.equipped };
+    for (const slot of Object.keys(equipped) as GearSlot[]) {
+        if (equipped[slot] && !itemIds.has(equipped[slot]!)) equipped[slot] = null;
+    }
+    const equippedRhunes = save.equippedRhunes.map((id) => (id && rhuneIds.has(id) ? id : null)) as SaveData['equippedRhunes'];
+
+    return { ...save, items, rhunes, equipped, equippedRhunes };
+}
 
 export async function loadGame(): Promise<SaveData> {
     try {
@@ -15,7 +38,7 @@ export async function loadGame(): Promise<SaveData> {
         if (!raw) return defaultSaveData();
         const parsed = JSON.parse(raw) as Partial<SaveData>;
         // Merge onto defaults so new fields introduced later never crash old saves.
-        return { ...defaultSaveData(), ...parsed };
+        return sanitizeSave({ ...defaultSaveData(), ...parsed });
     } catch (err) {
         console.warn('[save] loadGame failed — starting fresh', err);
         return defaultSaveData();

@@ -73,7 +73,7 @@ export default function RackPanel() {
                                     <div className="text-[10px] uppercase tracking-wide text-white/40">Rhune {i + 1}</div>
                                     {rhune ? (
                                         <div className="truncate text-xs font-bold" style={{ color: rarity!.hex }}>
-                                            {getRhuneDef(rhune.rhuneDefId).name}
+                                            {getRhuneDef(rhune.rhuneDefId)?.name ?? 'Unknown Rhune'}
                                         </div>
                                     ) : (
                                         <div className="text-xs text-white/25">Empty</div>

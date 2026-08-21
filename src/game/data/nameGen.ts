@@ -115,17 +115,18 @@ function hashSeed(str: string, salt: number): number {
 
 export function itemDisplayName(item: ItemInstance): string {
     const base = getBaseType(item.baseTypeId);
+    const baseName = base?.name ?? 'Unknown Item';
     const affixCount = item.affixes.length;
-    if (affixCount === 0) return base.name;
+    if (affixCount === 0) return baseName;
 
     const prefix = pick(PREFIXES, hashSeed(item.instanceId, 17));
-    if (affixCount === 1) return `${prefix} ${base.name}`;
+    if (affixCount === 1) return `${prefix} ${baseName}`;
 
     const suffix = pick(SUFFIXES, hashSeed(item.instanceId, 31));
-    if (affixCount <= 3) return `${prefix} ${base.name} ${suffix}`;
+    if (affixCount <= 3) return `${prefix} ${baseName} ${suffix}`;
 
     const suffix2 = pick(SUFFIXES, hashSeed(item.instanceId, 53) + 7);
-    return `${prefix} ${base.name} ${suffix}, ${suffix2}`;
+    return `${prefix} ${baseName} ${suffix}, ${suffix2}`;
 }
 
 export const RARITY_TITLE: Record<Rarity, string> = {

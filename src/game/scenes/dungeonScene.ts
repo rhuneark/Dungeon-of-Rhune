@@ -542,7 +542,7 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
         const b = bounds();
         const drops: { color: number; name: string }[] = [
             ...roll.items.map((it) => ({ color: RARITIES[it.rarity].color, name: itemDisplayName(it) })),
-            ...roll.rhunes.map((r) => ({ color: RARITIES[r.rarity].color, name: getRhuneDef(r.rhuneDefId).name })),
+            ...roll.rhunes.map((r) => ({ color: RARITIES[r.rarity].color, name: getRhuneDef(r.rhuneDefId)?.name ?? 'Unknown Rhune' })),
         ];
         if (drops.length === 0) {
             beginTransition();

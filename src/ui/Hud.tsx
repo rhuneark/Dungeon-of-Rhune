@@ -29,16 +29,31 @@ export default function Hud() {
                     </div>
                 ) : (
                     <div className="pointer-events-auto flex flex-col gap-1 rounded-xl bg-black/50 px-4 py-2">
-                        <div className="text-lg font-bold tabular-nums">Floor {run?.floor ?? 1}</div>
+                        <div className="text-lg font-bold tabular-nums">
+                            Floor {run?.floor ?? 1}
+                            {run?.isBossFloor && <span className="ml-2 text-xs font-bold uppercase tracking-wide text-red-400">Boss</span>}
+                        </div>
                         <div className="h-2 w-36 overflow-hidden rounded-full bg-white/10">
                             <div
                                 className="h-full rounded-full bg-red-500 transition-[width] duration-150"
                                 style={{ width: `${run ? Math.max(0, (run.hp / Math.max(1, run.maxHp)) * 100) : 100}%` }}
                             />
                         </div>
-                        <div className="text-[11px] text-white/50">
-                            Kills {run?.kills ?? 0}/{run?.killsNeeded ?? 0}
-                        </div>
+                        {run?.isBossFloor && run.bossMaxHp > 0 ? (
+                            <>
+                                <div className="mt-0.5 h-2 w-36 overflow-hidden rounded-full bg-white/10">
+                                    <div
+                                        className="h-full rounded-full bg-amber-400 transition-[width] duration-150"
+                                        style={{ width: `${Math.max(0, (run.bossHp / Math.max(1, run.bossMaxHp)) * 100)}%` }}
+                                    />
+                                </div>
+                                <div className="text-[11px] text-white/50">Boss HP</div>
+                            </>
+                        ) : (
+                            <div className="text-[11px] text-white/50">
+                                Kills {run?.kills ?? 0}/{run?.killsNeeded ?? 0}
+                            </div>
+                        )}
                     </div>
                 )}
 

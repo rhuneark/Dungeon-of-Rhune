@@ -90,14 +90,15 @@ export function rollRhune(tier: number, forcedRarity?: Rarity, luck = 0): RhuneI
     };
 }
 
-/** Roll a small floor-clear loot batch: 1-3 drops, richer at deeper tiers. */
-export function rollFloorLoot(tier: number, floor: number, luck = 0): { items: ItemInstance[]; rhunes: RhuneInstance[] } {
-    const dropCount = 1 + Math.floor(Math.random() * 2) + (floor % 5 === 0 ? 1 : 0);
+/** Roll a small floor-clear loot batch: 1-3 drops, richer at deeper tiers. Boss floors drop more, at guaranteed-better odds. */
+export function rollFloorLoot(tier: number, floor: number, luck = 0, isBoss = false): { items: ItemInstance[]; rhunes: RhuneInstance[] } {
+    const dropCount = isBoss ? 3 + Math.floor(Math.random() * 2) : 1 + Math.floor(Math.random() * 2) + (floor % 5 === 0 ? 1 : 0);
+    const effectiveLuck = isBoss ? luck + 1.2 : luck;
     const items: ItemInstance[] = [];
     const rhunes: RhuneInstance[] = [];
     for (let i = 0; i < dropCount; i++) {
-        if (Math.random() < 0.22) rhunes.push(rollRhune(tier, undefined, luck));
-        else items.push(rollItem(tier, undefined, luck));
+        if (Math.random() < 0.22) rhunes.push(rollRhune(tier, undefined, effectiveLuck));
+        else items.push(rollItem(tier, undefined, effectiveLuck));
     }
     return { items, rhunes };
 }

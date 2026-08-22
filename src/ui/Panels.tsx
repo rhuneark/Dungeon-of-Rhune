@@ -4,6 +4,8 @@ import RackPanel from './panels/RackPanel.tsx';
 import StatuePanel from './panels/StatuePanel.tsx';
 import PortalPanel from './panels/PortalPanel.tsx';
 import BlacksmithPanel from './panels/BlacksmithPanel.tsx';
+import MerchantPanel from './panels/MerchantPanel.tsx';
+import QuestBoardPanel from './panels/QuestBoardPanel.tsx';
 import DeathPanel from './panels/DeathPanel.tsx';
 
 export default function Panels() {
@@ -13,6 +15,8 @@ export default function Panels() {
     if (panel === 'statue') return <StatuePanel />;
     if (panel === 'portal') return <PortalPanel />;
     if (panel === 'blacksmith') return <BlacksmithPanel />;
+    if (panel === 'merchant') return <MerchantPanel />;
+    if (panel === 'quests') return <QuestBoardPanel />;
     if (panel === 'death') return <DeathPanel />;
     return null;
 }

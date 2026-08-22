@@ -24,7 +24,7 @@ export default function BlacksmithPanel() {
     const cost = craftCost(save.selectedTier);
 
     return (
-        <Modal title="Blacksmith" subtitle={`${save.currency} salvage currency`}>
+        <Modal title="Blacksmith" subtitle={`${save.currency} Scrap`}>
             <div className="mb-3 flex gap-2">
                 <button
                     type="button"

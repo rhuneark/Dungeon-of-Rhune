@@ -17,7 +17,7 @@ export function enterDungeon(): void {
         location: 'dungeon',
         panel: null,
         deathSummary: null,
-        run: { floor: 1, hp: 0, maxHp: 0, kills: 0, killsNeeded: 0 },
+        run: { floor: 1, hp: 0, maxHp: 0, kills: 0, killsNeeded: 0, isBossFloor: false, bossHp: 0, bossMaxHp: 0 },
     });
 }
 
@@ -27,16 +27,22 @@ export function onRunHpChange(hp: number, maxHp: number): void {
     store.patch({ run: { ...run, hp, maxHp } });
 }
 
-export function onRunFloorChange(floor: number): void {
+export function onRunFloorChange(floor: number, isBossFloor: boolean): void {
     const run = store.get().run;
     if (!run) return;
-    store.patch({ run: { ...run, floor } });
+    store.patch({ run: { ...run, floor, isBossFloor, bossHp: 0, bossMaxHp: 0 } });
 }
 
 export function onRunKillsChange(kills: number, killsNeeded: number): void {
     const run = store.get().run;
     if (!run) return;
     store.patch({ run: { ...run, kills, killsNeeded } });
+}
+
+export function onRunBossHpChange(hp: number, maxHp: number): void {
+    const run = store.get().run;
+    if (!run) return;
+    store.patch({ run: { ...run, bossHp: hp, bossMaxHp: maxHp } });
 }
 
 export function onFloorCleared(floor: number, loot: { items: ItemInstance[]; rhunes: RhuneInstance[] }): void {
@@ -64,9 +70,9 @@ export function onCurrencyEarned(amount: number): void {
     void saveGame(nextSave);
 }
 
-export function onDeath(floorReached: number, elapsedSeconds: number, totalKills: number): void {
+export function onDeath(floorReached: number, elapsedSeconds: number, totalKills: number, bossKills: number): void {
     const { save } = store.get();
-    const nextSave = recordRunEnd(save, save.selectedTier, floorReached, elapsedSeconds, totalKills);
+    const nextSave = recordRunEnd(save, save.selectedTier, floorReached, elapsedSeconds, totalKills, bossKills);
     dungeonSceneRef.current = null;
     store.patch({
         save: nextSave,
@@ -86,7 +92,7 @@ export function requestExitToHub(): void {
         return;
     }
     const runState = scene.getState();
-    const nextSave = recordRunEnd(save, save.selectedTier, runState.floor, runState.elapsedSeconds, runState.totalKills);
+    const nextSave = recordRunEnd(save, save.selectedTier, runState.floor, runState.elapsedSeconds, runState.totalKills, runState.bossKills);
     dungeonSceneRef.current = null;
     store.patch({ save: nextSave, run: null, location: 'hub', panel: null });
     void saveGame(nextSave);

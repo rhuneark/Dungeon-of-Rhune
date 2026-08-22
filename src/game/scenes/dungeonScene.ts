@@ -19,7 +19,7 @@ import type { Stage, Scene } from '../stage.ts';
 import type { Element, ItemInstance, ProcEffect, RhuneInstance, StatBlock, StatusType } from '../data/types.ts';
 import { ELEMENT_COLOR } from '../data/types.ts';
 import type { EquippedWeapon } from '../systems/inventory.ts';
-import { ENEMIES, pickEnemy } from '../data/enemies.ts';
+import { pickBoss, pickEnemy } from '../data/enemies.ts';
 import { getTier } from '../data/tiers.ts';
 import { rollFloorLoot } from '../systems/itemGen.ts';
 import { RARITIES } from '../data/rarity.ts';
@@ -49,6 +49,7 @@ export interface DungeonRunState {
     killsNeeded: number;
     elapsedSeconds: number;
     totalKills: number;
+    bossKills: number;
 }
 
 export interface DungeonSceneOptions {
@@ -58,10 +59,11 @@ export interface DungeonSceneOptions {
     rhunes: ResolvedRhune[];
     procAffixes: ResolvedProcAffix[];
     onHpChange(hp: number, maxHp: number): void;
-    onFloorChange(floor: number): void;
+    onFloorChange(floor: number, isBoss: boolean): void;
     onKillsChange(kills: number, needed: number): void;
+    onBossHpChange(hp: number, maxHp: number): void;
     onFloorCleared(floor: number, loot: { items: ItemInstance[]; rhunes: RhuneInstance[] }): void;
-    onDeath(floorReached: number, elapsedSeconds: number, totalKills: number): void;
+    onDeath(floorReached: number, elapsedSeconds: number, totalKills: number, bossKills: number): void;
     onCurrencyEarned(amount: number): void;
 }
 
@@ -83,12 +85,15 @@ interface EnemyEntity {
     x: number;
     y: number;
     hp: number;
+    maxHp: number;
+    damage: number;
     speed: number;
     radius: number;
     g: Graphics;
     dead: boolean;
     statuses: EnemyStatus[];
     shockMult: number;
+    isBoss: boolean;
 }
 
 interface Projectile {
@@ -226,6 +231,11 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
     let transitionTimer = 0;
     let elapsedSeconds = 0;
     let totalKills = 0;
+    let bossKills = 0;
+
+    function isBossFloor(f: number): boolean {
+        return f % 10 === 0;
+    }
 
     // Floating damage numbers / melee swing rings / explosions run their own
     // short-lived ticker callbacks outside the main tick loop — track them
@@ -262,12 +272,33 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
     }
 
     function spawnFloorEnemies(f: number) {
-        killsNeeded = spawnCountForFloor(f);
-        kills = 0;
         revivedThisFloor = false;
-        opts.onKillsChange(kills, killsNeeded);
         const mult = statMultForFloor(f);
         const b = bounds();
+
+        if (isBossFloor(f)) {
+            killsNeeded = 1;
+            kills = 0;
+            opts.onKillsChange(kills, killsNeeded);
+            const def = pickBoss();
+            const hp = def.hp * mult;
+            const x = WORLD_WIDTH / 2;
+            const y = b.minY + 60;
+            const g = new Graphics()
+                .circle(0, 0, def.radius)
+                .fill(def.color)
+                .circle(0, 0, def.radius)
+                .stroke({ width: 5, color: 0xfbbf24, alpha: 0.9 });
+            g.position.set(x, y);
+            enemyLayer.addChild(g);
+            enemies.push({ defId: def.id, x, y, hp, maxHp: hp, damage: def.damage, speed: def.speed, radius: def.radius, g, dead: false, statuses: [], shockMult: 1, isBoss: true });
+            opts.onBossHpChange(hp, hp);
+            return;
+        }
+
+        killsNeeded = spawnCountForFloor(f);
+        kills = 0;
+        opts.onKillsChange(kills, killsNeeded);
         for (let i = 0; i < killsNeeded; i++) {
             const def = pickEnemy();
             const edge = Math.floor(Math.random() * 4);
@@ -281,7 +312,8 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
             const g = new Graphics().circle(0, 0, def.radius).fill(def.color);
             g.position.set(x, y);
             enemyLayer.addChild(g);
-            enemies.push({ defId: def.id, x, y, hp: def.hp * mult, speed: def.speed, radius: def.radius, g, dead: false, statuses: [], shockMult: 1 });
+            const hp = def.hp * mult;
+            enemies.push({ defId: def.id, x, y, hp, maxHp: hp, damage: def.damage, speed: def.speed, radius: def.radius, g, dead: false, statuses: [], shockMult: 1, isBoss: false });
         }
     }
 
@@ -442,12 +474,14 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
                 enemy.g.position.set(enemy.x, enemy.y);
             }
         }
+        if (enemy.isBoss) opts.onBossHpChange(Math.max(0, enemy.hp), enemy.maxHp);
         if (enemy.hp <= 0) {
             enemy.dead = true;
             enemy.g.destroy();
             enemies = enemies.filter((e) => e !== enemy);
             kills += 1;
             totalKills += 1;
+            if (enemy.isBoss) bossKills += 1;
             opts.onKillsChange(kills, killsNeeded);
             handleOnKillProcs(enemy);
         }
@@ -537,7 +571,7 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
     }
 
     function spawnFloorLoot(f: number) {
-        const roll = rollFloorLoot(opts.tier, f, opts.stats.luck);
+        const roll = rollFloorLoot(opts.tier, f, opts.stats.luck, isBossFloor(f));
         lastFloorLoot = roll;
         const b = bounds();
         const drops: { color: number; name: string }[] = [
@@ -572,7 +606,7 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
 
     function nextFloor() {
         floor += 1;
-        opts.onFloorChange(floor);
+        opts.onFloorChange(floor, isBossFloor(floor));
         phase = 'combat';
         spawnFloorEnemies(floor);
     }
@@ -694,12 +728,11 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
                 e.g.position.set(e.x, e.y);
 
                 if (dist <= e.radius + 18 && player.invuln <= 0) {
-                    const def = ENEMIES.find((d) => d.id === e.defId)!;
                     player.invuln = 0.6 + opts.stats.invulnDuration;
                     if (Math.random() < opts.stats.dodgeChance) {
                         floatingText(player.x, player.y - 30, 'Dodge!', 0x38bdf8);
                     } else {
-                        const afterArmor = Math.max(1, def.damage * statMultForFloor(floor) - opts.stats.armor);
+                        const afterArmor = Math.max(1, e.damage * statMultForFloor(floor) - opts.stats.armor);
                         const afterReduction = afterArmor * (1 - opts.stats.damageReduction);
                         player.hp = Math.max(0, player.hp - afterReduction);
                         player.hitFlash = 0.2;
@@ -714,7 +747,7 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
                                 floatingText(player.x, player.y - 40, 'Revived!', 0xfbbf24);
                             } else {
                                 phase = 'dead';
-                                opts.onDeath(floor, elapsedSeconds, totalKills);
+                                opts.onDeath(floor, elapsedSeconds, totalKills, bossKills);
                                 return;
                             }
                         }
@@ -808,7 +841,7 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
 
     const weaponCooldowns = opts.weapons.map(() => 0);
 
-    opts.onFloorChange(floor);
+    opts.onFloorChange(floor, isBossFloor(floor));
     opts.onHpChange(player.hp, player.maxHp);
     spawnFloorEnemies(floor);
     app.ticker.add(tick);
@@ -824,7 +857,7 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
             world.destroy({ children: true });
         },
         getState(): DungeonRunState {
-            return { floor, hp: player.hp, maxHp: player.maxHp, kills, killsNeeded, elapsedSeconds, totalKills };
+            return { floor, hp: player.hp, maxHp: player.maxHp, kills, killsNeeded, elapsedSeconds, totalKills, bossKills };
         },
     };
 }

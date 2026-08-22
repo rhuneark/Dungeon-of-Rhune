@@ -16,6 +16,7 @@ import {
     unequipRhune,
     unequipSlot,
 } from '../../game/systems/inventory.ts';
+import { advanceBounties } from '../../game/systems/quests.ts';
 
 const SLOT_LABEL: Record<GearSlot, string> = {
     head: 'Head',
@@ -35,7 +36,7 @@ export default function InventoryPanel({ initialTab }: { initialTab: Tab }) {
     const save = useStore((s) => s.save);
 
     return (
-        <Modal title="Loadout" subtitle={`${save.currency} salvage currency`}>
+        <Modal title="Loadout" subtitle={`${save.currency} Scrap`}>
             <div className="mb-3 flex gap-2">
                 <button
                     type="button"
@@ -122,7 +123,7 @@ export default function InventoryPanel({ initialTab }: { initialTab: Tab }) {
                                     label="Salvage"
                                     tone="danger"
                                     onClick={() => {
-                                        const next = salvageItem(save, item.instanceId);
+                                        const next = advanceBounties(salvageItem(save, item.instanceId), 'salvage', 1);
                                         store.patch({ save: next });
                                         void saveGame(next);
                                     }}
@@ -147,7 +148,7 @@ export default function InventoryPanel({ initialTab }: { initialTab: Tab }) {
                                     label="Salvage"
                                     tone="danger"
                                     onClick={() => {
-                                        const next = salvageRhune(save, rhune.instanceId);
+                                        const next = advanceBounties(salvageRhune(save, rhune.instanceId), 'salvage', 1);
                                         store.patch({ save: next });
                                         void saveGame(next);
                                     }}

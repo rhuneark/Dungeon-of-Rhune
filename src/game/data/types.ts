@@ -254,6 +254,29 @@ export interface EnemyDef {
     color: number;
 }
 
+/**
+ * Bounty progress kinds the Quest Board tracks. Deliberately mirror actions
+ * already possible without the board (killing things, clearing floors,
+ * salvaging, gambling) so bounties are "keep doing what you're doing" goals.
+ */
+export type BountyKind = 'kills' | 'floors' | 'bossKills' | 'salvage' | 'gamble';
+
+/**
+ * Bounties are generated fresh each period and carry their own label/target/
+ * reward inline rather than referencing a static def table — unlike Rhunes
+ * and base types, there's no persistent roster to go stale, so there's
+ * nothing to look up and nothing that can point at removed content.
+ */
+export interface BountyInstance {
+    instanceId: string;
+    kind: BountyKind;
+    label: string;
+    target: number;
+    progress: number;
+    reward: number;
+    claimed: boolean;
+}
+
 export interface SaveData {
     version: 1;
     currency: number;
@@ -266,7 +289,12 @@ export interface SaveData {
     bestFloorByTier: Record<number, number>;
     stats: {
         lifetimeKills: number;
+        lifetimeBossKills: number;
     };
+    dailyBounties: BountyInstance[];
+    weeklyBounties: BountyInstance[];
+    dailyBountiesGeneratedAt: number;
+    weeklyBountiesGeneratedAt: number;
 }
 
 export function emptyEquipped(): Record<GearSlot, string | null> {
@@ -293,6 +321,10 @@ export function defaultSaveData(): SaveData {
         selectedTier: 1,
         unlockedTiers: [1],
         bestFloorByTier: {},
-        stats: { lifetimeKills: 0 },
+        stats: { lifetimeKills: 0, lifetimeBossKills: 0 },
+        dailyBounties: [],
+        weeklyBounties: [],
+        dailyBountiesGeneratedAt: 0,
+        weeklyBountiesGeneratedAt: 0,
     };
 }

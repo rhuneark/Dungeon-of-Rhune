@@ -25,6 +25,7 @@ import {
     onCurrencyEarned,
     onDeath,
     onFloorCleared,
+    onRunBossHpChange,
     onRunFloorChange,
     onRunHpChange,
     onRunKillsChange,
@@ -38,6 +39,8 @@ function mountSceneFor(location: 'hub' | 'dungeon', app: Application, stage: Sta
             onOpenStatue: () => store.patch({ panel: 'statue' }),
             onOpenPortal: () => store.patch({ panel: 'portal' }),
             onOpenBlacksmith: () => store.patch({ panel: 'blacksmith' }),
+            onOpenMerchant: () => store.patch({ panel: 'merchant' }),
+            onOpenQuestBoard: () => store.patch({ panel: 'quests' }),
             onEnterDungeon: enterDungeon,
         });
     }
@@ -53,6 +56,7 @@ function mountSceneFor(location: 'hub' | 'dungeon', app: Application, stage: Sta
         onHpChange: onRunHpChange,
         onFloorChange: onRunFloorChange,
         onKillsChange: onRunKillsChange,
+        onBossHpChange: onRunBossHpChange,
         onFloorCleared,
         onDeath,
         onCurrencyEarned,

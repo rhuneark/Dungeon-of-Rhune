@@ -129,7 +129,11 @@ export default function RackPanel() {
                         </div>
                         <div className="rounded-lg bg-white/5 p-3">
                             <div className="text-2xl font-bold text-primary">{save.currency}◆</div>
-                            <div className="text-[11px] text-white/50">Salvage currency</div>
+                            <div className="text-[11px] text-white/50">Scrap</div>
+                        </div>
+                        <div className="rounded-lg bg-white/5 p-3">
+                            <div className="text-2xl font-bold text-primary">{save.stats.lifetimeBossKills}</div>
+                            <div className="text-[11px] text-white/50">Bosses defeated</div>
                         </div>
                     </div>
                 </section>

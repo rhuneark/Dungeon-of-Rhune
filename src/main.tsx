@@ -7,6 +7,7 @@ import { initSdk, registerLifecycles, sdkReady } from './sdk/runSdk.ts';
 import { warmAssets } from './assets/preload.ts';
 import { loadGame, saveGame } from './game/systems/save.ts';
 import { ensureStarterKit } from './game/systems/starterKit.ts';
+import { refreshBounties } from './game/systems/quests.ts';
 import './styles/app.css';
 
 /**
@@ -24,8 +25,9 @@ async function boot() {
     //    hammer + boots so floor 1 isn't unwinnable with empty hands.
     const loaded = await loadGame();
     const withStarterKit = ensureStarterKit(loaded);
-    store.patch({ save: withStarterKit });
-    if (withStarterKit !== loaded) void saveGame(withStarterKit);
+    const withBounties = refreshBounties(withStarterKit);
+    store.patch({ save: withBounties });
+    if (withBounties !== loaded) void saveGame(withBounties);
 
     // 3. Mount React. `phase` starts at 'loading', so this paints the
     //    loading screen (progress bar at 0%).

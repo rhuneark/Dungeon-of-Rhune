@@ -12,7 +12,7 @@ import { defaultSaveData, type ItemInstance, type RhuneInstance, type SaveData }
 
 export type Phase = 'loading' | 'menu' | 'playing';
 export type Location = 'hub' | 'dungeon';
-export type PanelId = 'inventory' | 'rack' | 'statue' | 'portal' | 'blacksmith' | 'death' | null;
+export type PanelId = 'inventory' | 'rack' | 'statue' | 'portal' | 'blacksmith' | 'merchant' | 'quests' | 'death' | null;
 
 export interface RunHud {
     floor: number;
@@ -20,6 +20,9 @@ export interface RunHud {
     maxHp: number;
     kills: number;
     killsNeeded: number;
+    isBossFloor: boolean;
+    bossHp: number;
+    bossMaxHp: number;
 }
 
 export interface Toast {

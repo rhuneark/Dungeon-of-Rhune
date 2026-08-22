@@ -19,10 +19,12 @@ export interface HubSceneOptions {
     onOpenStatue(): void;
     onOpenPortal(): void;
     onOpenBlacksmith(): void;
+    onOpenMerchant(): void;
+    onOpenQuestBoard(): void;
     onEnterDungeon(): void;
 }
 
-type StationKind = 'statue' | 'dungeon' | 'chest' | 'rack' | 'portal' | 'blacksmith';
+type StationKind = 'statue' | 'dungeon' | 'chest' | 'rack' | 'portal' | 'blacksmith' | 'merchant' | 'questboard';
 
 interface StationDef {
     kind: StationKind;
@@ -73,6 +75,19 @@ function drawStationIcon(kind: StationKind, color: number): Graphics {
             g.roundRect(14, -34, 34, 62, 4).fill(color);
             break;
         }
+        case 'merchant': {
+            // Market stall: striped awning over a counter.
+            g.moveTo(-56, -30).lineTo(56, -30).lineTo(44, -4).lineTo(-44, -4).closePath().fill(color);
+            g.roundRect(-40, -4, 80, 34, 4).fill(color);
+            break;
+        }
+        case 'questboard': {
+            // Wooden board with a posted notice.
+            g.roundRect(-46, -56, 92, 78, 4).fill(color);
+            g.roundRect(-32, -42, 64, 20, 2).fill({ color: 0x0b1020, alpha: 0.35 });
+            g.roundRect(-32, -16, 44, 12, 2).fill({ color: 0x0b1020, alpha: 0.35 });
+            break;
+        }
     }
     return g;
 }
@@ -104,6 +119,8 @@ export function createHubScene(app: Application, stage: Stage, opts: HubSceneOpt
         { kind: 'rack', label: 'Armor Rack', x: 1720, y: 340, radius: 65, color: 0x64748b, onInteract: opts.onOpenRack },
         { kind: 'portal', label: 'Multiplayer Portal', x: 260, y: 820, radius: 75, color: 0x475569, onInteract: opts.onOpenPortal },
         { kind: 'blacksmith', label: 'Blacksmith', x: 1580, y: 830, radius: 70, color: 0x7c3aed, onInteract: opts.onOpenBlacksmith },
+        { kind: 'merchant', label: 'Merchant', x: 700, y: 600, radius: 65, color: 0x16a34a, onInteract: opts.onOpenMerchant },
+        { kind: 'questboard', label: 'Quest Board', x: 1220, y: 600, radius: 65, color: 0xca8a04, onInteract: opts.onOpenQuestBoard },
     ];
 
     const stationNodes = stations.map((station) => {

@@ -14,6 +14,7 @@ export const TIERS: TierDef[] = [
         unlockAtFloor: 5,
         lootWeights: { common: 60, uncommon: 30, rare: 9, epic: 1, legendary: 0 },
         color: 0x9ca3af,
+        pillarsEnabled: true,
     },
     {
         id: 2,
@@ -23,6 +24,7 @@ export const TIERS: TierDef[] = [
         unlockAtFloor: 10,
         lootWeights: { common: 45, uncommon: 35, rare: 16, epic: 3.5, legendary: 0.5 },
         color: 0x4ade80,
+        pillarsEnabled: true,
     },
     {
         id: 3,
@@ -32,15 +34,27 @@ export const TIERS: TierDef[] = [
         unlockAtFloor: 15,
         lootWeights: { common: 30, uncommon: 35, rare: 25, epic: 8, legendary: 2 },
         color: 0x60a5fa,
+        pillarsEnabled: true,
     },
     {
         id: 4,
         name: 'The Oblivion',
-        tagline: 'Nonsense monsters, unlimited, no refunds.',
+        tagline: 'Nonsense monsters, unlimited, no refunds. Pillars drop between floors.',
         enemyStatMult: 4,
-        unlockAtFloor: 9999, // deepest starting tier — no further gate yet
+        unlockAtFloor: 20, // now gates The Undiluted instead of being the final tier
         lootWeights: { common: 15, uncommon: 30, rare: 32, epic: 17, legendary: 6 },
         color: 0xc084fc,
+        pillarsEnabled: true,
+    },
+    {
+        id: 5,
+        name: 'The Undiluted',
+        tagline: 'Same numbers as Oblivion. None of the Pillar nonsense.',
+        enemyStatMult: 4,
+        unlockAtFloor: 9999, // deepest tier — no further gate
+        lootWeights: { common: 15, uncommon: 30, rare: 32, epic: 17, legendary: 6 },
+        color: 0xe5e7eb,
+        pillarsEnabled: false,
     },
 ];
 

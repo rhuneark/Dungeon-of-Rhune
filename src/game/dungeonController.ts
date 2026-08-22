@@ -7,6 +7,7 @@
 import { store } from '../state/store.ts';
 import type { DungeonScene } from './scenes/dungeonScene.ts';
 import type { ItemInstance, RhuneInstance } from './data/types.ts';
+import type { PillarDef } from './data/pillars.ts';
 import { recordRunEnd } from './systems/progress.ts';
 import { saveGame } from './systems/save.ts';
 
@@ -17,7 +18,7 @@ export function enterDungeon(): void {
         location: 'dungeon',
         panel: null,
         deathSummary: null,
-        run: { floor: 1, hp: 0, maxHp: 0, kills: 0, killsNeeded: 0, isBossFloor: false, bossHp: 0, bossMaxHp: 0 },
+        run: { floor: 1, hp: 0, maxHp: 0, kills: 0, killsNeeded: 0, isBossFloor: false, bossHp: 0, bossMaxHp: 0, pillarCount: 0 },
     });
 }
 
@@ -60,6 +61,12 @@ export function onFloorCleared(floor: number, loot: { items: ItemInstance[]; rhu
     } else {
         store.pushToast(`Floor ${floor} cleared!`);
     }
+}
+
+export function onPillarChosen(pillar: PillarDef): void {
+    const run = store.get().run;
+    if (run) store.patch({ run: { ...run, pillarCount: run.pillarCount + 1 } });
+    store.pushToast(`Pillar: ${pillar.name} — ${pillar.description}`);
 }
 
 /** Rhune of the Vulture etc — a proc-earned currency drop mid-run. No toast (can fire often); the HUD currency count reflects it once back in the hub. */

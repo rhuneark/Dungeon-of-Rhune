@@ -25,6 +25,7 @@ import { rollFloorLoot } from '../systems/itemGen.ts';
 import { RARITIES } from '../data/rarity.ts';
 import { itemDisplayName } from '../data/nameGen.ts';
 import { getRhuneDef } from '../data/rhunes.ts';
+import { PILLARS, type PillarDef } from '../data/pillars.ts';
 import { WORLD_WIDTH, WORLD_HEIGHT } from '../world.ts';
 import { createCamera } from '../camera.ts';
 import { createInputTracker, pointerMoveDirection } from '../input.ts';
@@ -65,6 +66,7 @@ export interface DungeonSceneOptions {
     onFloorCleared(floor: number, loot: { items: ItemInstance[]; rhunes: RhuneInstance[] }): void;
     onDeath(floorReached: number, elapsedSeconds: number, totalKills: number, bossKills: number): void;
     onCurrencyEarned(amount: number): void;
+    onPillarChosen(pillar: PillarDef): void;
 }
 
 export interface DungeonScene extends Scene {
@@ -119,6 +121,15 @@ interface LootOrb {
     label: Text;
 }
 
+interface PillarPick {
+    x: number;
+    y: number;
+    radius: number;
+    def: PillarDef;
+    g: Graphics;
+    label: Text;
+}
+
 interface Hazard {
     x: number;
     y: number;
@@ -152,6 +163,14 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
     const tierDef = getTier(opts.tier);
     const world = new Container();
     stage.root.addChild(world);
+
+    // Mutable copy of the player's gear-derived stats: Pillar picks (run-scoped,
+    // never touch the save) add onto this directly for the rest of the run.
+    const stats: Required<StatBlock> = { ...opts.stats };
+    let pillarEnemyHpMult = 1;
+    let pillarEnemyDamageMult = 1;
+    let pillarEnemySpeedMult = 1;
+    let pillarEnemySpawnMult = 1;
 
     const elementAmp = makeElementAmplifier(opts.rhunes);
     const moveTrailConfigs = getMoveTrailConfigs(opts.rhunes);
@@ -197,8 +216,8 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
     const player = {
         x: WORLD_WIDTH / 2,
         y: WORLD_HEIGHT / 2,
-        hp: opts.stats.maxHp,
-        maxHp: opts.stats.maxHp,
+        hp: stats.maxHp,
+        maxHp: stats.maxHp,
         invuln: 0,
         hitFlash: 0,
     };
@@ -215,19 +234,21 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
     const enemyLayer = new Container();
     const projectileLayer = new Container();
     const lootLayer = new Container();
+    const pillarLayer = new Container();
     const fxLayer = new Container();
-    world.addChild(enemyLayer, projectileLayer, lootLayer, fxLayer);
+    world.addChild(enemyLayer, projectileLayer, lootLayer, pillarLayer, fxLayer);
 
     let enemies: EnemyEntity[] = [];
     let projectiles: Projectile[] = [];
     let lootOrbs: LootOrb[] = [];
     let hazards: Hazard[] = [];
+    let pillarPicks: PillarPick[] = [];
     let lastFloorLoot: { items: ItemInstance[]; rhunes: RhuneInstance[] } = { items: [], rhunes: [] };
 
     let floor = 1;
     let kills = 0;
     let killsNeeded = 0;
-    let phase: 'combat' | 'looting' | 'transition' | 'dead' = 'combat';
+    let phase: 'combat' | 'looting' | 'pillars' | 'transition' | 'dead' = 'combat';
     let transitionTimer = 0;
     let elapsedSeconds = 0;
     let totalKills = 0;
@@ -264,7 +285,7 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
     }
 
     function spawnCountForFloor(f: number): number {
-        return Math.min(10 + Math.floor(f * 1.4) + (opts.tier - 1) * 3, 45);
+        return Math.min(Math.round((10 + Math.floor(f * 1.4) + (opts.tier - 1) * 3) * pillarEnemySpawnMult), 60);
     }
 
     function statMultForFloor(f: number): number {
@@ -281,7 +302,7 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
             kills = 0;
             opts.onKillsChange(kills, killsNeeded);
             const def = pickBoss();
-            const hp = def.hp * mult;
+            const hp = def.hp * mult * pillarEnemyHpMult;
             const x = WORLD_WIDTH / 2;
             const y = b.minY + 60;
             const g = new Graphics()
@@ -291,7 +312,7 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
                 .stroke({ width: 5, color: 0xfbbf24, alpha: 0.9 });
             g.position.set(x, y);
             enemyLayer.addChild(g);
-            enemies.push({ defId: def.id, x, y, hp, maxHp: hp, damage: def.damage, speed: def.speed, radius: def.radius, g, dead: false, statuses: [], shockMult: 1, isBoss: true });
+            enemies.push({ defId: def.id, x, y, hp, maxHp: hp, damage: def.damage, speed: def.speed * pillarEnemySpeedMult, radius: def.radius, g, dead: false, statuses: [], shockMult: 1, isBoss: true });
             opts.onBossHpChange(hp, hp);
             return;
         }
@@ -312,8 +333,8 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
             const g = new Graphics().circle(0, 0, def.radius).fill(def.color);
             g.position.set(x, y);
             enemyLayer.addChild(g);
-            const hp = def.hp * mult;
-            enemies.push({ defId: def.id, x, y, hp, maxHp: hp, damage: def.damage, speed: def.speed, radius: def.radius, g, dead: false, statuses: [], shockMult: 1, isBoss: false });
+            const hp = def.hp * mult * pillarEnemyHpMult;
+            enemies.push({ defId: def.id, x, y, hp, maxHp: hp, damage: def.damage, speed: def.speed * pillarEnemySpeedMult, radius: def.radius, g, dead: false, statuses: [], shockMult: 1, isBoss: false });
         }
     }
 
@@ -354,18 +375,18 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
 
     /** Base damage (already element-tagged) + flat elemental stat adds + temp elementBoosts, each independently amplified, crit applied once to the total. */
     function computeHitDamage(baseDamage: number, weaponElement: Element): { total: number; crit: boolean } {
-        const crit = Math.random() < opts.stats.critChance;
+        const crit = Math.random() < stats.critChance;
         const components: Partial<Record<Element, number>> = {};
         components[weaponElement] = (components[weaponElement] ?? 0) + baseDamage;
-        if (opts.stats.fireDamage) components.fire = (components.fire ?? 0) + opts.stats.fireDamage;
-        if (opts.stats.iceDamage) components.ice = (components.ice ?? 0) + opts.stats.iceDamage;
-        if (opts.stats.lightningDamage) components.lightning = (components.lightning ?? 0) + opts.stats.lightningDamage;
-        if (opts.stats.poisonDamage) components.poison = (components.poison ?? 0) + opts.stats.poisonDamage;
-        if (opts.stats.arcaneDamage) components.arcane = (components.arcane ?? 0) + opts.stats.arcaneDamage;
+        if (stats.fireDamage) components.fire = (components.fire ?? 0) + stats.fireDamage;
+        if (stats.iceDamage) components.ice = (components.ice ?? 0) + stats.iceDamage;
+        if (stats.lightningDamage) components.lightning = (components.lightning ?? 0) + stats.lightningDamage;
+        if (stats.poisonDamage) components.poison = (components.poison ?? 0) + stats.poisonDamage;
+        if (stats.arcaneDamage) components.arcane = (components.arcane ?? 0) + stats.arcaneDamage;
         for (const boost of elementBoosts) components[boost.element] = (components[boost.element] ?? 0) + boost.amount;
         let total = 0;
         for (const [el, val] of Object.entries(components)) total += (val as number) * elementAmp(el as Element);
-        if (crit) total *= 1.8 + opts.stats.critDamage;
+        if (crit) total *= 1.8 + stats.critDamage;
         return { total, crit };
     }
 
@@ -451,7 +472,7 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
             }
         }
         runItemProcs('onKill', deadEnemy.x, deadEnemy.y, null);
-        if (opts.stats.healOnKill > 0) healPlayer(opts.stats.healOnKill);
+        if (stats.healOnKill > 0) healPlayer(stats.healOnKill);
     }
 
     function damageEnemy(enemy: EnemyEntity, amount: number, crit: boolean, source: DamageSource) {
@@ -459,18 +480,18 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
         const finalAmount = amount * enemy.shockMult;
         enemy.hp -= finalAmount;
         floatingText(enemy.x, enemy.y - enemy.radius - 6, crit ? `${Math.round(finalAmount)}!` : `${Math.round(finalAmount)}`, crit ? 0xfbbf24 : 0xffffff);
-        if (finalAmount > 0 && opts.stats.lifesteal > 0) healPlayer(finalAmount * opts.stats.lifesteal);
+        if (finalAmount > 0 && stats.lifesteal > 0) healPlayer(finalAmount * stats.lifesteal);
         if (source === 'weapon') {
             for (const application of rollOnHitStatuses(opts.rhunes, crit)) applyStatus(enemy, application);
             runItemProcs('onHit', enemy.x, enemy.y, enemy);
             if (crit) runItemProcs('onCrit', enemy.x, enemy.y, enemy);
-            if (opts.stats.knockback > 0 && !enemy.dead) {
+            if (stats.knockback > 0 && !enemy.dead) {
                 const b = bounds();
                 const dx = enemy.x - player.x;
                 const dy = enemy.y - player.y;
                 const d = Math.hypot(dx, dy) || 1;
-                enemy.x = Math.min(Math.max(enemy.x + (dx / d) * opts.stats.knockback, b.minX), b.maxX);
-                enemy.y = Math.min(Math.max(enemy.y + (dy / d) * opts.stats.knockback, b.minY), b.maxY);
+                enemy.x = Math.min(Math.max(enemy.x + (dx / d) * stats.knockback, b.minX), b.maxX);
+                enemy.y = Math.min(Math.max(enemy.y + (dy / d) * stats.knockback, b.minY), b.maxY);
                 enemy.g.position.set(enemy.x, enemy.y);
             }
         }
@@ -525,8 +546,8 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
         const dy = nearest.y - player.y;
         const baseAngle = Math.atan2(dy, dx);
         const speed = weapon.stats.projectileSpeed ?? 500;
-        const shotCount = 1 + Math.floor(opts.stats.projectileCount);
-        const pierceCount = 1 + Math.floor(opts.stats.pierce);
+        const shotCount = 1 + Math.floor(stats.projectileCount);
+        const pierceCount = 1 + Math.floor(stats.pierce);
         const spreadStep = 0.16;
         const startAngle = baseAngle - (spreadStep * (shotCount - 1)) / 2;
         for (let i = 0; i < shotCount; i++) {
@@ -547,7 +568,7 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
                 pierceRemaining: pierceCount,
                 hitIds: new Set(),
                 source: 'weapon',
-                splashRadius: opts.stats.splashRadius,
+                splashRadius: stats.splashRadius,
             });
         }
     }
@@ -571,7 +592,7 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
     }
 
     function spawnFloorLoot(f: number) {
-        const roll = rollFloorLoot(opts.tier, f, opts.stats.luck, isBossFloor(f));
+        const roll = rollFloorLoot(opts.tier, f, stats.luck, isBossFloor(f));
         lastFloorLoot = roll;
         const b = bounds();
         const drops: { color: number; name: string }[] = [
@@ -579,7 +600,7 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
             ...roll.rhunes.map((r) => ({ color: RARITIES[r.rarity].color, name: getRhuneDef(r.rhuneDefId)?.name ?? 'Unknown Rhune' })),
         ];
         if (drops.length === 0) {
-            beginTransition();
+            beginPillarChoiceOrTransition();
             return;
         }
         for (const drop of drops) {
@@ -599,9 +620,82 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
         }
     }
 
+    function pickTwoDistinctPillars(): PillarDef[] {
+        const pool = [...PILLARS];
+        const out: PillarDef[] = [];
+        for (let i = 0; i < 2 && pool.length > 0; i++) {
+            out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+        }
+        return out;
+    }
+
+    function drawPillarIcon(def: PillarDef): Graphics {
+        const g = new Graphics().roundRect(-22, -70, 44, 140, 8).fill(def.color).roundRect(-30, -78, 60, 14, 4).fill(def.color).roundRect(-30, 62, 60, 14, 4).fill(def.color);
+        if (def.kind === 'specialized') g.roundRect(-22, -70, 44, 140, 8).stroke({ width: 3, color: 0xef4444, alpha: 0.9 });
+        return g;
+    }
+
+    function spawnPillarChoices() {
+        const b = bounds();
+        const centerX = (b.minX + b.maxX) / 2;
+        const centerY = (b.minY + b.maxY) / 2;
+        const offsets = [-160, 160];
+        pickTwoDistinctPillars().forEach((def, i) => {
+            const x = centerX + offsets[i];
+            const y = centerY;
+            const g = drawPillarIcon(def);
+            g.position.set(x, y);
+            const tag = def.kind === 'specialized' ? ' [RISK]' : '';
+            const label = new Text({
+                text: `${def.name}${tag}\n${def.description}`,
+                style: { fill: def.color, fontSize: 13, fontWeight: 'bold', align: 'center', wordWrap: true, wordWrapWidth: 220 },
+            });
+            label.anchor.set(0.5, 1);
+            label.position.set(x, y - 88);
+            pillarLayer.addChild(g, label);
+            pillarPicks.push({ x, y, radius: 60, def, g, label });
+        });
+    }
+
+    function applyPillar(def: PillarDef) {
+        for (const [k, v] of Object.entries(def.playerMods)) {
+            const stat = k as keyof StatBlock;
+            stats[stat] = (stats[stat] ?? 0) + (v as number);
+        }
+        // Re-clamp the same way aggregateStats does, so stacked pillar picks can't blow past sane caps.
+        stats.critChance = Math.min(stats.critChance, 0.75);
+        stats.lifesteal = Math.min(stats.lifesteal, 0.5);
+        stats.dodgeChance = Math.min(stats.dodgeChance, 0.6);
+        stats.damageReduction = Math.min(stats.damageReduction, 0.75);
+        stats.reviveChance = Math.min(stats.reviveChance, 0.75);
+
+        if (def.playerMods.maxHp) {
+            player.maxHp = stats.maxHp;
+            healPlayer(def.playerMods.maxHp);
+        }
+
+        if (def.enemyMods) {
+            pillarEnemyHpMult *= def.enemyMods.hpMult ?? 1;
+            pillarEnemyDamageMult *= def.enemyMods.damageMult ?? 1;
+            pillarEnemySpeedMult *= def.enemyMods.speedMult ?? 1;
+            pillarEnemySpawnMult *= def.enemyMods.spawnMult ?? 1;
+        }
+
+        opts.onPillarChosen(def);
+    }
+
     function beginTransition() {
         phase = 'transition';
         transitionTimer = 0.9;
+    }
+
+    function beginPillarChoiceOrTransition() {
+        if (!tierDef.pillarsEnabled) {
+            beginTransition();
+            return;
+        }
+        phase = 'pillars';
+        spawnPillarChoices();
     }
 
     function nextFloor() {
@@ -628,7 +722,7 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
             return b.remaining > 0;
         });
 
-        if (opts.stats.regen > 0 && player.hp < player.maxHp) healPlayer(opts.stats.regen * dt);
+        if (stats.regen > 0 && player.hp < player.maxHp) healPlayer(stats.regen * dt);
 
         // Movement: keyboard first, pointer-hold overrides when active (clamped to world bounds).
         const b = bounds();
@@ -638,8 +732,8 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
         const dirX = pointerDir ? pointerDir.x : kbDir.x;
         const dirY = pointerDir ? pointerDir.y : kbDir.y;
         const isMoving = dirX !== 0 || dirY !== 0;
-        player.x = Math.min(Math.max(player.x + dirX * opts.stats.moveSpeed * dt, b.minX), b.maxX);
-        player.y = Math.min(Math.max(player.y + dirY * opts.stats.moveSpeed * dt, b.minY), b.maxY);
+        player.x = Math.min(Math.max(player.x + dirX * stats.moveSpeed * dt, b.minX), b.maxX);
+        player.y = Math.min(Math.max(player.y + dirY * stats.moveSpeed * dt, b.minY), b.maxY);
         playerLayer.position.set(player.x, player.y);
         if (isMoving) hammerG.rotation = Math.atan2(dirY, dirX) + Math.PI / 2;
         camera.update(player.x, player.y, dt);
@@ -728,19 +822,19 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
                 e.g.position.set(e.x, e.y);
 
                 if (dist <= e.radius + 18 && player.invuln <= 0) {
-                    player.invuln = 0.6 + opts.stats.invulnDuration;
-                    if (Math.random() < opts.stats.dodgeChance) {
+                    player.invuln = 0.6 + stats.invulnDuration;
+                    if (Math.random() < stats.dodgeChance) {
                         floatingText(player.x, player.y - 30, 'Dodge!', 0x38bdf8);
                     } else {
-                        const afterArmor = Math.max(1, e.damage * statMultForFloor(floor) - opts.stats.armor);
-                        const afterReduction = afterArmor * (1 - opts.stats.damageReduction);
+                        const afterArmor = Math.max(1, e.damage * statMultForFloor(floor) * pillarEnemyDamageMult - stats.armor);
+                        const afterReduction = afterArmor * (1 - stats.damageReduction);
                         player.hp = Math.max(0, player.hp - afterReduction);
                         player.hitFlash = 0.2;
                         opts.onHpChange(player.hp, player.maxHp);
-                        if (opts.stats.thorns > 0) damageEnemy(e, opts.stats.thorns, false, 'thorns');
+                        if (stats.thorns > 0) damageEnemy(e, stats.thorns, false, 'thorns');
                         runItemProcs('onBeingHit', player.x, player.y, e);
                         if (player.hp <= 0) {
-                            if (!revivedThisFloor && Math.random() < opts.stats.reviveChance) {
+                            if (!revivedThisFloor && Math.random() < stats.reviveChance) {
                                 revivedThisFloor = true;
                                 player.hp = 1;
                                 opts.onHpChange(player.hp, player.maxHp);
@@ -802,7 +896,7 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
                 spawnFloorLoot(floor);
             }
         } else if (phase === 'looting') {
-            const magnet = opts.stats.magnetRadius;
+            const magnet = stats.magnetRadius;
             let allGone = true;
             lootOrbs = lootOrbs.filter((orb) => {
                 const dist = Math.hypot(orb.x - player.x, orb.y - player.y);
@@ -828,10 +922,23 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
                 return true;
             });
             if (allGone) {
-                if (opts.stats.floorHealPct > 0) healPlayer(player.maxHp * opts.stats.floorHealPct);
+                if (stats.floorHealPct > 0) healPlayer(player.maxHp * stats.floorHealPct);
                 runItemProcs('onFloorClear', player.x, player.y, null);
                 opts.onFloorCleared(floor, lastFloorLoot);
-                beginTransition();
+                beginPillarChoiceOrTransition();
+            }
+        } else if (phase === 'pillars') {
+            for (const pick of pillarPicks) {
+                if (Math.hypot(pick.x - player.x, pick.y - player.y) <= pick.radius) {
+                    applyPillar(pick.def);
+                    for (const p of pillarPicks) {
+                        p.g.destroy();
+                        p.label.destroy();
+                    }
+                    pillarPicks = [];
+                    beginTransition();
+                    break;
+                }
             }
         } else if (phase === 'transition') {
             transitionTimer -= dt;

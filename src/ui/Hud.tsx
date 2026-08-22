@@ -52,6 +52,7 @@ export default function Hud() {
                         ) : (
                             <div className="text-[11px] text-white/50">
                                 Kills {run?.kills ?? 0}/{run?.killsNeeded ?? 0}
+                                {run && run.pillarCount > 0 ? ` · Pillars ${run.pillarCount}` : ''}
                             </div>
                         )}
                     </div>

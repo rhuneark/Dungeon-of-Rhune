@@ -25,6 +25,7 @@ import {
     onCurrencyEarned,
     onDeath,
     onFloorCleared,
+    onPillarChosen,
     onRunBossHpChange,
     onRunFloorChange,
     onRunHpChange,
@@ -60,6 +61,7 @@ function mountSceneFor(location: 'hub' | 'dungeon', app: Application, stage: Sta
         onFloorCleared,
         onDeath,
         onCurrencyEarned,
+        onPillarChosen,
     });
     dungeonSceneRef.current = dungeon;
     return dungeon;

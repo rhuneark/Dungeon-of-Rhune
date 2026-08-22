@@ -242,6 +242,8 @@ export interface TierDef {
     /** Weighted rarity table for loot drops in this tier. */
     lootWeights: Record<Rarity, number>;
     color: number;
+    /** Whether Pillar choices drop between floors on this tier. */
+    pillarsEnabled: boolean;
 }
 
 export interface EnemyDef {

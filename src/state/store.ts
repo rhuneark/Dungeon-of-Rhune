@@ -23,6 +23,7 @@ export interface RunHud {
     isBossFloor: boolean;
     bossHp: number;
     bossMaxHp: number;
+    pillarCount: number;
 }
 
 export interface Toast {

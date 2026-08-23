@@ -279,11 +279,20 @@ export interface BountyInstance {
     claimed: boolean;
 }
 
+/** Player build style — persistent, points spent freely and respec'd for free (new-player-friendly). */
+export type BuildStyle = 'berserker' | 'ranger' | 'warden';
+
 export interface SaveData {
     version: 1;
     currency: number;
+    /** The Chest: permanent storage. Equipped items/rhunes still live here (equipping never moves them out). */
     items: ItemInstance[];
     rhunes: RhuneInstance[];
+    /** The Inventory: a small bounded bag for loot fresh out of a run — must be manually stored in the Chest to keep it safe from bag-capacity overflow. */
+    bag: ItemInstance[];
+    bagRhunes: RhuneInstance[];
+    bagUpgradeLevel: number;
+    chestUpgradeLevel: number;
     equipped: Record<GearSlot, string | null>;
     equippedRhunes: [string | null, string | null, string | null];
     selectedTier: number;
@@ -297,6 +306,13 @@ export interface SaveData {
     weeklyBounties: BountyInstance[];
     dailyBountiesGeneratedAt: number;
     weeklyBountiesGeneratedAt: number;
+    /** Lifetime XP (levels + available points are always derived from this — see systems/build.ts) plus points already committed per style. */
+    build: {
+        xp: number;
+        berserker: number;
+        ranger: number;
+        warden: number;
+    };
 }
 
 export function emptyEquipped(): Record<GearSlot, string | null> {
@@ -318,6 +334,10 @@ export function defaultSaveData(): SaveData {
         currency: 0,
         items: [],
         rhunes: [],
+        bag: [],
+        bagRhunes: [],
+        bagUpgradeLevel: 0,
+        chestUpgradeLevel: 0,
         equipped: emptyEquipped(),
         equippedRhunes: [null, null, null],
         selectedTier: 1,
@@ -328,5 +348,6 @@ export function defaultSaveData(): SaveData {
         weeklyBounties: [],
         dailyBountiesGeneratedAt: 0,
         weeklyBountiesGeneratedAt: 0,
+        build: { xp: 0, berserker: 0, ranger: 0, warden: 0 },
     };
 }

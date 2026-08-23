@@ -1,10 +1,11 @@
-import type { GearSlot, ItemInstance, SaveData, StatBlock, WeaponRole, Element } from '../data/types.ts';
+import type { GearSlot, ItemInstance, RhuneInstance, SaveData, StatBlock, WeaponRole, Element } from '../data/types.ts';
 import { slotAcceptsKind } from '../data/types.ts';
 import { getBaseType } from '../data/baseTypes.ts';
 import { findAffixDef } from '../data/affixes.ts';
 import { RARITIES } from '../data/rarity.ts';
 import { resolveEquippedRhunes, statModContribution, type ResolvedRhune } from './rhuneRuntime.ts';
 import { resolveItemProcAffixes, type ResolvedProcAffix } from './procAffixRuntime.ts';
+import { buildStatMods } from './build.ts';
 
 /** Base combat stats before any gear/rhunes are applied. */
 export const BASE_PLAYER_STATS: Required<StatBlock> = {
@@ -103,6 +104,10 @@ export function aggregateStats(save: SaveData): AggregateResult {
         }
     }
 
+    for (const [k, v] of Object.entries(buildStatMods(save))) {
+        (stats as any)[k] = ((stats as any)[k] ?? 0) + (v as number);
+    }
+
     stats.critChance = Math.min(stats.critChance, 0.75);
     stats.lifesteal = Math.min(stats.lifesteal, 0.5);
     stats.dodgeChance = Math.min(stats.dodgeChance, 0.6);
@@ -117,10 +122,20 @@ export function canEquip(item: ItemInstance, slot: GearSlot): boolean {
     return slotAcceptsKind(slot, base.kind);
 }
 
+/**
+ * Equipping always works from the Chest OR the bag — an item sitting in the
+ * bag transfers into the Chest the moment you commit to wearing it, since
+ * worn gear isn't "in storage" (chestCount excludes equipped items, so this
+ * never trips the Chest cap).
+ */
 export function equipItem(save: SaveData, itemId: string, slot: GearSlot): SaveData {
-    const item = save.items.find((i) => i.instanceId === itemId);
+    const fromBag = save.bag.find((i) => i.instanceId === itemId);
+    const item = fromBag ?? save.items.find((i) => i.instanceId === itemId);
     if (!item || !canEquip(item, slot)) return save;
-    return { ...save, equipped: { ...save.equipped, [slot]: itemId } };
+    const base = fromBag
+        ? { ...save, bag: save.bag.filter((i) => i.instanceId !== itemId), items: [...save.items, item] }
+        : save;
+    return { ...base, equipped: { ...base.equipped, [slot]: itemId } };
 }
 
 export function unequipSlot(save: SaveData, slot: GearSlot): SaveData {
@@ -128,9 +143,13 @@ export function unequipSlot(save: SaveData, slot: GearSlot): SaveData {
 }
 
 export function equipRhune(save: SaveData, rhuneId: string, socket: 0 | 1 | 2): SaveData {
-    const next = [...save.equippedRhunes] as SaveData['equippedRhunes'];
+    const fromBag = save.bagRhunes.find((r) => r.instanceId === rhuneId);
+    const base = fromBag
+        ? { ...save, bagRhunes: save.bagRhunes.filter((r) => r.instanceId !== rhuneId), rhunes: [...save.rhunes, fromBag] }
+        : save;
+    const next = [...base.equippedRhunes] as SaveData['equippedRhunes'];
     next[socket] = rhuneId;
-    return { ...save, equippedRhunes: next };
+    return { ...base, equippedRhunes: next };
 }
 
 export function unequipRhune(save: SaveData, socket: 0 | 1 | 2): SaveData {
@@ -144,7 +163,9 @@ export function salvageValue(item: ItemInstance, salvageBonus = 0): number {
 }
 
 export function salvageItem(save: SaveData, itemId: string): SaveData {
-    const item = save.items.find((i) => i.instanceId === itemId);
+    const inChest = save.items.find((i) => i.instanceId === itemId);
+    const inBag = save.bag.find((i) => i.instanceId === itemId);
+    const item = inChest ?? inBag;
     if (!item) return save;
     const equipped = { ...save.equipped };
     for (const slot of Object.keys(equipped) as GearSlot[]) {
@@ -154,7 +175,8 @@ export function salvageItem(save: SaveData, itemId: string): SaveData {
     return {
         ...save,
         currency: save.currency + salvageValue(item, bonus),
-        items: save.items.filter((i) => i.instanceId !== itemId),
+        items: inChest ? save.items.filter((i) => i.instanceId !== itemId) : save.items,
+        bag: inBag ? save.bag.filter((i) => i.instanceId !== itemId) : save.bag,
         equipped,
     };
 }
@@ -185,14 +207,135 @@ export function autoEquipRhuneSocket(save: SaveData): 0 | 1 | 2 {
 }
 
 export function salvageRhune(save: SaveData, rhuneId: string): SaveData {
-    const rhune = save.rhunes.find((r) => r.instanceId === rhuneId);
+    const inChest = save.rhunes.find((r) => r.instanceId === rhuneId);
+    const inBag = save.bagRhunes.find((r) => r.instanceId === rhuneId);
+    const rhune = inChest ?? inBag;
     if (!rhune) return save;
     const equippedRhunes = save.equippedRhunes.map((id) => (id === rhuneId ? null : id)) as SaveData['equippedRhunes'];
     const bonus = aggregateStats(save).stats.salvageBonus;
     return {
         ...save,
         currency: save.currency + Math.round(RARITIES[rhune.rarity].salvageValue * (1 + bonus)),
-        rhunes: save.rhunes.filter((r) => r.instanceId !== rhuneId),
+        rhunes: inChest ? save.rhunes.filter((r) => r.instanceId !== rhuneId) : save.rhunes,
+        bagRhunes: inBag ? save.bagRhunes.filter((r) => r.instanceId !== rhuneId) : save.bagRhunes,
         equippedRhunes,
     };
+}
+
+// --- Bag (Inventory) <-> Chest capacity, upgrades, and transfers ---
+
+const BAG_BASE_CAPACITY = 14;
+const BAG_CAPACITY_PER_UPGRADE = 4;
+const BAG_UPGRADE_BASE_COST = 40;
+const BAG_UPGRADE_COST_STEP = 30;
+
+const CHEST_BASE_CAPACITY = 60;
+const CHEST_CAPACITY_PER_UPGRADE = 20;
+const CHEST_UPGRADE_BASE_COST = 80;
+const CHEST_UPGRADE_COST_STEP = 60;
+
+export function bagCapacity(save: SaveData): number {
+    return BAG_BASE_CAPACITY + save.bagUpgradeLevel * BAG_CAPACITY_PER_UPGRADE;
+}
+
+export function bagCount(save: SaveData): number {
+    return save.bag.length + save.bagRhunes.length;
+}
+
+export function bagUpgradeCost(save: SaveData): number {
+    return BAG_UPGRADE_BASE_COST + save.bagUpgradeLevel * BAG_UPGRADE_COST_STEP;
+}
+
+export function upgradeBag(save: SaveData): SaveData {
+    const cost = bagUpgradeCost(save);
+    if (save.currency < cost) return save;
+    return { ...save, currency: save.currency - cost, bagUpgradeLevel: save.bagUpgradeLevel + 1 };
+}
+
+export function chestCapacity(save: SaveData): number {
+    return CHEST_BASE_CAPACITY + save.chestUpgradeLevel * CHEST_CAPACITY_PER_UPGRADE;
+}
+
+/** Worn gear doesn't take up storage — only what's actually sitting in the Chest counts. */
+export function chestCount(save: SaveData): number {
+    return (
+        save.items.filter((i) => isItemEquipped(save, i.instanceId) === null).length +
+        save.rhunes.filter((r) => isRhuneEquipped(save, r.instanceId) === -1).length
+    );
+}
+
+export function chestUpgradeCost(save: SaveData): number {
+    return CHEST_UPGRADE_BASE_COST + save.chestUpgradeLevel * CHEST_UPGRADE_COST_STEP;
+}
+
+export function upgradeChest(save: SaveData): SaveData {
+    const cost = chestUpgradeCost(save);
+    if (save.currency < cost) return save;
+    return { ...save, currency: save.currency - cost, chestUpgradeLevel: save.chestUpgradeLevel + 1 };
+}
+
+export function moveItemToChest(save: SaveData, itemId: string): SaveData {
+    if (chestCount(save) >= chestCapacity(save)) return save;
+    const item = save.bag.find((i) => i.instanceId === itemId);
+    if (!item) return save;
+    return { ...save, bag: save.bag.filter((i) => i.instanceId !== itemId), items: [...save.items, item] };
+}
+
+export function moveItemToBag(save: SaveData, itemId: string): SaveData {
+    if (isItemEquipped(save, itemId)) return save; // unequip first
+    if (bagCount(save) >= bagCapacity(save)) return save;
+    const item = save.items.find((i) => i.instanceId === itemId);
+    if (!item) return save;
+    return { ...save, items: save.items.filter((i) => i.instanceId !== itemId), bag: [...save.bag, item] };
+}
+
+export function moveRhuneToChest(save: SaveData, rhuneId: string): SaveData {
+    if (chestCount(save) >= chestCapacity(save)) return save;
+    const rhune = save.bagRhunes.find((r) => r.instanceId === rhuneId);
+    if (!rhune) return save;
+    return { ...save, bagRhunes: save.bagRhunes.filter((r) => r.instanceId !== rhuneId), rhunes: [...save.rhunes, rhune] };
+}
+
+export function moveRhuneToBag(save: SaveData, rhuneId: string): SaveData {
+    if (isRhuneEquipped(save, rhuneId) !== -1) return save; // unsocket first
+    if (bagCount(save) >= bagCapacity(save)) return save;
+    const rhune = save.rhunes.find((r) => r.instanceId === rhuneId);
+    if (!rhune) return save;
+    return { ...save, rhunes: save.rhunes.filter((r) => r.instanceId !== rhuneId), bagRhunes: [...save.bagRhunes, rhune] };
+}
+
+export interface BagLootResult {
+    save: SaveData;
+    storedCount: number;
+    /** Scrap from loot that couldn't fit — nothing is ever silently lost, a full bag auto-salvages the overflow. */
+    overflowScrap: number;
+}
+
+/** Dungeon floor loot lands in the bag, not the Chest — capacity-checked, overflow auto-salvaged. */
+export function addLootToBag(save: SaveData, loot: { items: ItemInstance[]; rhunes: RhuneInstance[] }): BagLootResult {
+    const bonus = aggregateStats(save).stats.salvageBonus;
+    const bag = [...save.bag];
+    const bagRhunes = [...save.bagRhunes];
+    const cap = bagCapacity(save);
+    let storedCount = 0;
+    let overflowScrap = 0;
+
+    for (const item of loot.items) {
+        if (bag.length + bagRhunes.length < cap) {
+            bag.push(item);
+            storedCount += 1;
+        } else {
+            overflowScrap += salvageValue(item, bonus);
+        }
+    }
+    for (const rhune of loot.rhunes) {
+        if (bag.length + bagRhunes.length < cap) {
+            bagRhunes.push(rhune);
+            storedCount += 1;
+        } else {
+            overflowScrap += Math.round(RARITIES[rhune.rarity].salvageValue * (1 + bonus));
+        }
+    }
+
+    return { save: { ...save, bag, bagRhunes, currency: save.currency + overflowScrap }, storedCount, overflowScrap };
 }

@@ -13,6 +13,7 @@ import { getRhuneDef } from '../../game/data/rhunes.ts';
 import { itemDisplayName } from '../../game/data/nameGen.ts';
 import { aggregateStats } from '../../game/systems/inventory.ts';
 import { TIERS } from '../../game/data/tiers.ts';
+import { buildLevel } from '../../game/systems/build.ts';
 
 const SLOT_LABEL: Record<GearSlot, string> = {
     head: 'Head',
@@ -134,6 +135,10 @@ export default function RackPanel() {
                         <div className="rounded-lg bg-white/5 p-3">
                             <div className="text-2xl font-bold text-primary">{save.stats.lifetimeBossKills}</div>
                             <div className="text-[11px] text-white/50">Bosses defeated</div>
+                        </div>
+                        <div className="rounded-lg bg-white/5 p-3">
+                            <div className="text-2xl font-bold text-primary">{buildLevel(save.build.xp)}</div>
+                            <div className="text-[11px] text-white/50">Build level</div>
                         </div>
                     </div>
                 </section>

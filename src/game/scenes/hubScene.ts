@@ -1,13 +1,15 @@
 /**
  * The hub: a free-roam room (Diablo-camp style) — walk anywhere with
- * WASD/arrows or by holding the pointer, camera follows you. Six stations
- * are laid out per the reference room plan, spread around open floor space:
- * Tier Statue (top-left), Dungeon Entrance (top-center), Chest + Armor Rack
- * (grouped top-right), Multiplayer Portal (bottom-left), Blacksmith
- * (bottom-right). Stations are always tappable (reliable on PC/mobile
- * alike); walking close to one glows it, echoing "go to it to interact".
+ * WASD/arrows or by holding the pointer, camera follows you. Eight stations
+ * sit in three well-spaced rows (top: Statue/Dungeon/Portal, middle:
+ * Chest/Rack/Quest Board, bottom: Merchant/Blacksmith) so nothing crowds —
+ * Dungeon Entrance stays top-center regardless of what else changes here.
+ * Stations are always tappable (reliable on PC/mobile alike) via an
+ * explicit circular hitArea sized to the full glow radius, not just the
+ * icon's drawn pixels — walking close to one glows it, echoing "go to it
+ * to interact", but tapping works from anywhere on screen.
  */
-import { Container, Graphics, Text, type Application, type Ticker } from 'pixi.js';
+import { Circle, Container, Graphics, Text, type Application, type Ticker } from 'pixi.js';
 import type { Stage, Scene } from '../stage.ts';
 import { WORLD_WIDTH, WORLD_HEIGHT } from '../world.ts';
 import { createCamera } from '../camera.ts';
@@ -112,15 +114,20 @@ export function createHubScene(app: Application, stage: Stage, opts: HubSceneOpt
     const stationLayer = new Container();
     world.addChild(stationLayer);
 
+    // Three rows, evenly spaced, nothing closer than ~450 units center-to-center —
+    // Dungeon Entrance is the one fixed point everything else is arranged around.
     const stations: StationDef[] = [
-        { kind: 'statue', label: 'Tier Statue', x: 340, y: 300, radius: 70, color: 0x818cf8, onInteract: opts.onOpenStatue },
+        // top row
+        { kind: 'statue', label: 'Tier Statue', x: 300, y: 240, radius: 70, color: 0x818cf8, onInteract: opts.onOpenStatue },
         { kind: 'dungeon', label: 'Enter Dungeon', x: WORLD_WIDTH / 2, y: 220, radius: 80, color: 0xef4444, onInteract: opts.onEnterDungeon },
-        { kind: 'chest', label: 'Chest', x: 1500, y: 260, radius: 65, color: 0xd97706, onInteract: opts.onOpenChest },
-        { kind: 'rack', label: 'Armor Rack', x: 1720, y: 340, radius: 65, color: 0x64748b, onInteract: opts.onOpenRack },
-        { kind: 'portal', label: 'Multiplayer Portal', x: 260, y: 820, radius: 75, color: 0x475569, onInteract: opts.onOpenPortal },
-        { kind: 'blacksmith', label: 'Blacksmith', x: 1580, y: 830, radius: 70, color: 0x7c3aed, onInteract: opts.onOpenBlacksmith },
-        { kind: 'merchant', label: 'Merchant', x: 700, y: 600, radius: 65, color: 0x16a34a, onInteract: opts.onOpenMerchant },
-        { kind: 'questboard', label: 'Quest Board', x: 1220, y: 600, radius: 65, color: 0xca8a04, onInteract: opts.onOpenQuestBoard },
+        { kind: 'portal', label: 'Multiplayer Portal', x: 1620, y: 240, radius: 75, color: 0x475569, onInteract: opts.onOpenPortal },
+        // middle row
+        { kind: 'chest', label: 'Chest', x: 280, y: 580, radius: 65, color: 0xd97706, onInteract: opts.onOpenChest },
+        { kind: 'rack', label: 'Armor Rack', x: WORLD_WIDTH / 2, y: 580, radius: 65, color: 0x64748b, onInteract: opts.onOpenRack },
+        { kind: 'questboard', label: 'Quest Board', x: 1640, y: 580, radius: 65, color: 0xca8a04, onInteract: opts.onOpenQuestBoard },
+        // bottom row
+        { kind: 'merchant', label: 'Merchant', x: 620, y: 880, radius: 65, color: 0x16a34a, onInteract: opts.onOpenMerchant },
+        { kind: 'blacksmith', label: 'Blacksmith', x: 1300, y: 880, radius: 70, color: 0x7c3aed, onInteract: opts.onOpenBlacksmith },
     ];
 
     const stationNodes = stations.map((station) => {
@@ -128,6 +135,11 @@ export function createHubScene(app: Application, stage: Stage, opts: HubSceneOpt
         container.position.set(station.x, station.y);
         container.eventMode = 'static';
         container.cursor = 'pointer';
+        // Icons are irregular shapes (crosses, arcs, thin boards) — without an explicit
+        // hitArea, Pixi only accepts clicks on their exact drawn pixels, which reads as
+        // "have to click around a few times". A generous circle covering the full glow
+        // zone makes the whole visible influence-radius reliably tappable.
+        container.hitArea = new Circle(0, 0, station.radius + INTERACT_GLOW_PAD);
 
         const glow = new Graphics().circle(0, 0, station.radius + INTERACT_GLOW_PAD).fill({ color: station.color, alpha: 0.18 });
         glow.visible = false;

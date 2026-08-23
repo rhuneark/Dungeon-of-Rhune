@@ -10,6 +10,8 @@ import type { ItemInstance, RhuneInstance } from './data/types.ts';
 import type { PillarDef } from './data/pillars.ts';
 import { recordRunEnd } from './systems/progress.ts';
 import { saveGame } from './systems/save.ts';
+import { addLootToBag } from './systems/inventory.ts';
+import { buildLevel } from './systems/build.ts';
 
 export const dungeonSceneRef: { current: DungeonScene | null } = { current: null };
 
@@ -48,16 +50,13 @@ export function onRunBossHpChange(hp: number, maxHp: number): void {
 
 export function onFloorCleared(floor: number, loot: { items: ItemInstance[]; rhunes: RhuneInstance[] }): void {
     const { save } = store.get();
-    const nextSave = {
-        ...save,
-        items: [...save.items, ...loot.items],
-        rhunes: [...save.rhunes, ...loot.rhunes],
-    };
+    const { save: nextSave, overflowScrap } = addLootToBag(save, loot);
     store.patch({ save: nextSave });
     void saveGame(nextSave);
     const dropCount = loot.items.length + loot.rhunes.length;
     if (dropCount > 0) {
-        store.pushToast(`Floor ${floor} cleared — ${dropCount} drop${dropCount === 1 ? '' : 's'}!`);
+        const overflowNote = overflowScrap > 0 ? ` (bag full — ${overflowScrap}◆ auto-salvaged)` : '';
+        store.pushToast(`Floor ${floor} cleared — ${dropCount} drop${dropCount === 1 ? '' : 's'}!${overflowNote}`);
     } else {
         store.pushToast(`Floor ${floor} cleared!`);
     }
@@ -77,6 +76,12 @@ export function onCurrencyEarned(amount: number): void {
     void saveGame(nextSave);
 }
 
+function reportLevelUp(beforeXp: number, afterXp: number): void {
+    const before = buildLevel(beforeXp);
+    const after = buildLevel(afterXp);
+    if (after > before) store.pushToast(`Level up! You're now level ${after} — spend the point${after - before === 1 ? '' : 's'} in your Build (C).`);
+}
+
 export function onDeath(floorReached: number, elapsedSeconds: number, totalKills: number, bossKills: number): void {
     const { save } = store.get();
     const nextSave = recordRunEnd(save, save.selectedTier, floorReached, elapsedSeconds, totalKills, bossKills);
@@ -89,6 +94,7 @@ export function onDeath(floorReached: number, elapsedSeconds: number, totalKills
         deathSummary: { floor: floorReached },
     });
     void saveGame(nextSave);
+    reportLevelUp(save.build.xp, nextSave.build.xp);
 }
 
 export function requestExitToHub(): void {
@@ -103,4 +109,5 @@ export function requestExitToHub(): void {
     dungeonSceneRef.current = null;
     store.patch({ save: nextSave, run: null, location: 'hub', panel: null });
     void saveGame(nextSave);
+    reportLevelUp(save.build.xp, nextSave.build.xp);
 }

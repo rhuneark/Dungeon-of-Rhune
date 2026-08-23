@@ -12,7 +12,8 @@ import { defaultSaveData, type ItemInstance, type RhuneInstance, type SaveData }
 
 export type Phase = 'loading' | 'menu' | 'playing';
 export type Location = 'hub' | 'dungeon';
-export type PanelId = 'inventory' | 'rack' | 'statue' | 'portal' | 'blacksmith' | 'merchant' | 'quests' | 'death' | null;
+/** 'inventory' is the bounded bag (I key); 'chest' is permanent tabbed storage (walk to the Chest station); 'build' is the level/style panel (C key). */
+export type PanelId = 'inventory' | 'chest' | 'rack' | 'statue' | 'portal' | 'blacksmith' | 'merchant' | 'quests' | 'build' | 'death' | null;
 
 export interface RunHud {
     floor: number;

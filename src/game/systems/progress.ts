@@ -7,6 +7,7 @@ import RundotGameAPI from '@series-inc/rundot-game-sdk/api';
 import { TIERS, getTier } from '../data/tiers.ts';
 import type { SaveData } from '../data/types.ts';
 import { advanceBounties } from './quests.ts';
+import { grantXp, xpForRun } from './build.ts';
 
 /** floorReached = the floor the player was ON when the run ended (died or exited). */
 export function recordRunEnd(save: SaveData, tier: number, floorReached: number, elapsedSeconds = 0, totalKills = 0, bossKills = 0): SaveData {
@@ -31,6 +32,7 @@ export function recordRunEnd(save: SaveData, tier: number, floorReached: number,
     next = advanceBounties(next, 'kills', totalKills);
     next = advanceBounties(next, 'floors', clearedFloors);
     next = advanceBounties(next, 'bossKills', bossKills);
+    next = grantXp(next, xpForRun(totalKills, clearedFloors, bossKills));
     return next;
 }
 

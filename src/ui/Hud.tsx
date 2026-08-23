@@ -7,15 +7,42 @@
  * through to the canvas; each interactive control opts back in with
  * pointer-events-auto.
  */
+import { useEffect } from 'react';
 import { store, useStore } from '../state/store.ts';
 import { getTier } from '../game/data/tiers.ts';
 import { requestExitToHub } from '../game/dungeonController.ts';
 
+/** I = Inventory (bag), C = Build. Same toggle-or-switch behavior as tapping the HUD buttons, minus a keyboard on mobile. */
+function useHotkeys(phase: string) {
+    useEffect(() => {
+        if (phase !== 'playing') return;
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.target instanceof HTMLElement && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+            const panel = store.get().panel;
+            if (panel === 'death') return; // don't let a hotkey dodge the death recap
+            const key = e.key.toLowerCase();
+            if (key === 'i') {
+                e.preventDefault();
+                store.patch({ panel: panel === 'inventory' ? null : 'inventory' });
+            } else if (key === 'c') {
+                e.preventDefault();
+                store.patch({ panel: panel === 'build' ? null : 'build' });
+            } else if (key === 'escape' && panel !== null) {
+                store.patch({ panel: null });
+            }
+        };
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [phase]);
+}
+
 export default function Hud() {
+    const phase = useStore((s) => s.phase);
     const location = useStore((s) => s.location);
     const save = useStore((s) => s.save);
     const run = useStore((s) => s.run);
     const paused = useStore((s) => s.paused);
+    useHotkeys(phase);
 
     const tier = getTier(save.selectedTier);
 
@@ -59,6 +86,24 @@ export default function Hud() {
                 )}
 
                 <div className="flex gap-2">
+                    <button
+                        type="button"
+                        className="pointer-events-auto rounded-xl bg-black/50 px-3 py-2 text-sm font-bold transition-transform active:scale-95"
+                        onClick={() => store.patch({ panel: 'inventory' })}
+                        title="Inventory (I)"
+                    >
+                        Bag
+                    </button>
+                    {location === 'hub' && (
+                        <button
+                            type="button"
+                            className="pointer-events-auto rounded-xl bg-black/50 px-3 py-2 text-sm font-bold transition-transform active:scale-95"
+                            onClick={() => store.patch({ panel: 'build' })}
+                            title="Build (C)"
+                        >
+                            Build
+                        </button>
+                    )}
                     {location === 'dungeon' && (
                         <button
                             type="button"

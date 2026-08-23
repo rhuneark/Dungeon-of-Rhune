@@ -20,6 +20,8 @@ const SAVE_KEY = 'dor_save_v1';
 function sanitizeSave(save: SaveData): SaveData {
     const items = save.items.filter((item) => getBaseType(item.baseTypeId) !== undefined);
     const rhunes = save.rhunes.filter((rhune) => getRhuneDef(rhune.rhuneDefId) !== undefined);
+    const bag = save.bag.filter((item) => getBaseType(item.baseTypeId) !== undefined);
+    const bagRhunes = save.bagRhunes.filter((rhune) => getRhuneDef(rhune.rhuneDefId) !== undefined);
     const itemIds = new Set(items.map((i) => i.instanceId));
     const rhuneIds = new Set(rhunes.map((r) => r.instanceId));
 
@@ -29,7 +31,7 @@ function sanitizeSave(save: SaveData): SaveData {
     }
     const equippedRhunes = save.equippedRhunes.map((id) => (id && rhuneIds.has(id) ? id : null)) as SaveData['equippedRhunes'];
 
-    return { ...save, items, rhunes, equipped, equippedRhunes };
+    return { ...save, items, rhunes, bag, bagRhunes, equipped, equippedRhunes };
 }
 
 export async function loadGame(): Promise<SaveData> {

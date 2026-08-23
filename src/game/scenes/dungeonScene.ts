@@ -14,7 +14,7 @@
  * not DOT ticks or proc-dealt damage), onKill, onBeingHit (contact damage
  * taken), onMove (throttled), and onFloorClear.
  */
-import { Container, Graphics, Text, type Application, type Ticker } from 'pixi.js';
+import { Circle, Container, Graphics, Text, type Application, type Ticker } from 'pixi.js';
 import type { Stage, Scene } from '../stage.ts';
 import type { Element, ItemInstance, ProcEffect, RhuneInstance, StatBlock, StatusType } from '../data/types.ts';
 import { ELEMENT_COLOR } from '../data/types.ts';
@@ -126,8 +126,8 @@ interface PillarPick {
     y: number;
     radius: number;
     def: PillarDef;
-    g: Graphics;
-    label: Text;
+    container: Container;
+    glow: Graphics;
 }
 
 interface Hazard {
@@ -635,6 +635,9 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
         return g;
     }
 
+    const PILLAR_PICK_RADIUS = 60;
+    const PILLAR_HIT_RADIUS = 95;
+
     function spawnPillarChoices() {
         const b = bounds();
         const centerX = (b.minX + b.maxX) / 2;
@@ -643,18 +646,42 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
         pickTwoDistinctPillars().forEach((def, i) => {
             const x = centerX + offsets[i];
             const y = centerY;
-            const g = drawPillarIcon(def);
-            g.position.set(x, y);
+
+            const container = new Container();
+            container.position.set(x, y);
+            container.eventMode = 'static';
+            container.cursor = 'pointer';
+            container.hitArea = new Circle(0, 0, PILLAR_HIT_RADIUS);
+
+            const glow = new Graphics().circle(0, 0, PILLAR_HIT_RADIUS).fill({ color: def.color, alpha: 0.16 });
+            glow.visible = false;
+            const icon = drawPillarIcon(def);
             const tag = def.kind === 'specialized' ? ' [RISK]' : '';
             const label = new Text({
-                text: `${def.name}${tag}\n${def.description}`,
+                text: `${def.name}${tag}\n${def.description}\n(tap to choose)`,
                 style: { fill: def.color, fontSize: 13, fontWeight: 'bold', align: 'center', wordWrap: true, wordWrapWidth: 220 },
             });
             label.anchor.set(0.5, 1);
-            label.position.set(x, y - 88);
-            pillarLayer.addChild(g, label);
-            pillarPicks.push({ x, y, radius: 60, def, g, label });
+            label.position.set(0, -88);
+
+            container.addChild(glow, icon, label);
+            container.on('pointerover', () => icon.scale.set(1.06));
+            container.on('pointerout', () => icon.scale.set(1));
+
+            pillarLayer.addChild(container);
+            const pick: PillarPick = { x, y, radius: PILLAR_PICK_RADIUS, def, container, glow };
+            container.on('pointertap', () => resolvePillarChoice(pick));
+            pillarPicks.push(pick);
         });
+    }
+
+    /** Player taps one of the two pillar choices — the other is discarded, never both. */
+    function resolvePillarChoice(chosen: PillarPick) {
+        if (phase !== 'pillars') return; // already resolved by the other pick
+        applyPillar(chosen.def);
+        for (const p of pillarPicks) p.container.destroy({ children: true });
+        pillarPicks = [];
+        beginTransition();
     }
 
     function applyPillar(def: PillarDef) {
@@ -928,17 +955,9 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
                 beginPillarChoiceOrTransition();
             }
         } else if (phase === 'pillars') {
+            // Purely visual — picking a Pillar is a deliberate tap (see spawnPillarChoices), never automatic.
             for (const pick of pillarPicks) {
-                if (Math.hypot(pick.x - player.x, pick.y - player.y) <= pick.radius) {
-                    applyPillar(pick.def);
-                    for (const p of pillarPicks) {
-                        p.g.destroy();
-                        p.label.destroy();
-                    }
-                    pillarPicks = [];
-                    beginTransition();
-                    break;
-                }
+                pick.glow.visible = Math.hypot(pick.x - player.x, pick.y - player.y) <= pick.radius;
             }
         } else if (phase === 'transition') {
             transitionTimer -= dt;

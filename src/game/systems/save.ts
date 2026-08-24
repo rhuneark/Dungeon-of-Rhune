@@ -8,6 +8,7 @@ import RundotGameAPI from '@series-inc/rundot-game-sdk/api';
 import { defaultSaveData, type GearSlot, type SaveData } from '../data/types.ts';
 import { getBaseType } from '../data/baseTypes.ts';
 import { getRhuneDef } from '../data/rhunes.ts';
+import { getSkillNode } from '../data/skillTree.ts';
 
 const SAVE_KEY = 'dor_save_v1';
 
@@ -30,8 +31,12 @@ function sanitizeSave(save: SaveData): SaveData {
         if (equipped[slot] && !itemIds.has(equipped[slot]!)) equipped[slot] = null;
     }
     const equippedRhunes = save.equippedRhunes.map((id) => (id && rhuneIds.has(id) ? id : null)) as SaveData['equippedRhunes'];
+    const bonusRhuneSocket = save.bonusRhuneSocket && rhuneIds.has(save.bonusRhuneSocket) ? save.bonusRhuneSocket : null;
 
-    return { ...save, items, rhunes, bag, bagRhunes, equipped, equippedRhunes };
+    // The skill tree gets rebalanced over time too — drop allocated ids that no longer exist.
+    const allocated = save.build.allocated.filter((id) => getSkillNode(id) !== undefined);
+
+    return { ...save, items, rhunes, bag, bagRhunes, equipped, equippedRhunes, bonusRhuneSocket, build: { ...save.build, allocated } };
 }
 
 export async function loadGame(): Promise<SaveData> {

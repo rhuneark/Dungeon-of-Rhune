@@ -18,6 +18,7 @@ import {
     chestUpgradeCost,
     equipItem,
     equipRhune,
+    hasFourthRhuneSocket,
     isItemEquipped,
     isRhuneEquipped,
     moveItemToBag,
@@ -122,8 +123,8 @@ export default function ChestPanel() {
                         );
                     })}
                     <div className="mb-1 mt-4 text-[11px] font-bold uppercase tracking-wide text-white/40">Rhune Sockets</div>
-                    {[0, 1, 2].map((socket) => {
-                        const rhuneId = save.equippedRhunes[socket];
+                    {(hasFourthRhuneSocket(save) ? [0, 1, 2, 3] : [0, 1, 2]).map((socket) => {
+                        const rhuneId = socket === 3 ? save.bonusRhuneSocket : save.equippedRhunes[socket];
                         const rhune = rhuneId ? save.rhunes.find((r) => r.instanceId === rhuneId) : null;
                         return (
                             <div key={socket}>
@@ -132,14 +133,16 @@ export default function ChestPanel() {
                                         <ActionButton
                                             label="Unclip"
                                             onClick={() => {
-                                                const next = unequipRhune(save, socket as 0 | 1 | 2);
+                                                const next = unequipRhune(save, socket as 0 | 1 | 2 | 3);
                                                 store.patch({ save: next });
                                                 void saveGame(next);
                                             }}
                                         />
                                     </RhuneCard>
                                 ) : (
-                                    <div className="rounded-xl border border-dashed border-white/15 p-3 text-center text-xs text-white/30">Empty socket</div>
+                                    <div className="rounded-xl border border-dashed border-white/15 p-3 text-center text-xs text-white/30">
+                                        {socket === 3 ? 'Bonus socket (The Fourth Rhune)' : 'Empty socket'}
+                                    </div>
                                 )}
                             </div>
                         );

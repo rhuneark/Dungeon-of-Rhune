@@ -5,7 +5,7 @@ import { findAffixDef } from '../data/affixes.ts';
 import { RARITIES } from '../data/rarity.ts';
 import { resolveEquippedRhunes, statModContribution, type ResolvedRhune } from './rhuneRuntime.ts';
 import { resolveItemProcAffixes, type ResolvedProcAffix } from './procAffixRuntime.ts';
-import { buildStatMods } from './build.ts';
+import { resolveSkillTree, type SkillTreeRuntime } from './skillTree.ts';
 
 /** Base combat stats before any gear/rhunes are applied. */
 export const BASE_PLAYER_STATS: Required<StatBlock> = {
@@ -39,6 +39,8 @@ export const BASE_PLAYER_STATS: Required<StatBlock> = {
     knockback: 0,
     regen: 0,
     splashRadius: 0,
+    blockChance: 0,
+    thornsPercent: 0,
 };
 
 /** Flat stat contribution of one item instance: base stats + rolled STAT affixes (proc affixes are behavioral, not summed here). */
@@ -70,6 +72,8 @@ export interface AggregateResult {
     rhunes: ResolvedRhune[];
     /** Every "X% chance on ___ to ___" proc affix across all equipped gear. */
     procAffixes: ResolvedProcAffix[];
+    /** Resolved passive skill tree — stat contribution already folded into `stats`, special hooks for dungeonScene.ts. */
+    skillTree: SkillTreeRuntime;
 }
 
 /** Sum base stats + every equipped item + every socketed rhune into final player stats. */
@@ -104,7 +108,8 @@ export function aggregateStats(save: SaveData): AggregateResult {
         }
     }
 
-    for (const [k, v] of Object.entries(buildStatMods(save))) {
+    const skillTree = resolveSkillTree(save);
+    for (const [k, v] of Object.entries(skillTree.stats)) {
         (stats as any)[k] = ((stats as any)[k] ?? 0) + (v as number);
     }
 
@@ -113,7 +118,9 @@ export function aggregateStats(save: SaveData): AggregateResult {
     stats.dodgeChance = Math.min(stats.dodgeChance, 0.6);
     stats.damageReduction = Math.min(stats.damageReduction, 0.75);
     stats.reviveChance = Math.min(stats.reviveChance, 0.75);
-    return { stats, weapons, rhunes: resolvedRhunes, procAffixes: resolveItemProcAffixes(equippedItems) };
+    stats.blockChance = Math.min(stats.blockChance, 0.6);
+    stats.thornsPercent = Math.min(stats.thornsPercent, 0.75);
+    return { stats, weapons, rhunes: resolvedRhunes, procAffixes: resolveItemProcAffixes(equippedItems), skillTree };
 }
 
 export function canEquip(item: ItemInstance, slot: GearSlot): boolean {
@@ -142,20 +149,28 @@ export function unequipSlot(save: SaveData, slot: GearSlot): SaveData {
     return { ...save, equipped: { ...save.equipped, [slot]: null } };
 }
 
-export function equipRhune(save: SaveData, rhuneId: string, socket: 0 | 1 | 2): SaveData {
+/** Socket 3 is the bonus Rhynekra-capstone socket — see hasFourthRhuneSocket(). */
+export function equipRhune(save: SaveData, rhuneId: string, socket: 0 | 1 | 2 | 3): SaveData {
     const fromBag = save.bagRhunes.find((r) => r.instanceId === rhuneId);
     const base = fromBag
         ? { ...save, bagRhunes: save.bagRhunes.filter((r) => r.instanceId !== rhuneId), rhunes: [...save.rhunes, fromBag] }
         : save;
+    if (socket === 3) return { ...base, bonusRhuneSocket: rhuneId };
     const next = [...base.equippedRhunes] as SaveData['equippedRhunes'];
     next[socket] = rhuneId;
     return { ...base, equippedRhunes: next };
 }
 
-export function unequipRhune(save: SaveData, socket: 0 | 1 | 2): SaveData {
+export function unequipRhune(save: SaveData, socket: 0 | 1 | 2 | 3): SaveData {
+    if (socket === 3) return { ...save, bonusRhuneSocket: null };
     const next = [...save.equippedRhunes] as SaveData['equippedRhunes'];
     next[socket] = null;
     return { ...save, equippedRhunes: next };
+}
+
+/** The Rhynekra capstone "The Fourth Rhune" — hidden in the UI until allocated. */
+export function hasFourthRhuneSocket(save: SaveData): boolean {
+    return save.build.allocated.includes('rhynekra_capstone_fourth_rhune');
 }
 
 export function salvageValue(item: ItemInstance, salvageBonus = 0): number {
@@ -189,7 +204,9 @@ export function isItemEquipped(save: SaveData, itemId: string): GearSlot | null 
 }
 
 export function isRhuneEquipped(save: SaveData, rhuneId: string): number {
-    return save.equippedRhunes.findIndex((id) => id === rhuneId);
+    const idx = save.equippedRhunes.findIndex((id) => id === rhuneId);
+    if (idx !== -1) return idx;
+    return save.bonusRhuneSocket === rhuneId ? 3 : -1;
 }
 
 /** v1 UX default: pick a sensible open slot rather than prompting the player to choose. */
@@ -201,9 +218,11 @@ export function autoEquipSlot(save: SaveData, item: ItemInstance): GearSlot {
     return base.kind as GearSlot;
 }
 
-export function autoEquipRhuneSocket(save: SaveData): 0 | 1 | 2 {
+export function autoEquipRhuneSocket(save: SaveData): 0 | 1 | 2 | 3 {
     const idx = save.equippedRhunes.findIndex((r) => r === null);
-    return (idx === -1 ? 0 : idx) as 0 | 1 | 2;
+    if (idx !== -1) return idx as 0 | 1 | 2;
+    if (hasFourthRhuneSocket(save) && !save.bonusRhuneSocket) return 3;
+    return 0; // every socket full — falls back to overwriting socket 0
 }
 
 export function salvageRhune(save: SaveData, rhuneId: string): SaveData {
@@ -212,6 +231,7 @@ export function salvageRhune(save: SaveData, rhuneId: string): SaveData {
     const rhune = inChest ?? inBag;
     if (!rhune) return save;
     const equippedRhunes = save.equippedRhunes.map((id) => (id === rhuneId ? null : id)) as SaveData['equippedRhunes'];
+    const bonusRhuneSocket = save.bonusRhuneSocket === rhuneId ? null : save.bonusRhuneSocket;
     const bonus = aggregateStats(save).stats.salvageBonus;
     return {
         ...save,
@@ -219,6 +239,7 @@ export function salvageRhune(save: SaveData, rhuneId: string): SaveData {
         rhunes: inChest ? save.rhunes.filter((r) => r.instanceId !== rhuneId) : save.rhunes,
         bagRhunes: inBag ? save.bagRhunes.filter((r) => r.instanceId !== rhuneId) : save.bagRhunes,
         equippedRhunes,
+        bonusRhuneSocket,
     };
 }
 

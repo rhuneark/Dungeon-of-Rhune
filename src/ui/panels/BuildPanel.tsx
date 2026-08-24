@@ -1,36 +1,38 @@
 /**
- * The Build panel: your permanent, account-wide playstyle. Three simple
- * styles, one point per level, no tree to puzzle over — reads at a glance.
- * Opened with the "C" key.
+ * The Build panel: the passive skill tree. Six branches, each an accordion
+ * section (tap the header to expand) so 60 nodes don't have to render as one
+ * giant scroll. Opened with the "C" key.
  */
+import { useState } from 'react';
 import Modal from './Modal.tsx';
 import { store, useStore } from '../../state/store.ts';
 import { saveGame } from '../../game/systems/save.ts';
+import { SKILL_BRANCHES, nodesForBranch, type SkillBranchId, type SkillNodeDef } from '../../game/data/skillTree.ts';
 import {
+    allocateNode,
+    allocatedCapstone,
     availablePoints,
-    BUILD_STYLES,
     buildLevelInfo,
-    MAX_POINTS_PER_STYLE,
-    respecBuild,
-    spendBuildPoint,
-    STYLE_DESCRIPTIONS,
-    STYLE_LABELS,
-} from '../../game/systems/build.ts';
+    canAllocate,
+    pointsSpentInBranch,
+    respecCost,
+    respecSkillTree,
+} from '../../game/systems/skillTree.ts';
 
-const STYLE_COLOR: Record<string, string> = {
-    berserker: '#ef4444',
-    ranger: '#4ade80',
-    warden: '#818cf8',
-};
+const TIER_LABEL: Record<SkillNodeDef['tier'], string> = { minor: 'Minor', notable: 'Notable', capstone: 'Capstone' };
 
 export default function BuildPanel() {
     const save = useStore((s) => s.save);
+    const [expanded, setExpanded] = useState<SkillBranchId | null>(null);
     const { level, into, need } = buildLevelInfo(save.build.xp);
     const points = availablePoints(save);
     const pct = Math.min(100, Math.round((into / need) * 100));
+    const capstone = allocatedCapstone(save);
+    const cost = respecCost(save);
+    const canRespec = save.build.allocated.length > 0 && save.currency >= cost;
 
     return (
-        <Modal title="Build" subtitle="Your playstyle — earned from runs, respec anytime, free.">
+        <Modal title="Build" subtitle="Your passive skill tree — earned from runs, respec for Scrap.">
             <div className="mb-4 rounded-xl bg-white/5 p-3">
                 <div className="flex items-center justify-between">
                     <span className="text-lg font-bold">Level {level}</span>
@@ -44,38 +46,78 @@ export default function BuildPanel() {
                 </div>
             </div>
 
-            <div className="space-y-3">
-                {BUILD_STYLES.map((style) => {
-                    const spent = save.build[style];
-                    const maxed = spent >= MAX_POINTS_PER_STYLE;
-                    const color = STYLE_COLOR[style];
+            <div className="space-y-2">
+                {SKILL_BRANCHES.map((branch) => {
+                    const nodes = nodesForBranch(branch.id);
+                    const spent = pointsSpentInBranch(save, branch.id);
+                    const totalCost = nodes.reduce((s, n) => s + n.cost, 0);
+                    const isExpanded = expanded === branch.id;
+                    const hex = `#${branch.color.toString(16).padStart(6, '0')}`;
                     return (
-                        <div key={style} className="rounded-xl border p-3" style={{ borderColor: color + '55', backgroundColor: color + '14' }}>
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm font-bold" style={{ color }}>
-                                    {STYLE_LABELS[style]}
-                                </span>
-                                <span className="text-xs font-bold text-white/60">
-                                    {spent}/{MAX_POINTS_PER_STYLE}
-                                </span>
-                            </div>
-                            <p className="mt-1 text-xs text-white/50">{STYLE_DESCRIPTIONS[style]}</p>
-                            <div className="mt-2">
-                                <button
-                                    type="button"
-                                    disabled={points <= 0 || maxed}
-                                    className={`w-full rounded-lg py-2 text-xs font-bold active:scale-95 ${
-                                        points > 0 && !maxed ? 'bg-primary text-black' : 'cursor-not-allowed bg-white/10 text-white/30'
-                                    }`}
-                                    onClick={() => {
-                                        const next = spendBuildPoint(save, style);
-                                        store.patch({ save: next });
-                                        void saveGame(next);
-                                    }}
-                                >
-                                    {maxed ? 'Maxed' : '+1 Point'}
-                                </button>
-                            </div>
+                        <div key={branch.id} className="rounded-xl border" style={{ borderColor: hex + '55', backgroundColor: hex + '0d' }}>
+                            <button
+                                type="button"
+                                className="flex w-full items-center justify-between p-3 text-left"
+                                onClick={() => setExpanded(isExpanded ? null : branch.id)}
+                            >
+                                <div>
+                                    <div className="text-sm font-bold" style={{ color: hex }}>
+                                        {branch.name} <span className="text-[10px] font-normal uppercase tracking-wide text-white/40">· {branch.pillar}</span>
+                                    </div>
+                                    <p className="text-[11px] text-white/50">{branch.tagline}</p>
+                                </div>
+                                <div className="whitespace-nowrap text-xs font-bold text-white/60">
+                                    {spent}/{totalCost} {isExpanded ? '▲' : '▼'}
+                                </div>
+                            </button>
+
+                            {isExpanded && (
+                                <div className="space-y-1.5 border-t border-white/10 p-3 pt-2">
+                                    {nodes.map((node) => {
+                                        const allocated = save.build.allocated.includes(node.id);
+                                        const check = canAllocate(save, node.id);
+                                        const lockedByOtherCapstone = node.tier === 'capstone' && capstone !== null && capstone.id !== node.id;
+                                        return (
+                                            <div
+                                                key={node.id}
+                                                className={`rounded-lg border p-2 ${allocated ? 'border-white/20 bg-white/10' : 'border-white/5 bg-white/[0.03]'}`}
+                                            >
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <div className="min-w-0">
+                                                        <span className="text-[10px] font-bold uppercase tracking-wide text-white/40">{TIER_LABEL[node.tier]}</span>
+                                                        <div className="truncate text-xs font-bold text-white">{node.name}</div>
+                                                    </div>
+                                                    {allocated ? (
+                                                        <span className="shrink-0 text-[11px] font-bold uppercase text-primary">Owned</span>
+                                                    ) : (
+                                                        <button
+                                                            type="button"
+                                                            disabled={!check.ok}
+                                                            title={check.ok ? '' : check.reason}
+                                                            className={`shrink-0 rounded-lg px-2.5 py-1.5 text-[11px] font-bold active:scale-95 ${
+                                                                check.ok ? 'bg-primary text-black' : 'cursor-not-allowed bg-white/10 text-white/30'
+                                                            }`}
+                                                            onClick={() => {
+                                                                const next = allocateNode(save, node.id);
+                                                                store.patch({ save: next });
+                                                                void saveGame(next);
+                                                            }}
+                                                        >
+                                                            {node.cost}pt
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                <p className="mt-1 text-[11px] text-white/50">{node.description}</p>
+                                                {!allocated && !check.ok && (
+                                                    <p className="mt-0.5 text-[10px] font-bold text-red-400/80">
+                                                        {lockedByOtherCapstone ? `Locked — committed to ${capstone!.name}` : check.reason}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
                     );
                 })}
@@ -83,15 +125,19 @@ export default function BuildPanel() {
 
             <button
                 type="button"
-                className="mt-4 w-full rounded-lg bg-white/10 py-2 text-xs font-bold text-white active:scale-95"
+                disabled={!canRespec}
+                className={`mt-4 w-full rounded-lg py-2 text-xs font-bold active:scale-95 ${
+                    canRespec ? 'bg-white/10 text-white' : 'cursor-not-allowed bg-white/5 text-white/30'
+                }`}
                 onClick={() => {
-                    const next = respecBuild(save);
+                    if (!canRespec) return;
+                    const next = respecSkillTree(save);
                     store.patch({ save: next });
                     void saveGame(next);
-                    store.pushToast('Build reset — all points refunded.');
+                    store.pushToast('Skill tree reset.');
                 }}
             >
-                Respec (free)
+                {save.build.allocated.length === 0 ? 'Nothing to respec' : `Respec (${cost}◆)`}
             </button>
         </Modal>
     );

@@ -47,13 +47,14 @@ function mountSceneFor(location: 'hub' | 'dungeon', app: Application, stage: Sta
     }
 
     const { save } = store.get();
-    const { stats, weapons, rhunes, procAffixes } = aggregateStats(save);
+    const { stats, weapons, rhunes, procAffixes, skillTree } = aggregateStats(save);
     const dungeon = createDungeonScene(app, stage, {
         tier: save.selectedTier,
         stats,
         weapons,
         rhunes,
         procAffixes,
+        skillTree,
         onHpChange: onRunHpChange,
         onFloorChange: onRunFloorChange,
         onKillsChange: onRunKillsChange,

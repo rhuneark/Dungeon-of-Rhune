@@ -37,10 +37,12 @@ import {
     rollOnKillProcs,
     type AuraConfig,
     type MoveTrailConfig,
+    type RhuneAmplifiers,
     type ResolvedRhune,
     type StatusApplication,
 } from '../systems/rhuneRuntime.ts';
 import { rollProcAffixes, scaleProcEffect, type ResolvedProcAffix } from '../systems/procAffixRuntime.ts';
+import type { SkillTreeRuntime } from '../systems/skillTree.ts';
 
 export interface DungeonRunState {
     floor: number;
@@ -59,6 +61,7 @@ export interface DungeonSceneOptions {
     weapons: EquippedWeapon[];
     rhunes: ResolvedRhune[];
     procAffixes: ResolvedProcAffix[];
+    skillTree: SkillTreeRuntime;
     onHpChange(hp: number, maxHp: number): void;
     onFloorChange(floor: number, isBoss: boolean): void;
     onKillsChange(kills: number, needed: number): void;
@@ -111,6 +114,7 @@ interface Projectile {
     hitIds: Set<EnemyEntity>;
     source: DamageSource;
     splashRadius: number;
+    element: Element;
 }
 
 interface LootOrb {
@@ -147,6 +151,7 @@ interface ElementBoost {
     element: Element;
     amount: number;
     remaining: number;
+    duration: number;
 }
 
 const STATUS_TINT: Record<StatusType, number> = {
@@ -172,9 +177,90 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
     let pillarEnemySpeedMult = 1;
     let pillarEnemySpawnMult = 1;
 
-    const elementAmp = makeElementAmplifier(opts.rhunes);
-    const moveTrailConfigs = getMoveTrailConfigs(opts.rhunes);
-    const auraConfigs = getAuraConfigs(opts.rhunes);
+    // --- passive skill tree runtime (see data/skillTree.ts + systems/skillTree.ts) ---
+    const skillTree = opts.skillTree;
+    const sp = (key: string) => skillTree.special(key); // shorthand — most nodes are looked up once, up front, below
+
+    // Rhynekra: amplifies the Rhune system itself rather than adding new effects.
+    const rhuneAmp: RhuneAmplifiers = {
+        effectMult: 1 + (sp('rhuneEffectMult')?.amount ?? 0),
+        chanceMult: 1 + (sp('rhuneProcChanceMult')?.amount ?? 0),
+        durationMult: 1 + (sp('rhuneDurationMult')?.amount ?? 0),
+    };
+    const elementalDamageMult = 1 + (sp('elementalDamageMult')?.amount ?? 0);
+    const kindling = sp('kindling');
+    const deepAttunement = sp('deepAttunement');
+    const overchargedSigils = sp('overchargedSigils');
+    const elementalCascade = sp('elementalCascade');
+    let elementalCascadeTimer = 0;
+
+    // Axiora: order & retaliation.
+    const measuredRecovery = sp('measuredRecovery');
+    const retribution = sp('retribution');
+    const unbroken = sp('unbroken');
+    const aegis = sp('aegisOfAxiora');
+    let aegisTimer = aegis ? aegis.amount : Infinity;
+    let aegisRemaining = 0;
+    let regenBursts: { remaining: number; perSec: number }[] = [];
+
+    // Hyphora: echo & repetition.
+    const lingeringEcho = sp('lingeringEcho');
+    const retainedForce = sp('retainedForce');
+    const buffDurationMult = 1 + (sp('buffDurationMult')?.amount ?? 0);
+    const familiarFoe = sp('familiarFoe');
+    const steadyRecall = sp('steadyRecall');
+    const fadedScars = sp('fadedScars');
+    const encore = sp('encore');
+    const echoingStrikes = skillTree.has('hyphora_notable_echoing_strikes');
+    const undyingRecollection = skillTree.has('hyphora_notable_undying_recollection');
+    const perfectRecall = sp('perfectRecall');
+    let hitEnemiesThisFloor = new Set<EnemyEntity>();
+    let combatTimeThisFloor = 0;
+    let encoreStacks = 0;
+    let encoreRemaining = 0;
+    let hardestHit = { damage: 0, element: 'physical' as Element };
+    let perfectRecallTimer = perfectRecall ? perfectRecall.amount : Infinity;
+
+    // Fluxxara: instability as power.
+    const chaoticMight = sp('chaoticMight');
+    const volatileStrikes = sp('volatileStrikes');
+    const entropy = sp('entropy');
+    const adaptiveReflexes = sp('adaptiveReflexes');
+    const mutation = sp('mutation');
+    const doubledFateNode = sp('doubledFate');
+    const doubledFateChance = doubledFateNode ? (echoingStrikes ? 1 : doubledFateNode.amount) : 0;
+    const wildConversion = skillTree.has('fluxxara_notable_wild_conversion');
+    const chaoticSurge = sp('chaoticSurge');
+    let chaoticSurgeTimer = chaoticSurge ? chaoticSurge.amount : Infinity;
+    let chaoticSurgeRemaining = 0;
+    let dodgeReflexRemaining = 0;
+    let mutationRemaining = 0;
+
+    // Vitalis: raw vitality.
+    const resilientFlesh = sp('resilientFlesh');
+    const overgrowth = sp('overgrowth');
+    const healMult = 1 + (sp('healMult')?.amount ?? 0);
+    const bondedSpirit = sp('bondedSpirit');
+    const vitalSurge = sp('vitalSurge');
+    let vitalSurgeRemaining = 0;
+    let vitalSurgeReady = true;
+    let bondedSpiritTimer = 0;
+
+    // Aeona: bending the moment.
+    const momentum = sp('momentum');
+    const briefReprieve = sp('briefReprieve');
+    const tickTock = sp('tickTock');
+    const borrowedMoments = sp('borrowedMoments');
+    const rewind = sp('rewind');
+    let movingStreak = 0;
+    let rewindUsedThisFloor = false;
+    const REWIND_SNAPSHOT_INTERVAL = 0.5;
+    let rewindSnapshotTimer = 0;
+    let rewindBuffer: { x: number; y: number; hp: number }[] = [];
+
+    const elementAmp = makeElementAmplifier(opts.rhunes, rhuneAmp);
+    const moveTrailConfigs = getMoveTrailConfigs(opts.rhunes, rhuneAmp);
+    const auraConfigs = getAuraConfigs(opts.rhunes, rhuneAmp);
     const moveTrailTimers = moveTrailConfigs.map(() => 0);
     const auraTimers: number[] = auraConfigs.map(() => 0);
     let onMoveProcTimer = 0;
@@ -369,15 +455,32 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
 
     function healPlayer(amount: number) {
         if (amount <= 0) return;
-        player.hp = Math.min(player.maxHp, player.hp + amount);
+        player.hp = Math.min(player.maxHp, player.hp + amount * healMult);
         opts.onHpChange(player.hp, player.maxHp);
     }
 
-    /** Base damage (already element-tagged) + flat elemental stat adds + temp elementBoosts, each independently amplified, crit applied once to the total. */
-    function computeHitDamage(baseDamage: number, weaponElement: Element): { total: number; crit: boolean } {
+    const ALL_STATUSES: StatusType[] = ['slow', 'burn', 'poison', 'shock', 'stun'];
+    const STATUS_BASE: Record<StatusType, { magnitude: number; duration: number }> = {
+        slow: { magnitude: 0.3, duration: 2 },
+        burn: { magnitude: 4, duration: 3 },
+        poison: { magnitude: 3, duration: 3 },
+        shock: { magnitude: 0.15, duration: 2 },
+        stun: { magnitude: 1, duration: 0.4 },
+    };
+    function randomStatusApplication(): StatusApplication {
+        const status = ALL_STATUSES[Math.floor(Math.random() * ALL_STATUSES.length)];
+        const base = STATUS_BASE[status];
+        return { status, magnitude: base.magnitude, duration: base.duration * buffDurationMult };
+    }
+    const RANDOM_ELEMENTS: Element[] = ['fire', 'ice', 'lightning', 'poison', 'arcane'];
+    const ELEMENT_STATUS_RIDER: Partial<Record<Element, StatusType>> = { fire: 'burn', ice: 'slow', lightning: 'shock', poison: 'poison' };
+
+    /** Base damage (already element-tagged) + flat elemental stat adds + temp elementBoosts, each independently amplified, crit applied once to the total, then every damage-scaling skill node in one pass. */
+    function computeHitDamage(baseDamage: number, weaponElement: Element, target: EnemyEntity | null): { total: number; crit: boolean; element: Element } {
+        const element = wildConversion ? RANDOM_ELEMENTS[Math.floor(Math.random() * RANDOM_ELEMENTS.length)] : weaponElement;
         const crit = Math.random() < stats.critChance;
         const components: Partial<Record<Element, number>> = {};
-        components[weaponElement] = (components[weaponElement] ?? 0) + baseDamage;
+        components[element] = (components[element] ?? 0) + baseDamage;
         if (stats.fireDamage) components.fire = (components.fire ?? 0) + stats.fireDamage;
         if (stats.iceDamage) components.ice = (components.ice ?? 0) + stats.iceDamage;
         if (stats.lightningDamage) components.lightning = (components.lightning ?? 0) + stats.lightningDamage;
@@ -385,9 +488,24 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
         if (stats.arcaneDamage) components.arcane = (components.arcane ?? 0) + stats.arcaneDamage;
         for (const boost of elementBoosts) components[boost.element] = (components[boost.element] ?? 0) + boost.amount;
         let total = 0;
-        for (const [el, val] of Object.entries(components)) total += (val as number) * elementAmp(el as Element);
+        for (const [el, val] of Object.entries(components)) {
+            const mult = elementAmp(el as Element) * (el === 'physical' ? 1 : elementalDamageMult);
+            total += (val as number) * mult;
+        }
         if (crit) total *= 1.8 + stats.critDamage;
-        return { total, crit };
+
+        if (retainedForce) total *= 1 + Math.min(retainedForce.amount2, retainedForce.amount * combatTimeThisFloor);
+        if (familiarFoe && target && hitEnemiesThisFloor.has(target)) total *= 1 + familiarFoe.amount;
+        if (encoreStacks > 0 && encore) total *= 1 + encoreStacks * encore.amount;
+        if (chaoticMight) total *= 1 + chaoticMight.amount + Math.random() * chaoticMight.amount2;
+        if (entropy && target && target.statuses.length >= 2) total *= 1 + entropy.amount;
+        if (momentum) total *= 1 + Math.min(momentum.amount2, momentum.amount * movingStreak);
+        if (vitalSurgeRemaining > 0 && vitalSurge) total *= 1 + vitalSurge.amount;
+        if (chaoticSurgeRemaining > 0 && chaoticSurge) total *= 1 + chaoticSurge.amount2;
+        if (mutationRemaining > 0 && mutation) total *= 1 + mutation.amount2;
+
+        if (total > hardestHit.damage) hardestHit = { damage: total, element };
+        return { total, crit, element };
     }
 
     function spawnExplosion(x: number, y: number, radius: number, element: Element) {
@@ -417,6 +535,7 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
                 hitIds: new Set(),
                 source,
                 splashRadius: 0,
+                element,
             });
         }
     }
@@ -434,7 +553,7 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
                 healPlayer(effect.amount);
                 break;
             case 'elementBoost':
-                elementBoosts.push({ element: effect.element, amount: effect.amount, remaining: effect.duration });
+                elementBoosts.push({ element: effect.element, amount: effect.amount, remaining: effect.duration, duration: effect.duration });
                 break;
             case 'explosion':
                 spawnExplosion(originX, originY, effect.radius, effect.element);
@@ -457,7 +576,7 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
     }
 
     function handleOnKillProcs(deadEnemy: EnemyEntity) {
-        for (const proc of rollOnKillProcs(opts.rhunes)) {
+        for (const proc of rollOnKillProcs(opts.rhunes, rhuneAmp)) {
             if (proc.result === 'explosion') {
                 spawnExplosion(deadEnemy.x, deadEnemy.y, 90, 'physical');
                 for (const other of [...enemies]) {
@@ -473,16 +592,49 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
         }
         runItemProcs('onKill', deadEnemy.x, deadEnemy.y, null);
         if (stats.healOnKill > 0) healPlayer(stats.healOnKill);
+
+        // Hyphora: Encore — kills stack a temporary damage buff.
+        if (encore) {
+            encoreStacks = Math.min(10, encoreStacks + 1);
+            encoreRemaining = encore.amount2;
+        }
+        // Fluxxara: Mutation — chance on kill for a temporary stat spike.
+        if (mutation && Math.random() < mutation.amount) {
+            mutationRemaining = 4;
+            floatingText(deadEnemy.x, deadEnemy.y - 20, 'Mutation!', 0xf97316);
+        }
+        // Aeona: Borrowed Moments — kills have a chance to knock weapon cooldowns down.
+        if (borrowedMoments && Math.random() < borrowedMoments.amount) {
+            for (let i = 0; i < weaponCooldowns.length; i++) weaponCooldowns[i] *= 1 - borrowedMoments.amount2;
+        }
     }
 
-    function damageEnemy(enemy: EnemyEntity, amount: number, crit: boolean, source: DamageSource) {
+    /** `element` is the actually-dealt element (may differ from the weapon's own if Wild Conversion randomized it) — only weapon hits pass it. */
+    function damageEnemy(enemy: EnemyEntity, amount: number, crit: boolean, source: DamageSource, element?: Element) {
         if (enemy.dead) return;
         const finalAmount = amount * enemy.shockMult;
         enemy.hp -= finalAmount;
         floatingText(enemy.x, enemy.y - enemy.radius - 6, crit ? `${Math.round(finalAmount)}!` : `${Math.round(finalAmount)}`, crit ? 0xfbbf24 : 0xffffff);
         if (finalAmount > 0 && stats.lifesteal > 0) healPlayer(finalAmount * stats.lifesteal);
         if (source === 'weapon') {
-            for (const application of rollOnHitStatuses(opts.rhunes, crit)) applyStatus(enemy, application);
+            hitEnemiesThisFloor.add(enemy);
+            const applications = rollOnHitStatuses(opts.rhunes, crit, rhuneAmp);
+            for (const application of applications) {
+                applyStatus(enemy, application);
+                if (deepAttunement) applyStatus(enemy, { status: 'poison', magnitude: deepAttunement.amount, duration: 3 * buffDurationMult });
+                if (overchargedSigils && !enemy.dead) {
+                    for (const other of enemies) {
+                        if (other === enemy || Math.hypot(other.x - enemy.x, other.y - enemy.y) > overchargedSigils.amount) continue;
+                        applyStatus(other, application);
+                    }
+                }
+            }
+            if (element && wildConversion) {
+                const rider = ELEMENT_STATUS_RIDER[element];
+                if (rider) applyStatus(enemy, { ...STATUS_BASE[rider], status: rider, duration: STATUS_BASE[rider].duration * buffDurationMult });
+            }
+            if (kindling && applications.length === 0 && Math.random() < kindling.amount) applyStatus(enemy, randomStatusApplication());
+            if (volatileStrikes && Math.random() < volatileStrikes.amount) applyStatus(enemy, randomStatusApplication());
             runItemProcs('onHit', enemy.x, enemy.y, enemy);
             if (crit) runItemProcs('onCrit', enemy.x, enemy.y, enemy);
             if (stats.knockback > 0 && !enemy.dead) {
@@ -521,15 +673,27 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
         return nearest;
     }
 
+    /** One melee hit against one enemy — factored out so Echoing Strikes (guaranteed 2x) and Lingering Echo (chance to repeat) can both just call this again. */
+    function applyMeleeHit(enemy: EnemyEntity, weapon: EquippedWeapon) {
+        const { total, crit, element } = computeHitDamage(weapon.stats.damage ?? 5, weapon.element, enemy);
+        damageEnemy(enemy, total, crit, 'weapon', element);
+        if (lingeringEcho && Math.random() < lingeringEcho.amount) {
+            const echo = computeHitDamage(weapon.stats.damage ?? 5, weapon.element, enemy);
+            damageEnemy(enemy, echo.total, echo.crit, 'weapon', echo.element);
+        }
+    }
+
     function fireMelee(weapon: EquippedWeapon) {
         const radius = (weapon.stats.aoeRadius ?? 60) + 30;
         let hitAny = false;
-        for (const enemy of [...enemies]) {
-            const dist = Math.hypot(enemy.x - player.x, enemy.y - player.y);
-            if (dist <= radius) {
-                hitAny = true;
-                const { total, crit } = computeHitDamage(weapon.stats.damage ?? 5, weapon.element);
-                damageEnemy(enemy, total, crit, 'weapon');
+        const strikes = echoingStrikes ? 2 : 1;
+        for (let s = 0; s < strikes; s++) {
+            for (const enemy of [...enemies]) {
+                const dist = Math.hypot(enemy.x - player.x, enemy.y - player.y);
+                if (dist <= radius) {
+                    hitAny = true;
+                    applyMeleeHit(enemy, weapon);
+                }
             }
         }
         if (hitAny) {
@@ -537,6 +701,27 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
             fxLayer.addChild(ring);
             fadeAndDestroy(ring, 0.18);
         }
+    }
+
+    function spawnPlayerProjectile(angle: number, speed: number, damage: number, crit: boolean, element: Element, pierceRemaining: number) {
+        const g = new Graphics().circle(0, 0, 6).fill(ELEMENT_COLOR[element]);
+        g.position.set(player.x, player.y);
+        projectileLayer.addChild(g);
+        projectiles.push({
+            x: player.x,
+            y: player.y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            damage,
+            crit,
+            g,
+            life: 2,
+            pierceRemaining,
+            hitIds: new Set(),
+            source: 'weapon',
+            splashRadius: stats.splashRadius,
+            element,
+        });
     }
 
     function fireRanged(weapon: EquippedWeapon) {
@@ -550,26 +735,16 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
         const pierceCount = 1 + Math.floor(stats.pierce);
         const spreadStep = 0.16;
         const startAngle = baseAngle - (spreadStep * (shotCount - 1)) / 2;
-        for (let i = 0; i < shotCount; i++) {
-            const angle = startAngle + spreadStep * i;
-            const { total, crit } = computeHitDamage(weapon.stats.damage ?? 5, weapon.element);
-            const g = new Graphics().circle(0, 0, 6).fill(ELEMENT_COLOR[weapon.element]);
-            g.position.set(player.x, player.y);
-            projectileLayer.addChild(g);
-            projectiles.push({
-                x: player.x,
-                y: player.y,
-                vx: Math.cos(angle) * speed,
-                vy: Math.sin(angle) * speed,
-                damage: total,
-                crit,
-                g,
-                life: 2,
-                pierceRemaining: pierceCount,
-                hitIds: new Set(),
-                source: 'weapon',
-                splashRadius: stats.splashRadius,
-            });
+        const volleys = echoingStrikes ? 2 : 1;
+        for (let v = 0; v < volleys; v++) {
+            for (let i = 0; i < shotCount; i++) {
+                const angle = startAngle + spreadStep * i;
+                const { total, crit, element } = computeHitDamage(weapon.stats.damage ?? 5, weapon.element, nearest);
+                spawnPlayerProjectile(angle, speed, total, crit, element, pierceCount);
+                if (doubledFateChance > 0 && Math.random() < doubledFateChance) {
+                    spawnPlayerProjectile(angle + 0.3, speed, total, crit, element, pierceCount);
+                }
+            }
         }
     }
 
@@ -695,6 +870,8 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
         stats.dodgeChance = Math.min(stats.dodgeChance, 0.6);
         stats.damageReduction = Math.min(stats.damageReduction, 0.75);
         stats.reviveChance = Math.min(stats.reviveChance, 0.75);
+        stats.blockChance = Math.min(stats.blockChance, 0.6);
+        stats.thornsPercent = Math.min(stats.thornsPercent, 0.75);
 
         if (def.playerMods.maxHp) {
             player.maxHp = stats.maxHp;
@@ -729,6 +906,14 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
         floor += 1;
         opts.onFloorChange(floor, isBossFloor(floor));
         phase = 'combat';
+        hitEnemiesThisFloor = new Set();
+        combatTimeThisFloor = 0;
+        rewindUsedThisFloor = false;
+        rewindBuffer = [];
+        if (!undyingRecollection) {
+            encoreStacks = 0;
+            encoreRemaining = 0;
+        }
         spawnFloorEnemies(floor);
     }
 
@@ -746,10 +931,22 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
 
         elementBoosts = elementBoosts.filter((b) => {
             b.remaining -= dt;
+            if (b.remaining <= 0 && tickTock && Math.random() < tickTock.amount) b.remaining = b.duration; // Aeona: Tick Tock
             return b.remaining > 0;
         });
 
-        if (stats.regen > 0 && player.hp < player.maxHp) healPlayer(stats.regen * dt);
+        // Regen: base stat + Overgrowth (scales up the lower HP is) + Faded Scars (scales off max HP).
+        let effectiveRegen = stats.regen;
+        if (overgrowth) effectiveRegen += overgrowth.amount * (1 - player.hp / Math.max(1, player.maxHp));
+        if (fadedScars) effectiveRegen += fadedScars.amount * player.maxHp;
+        if (effectiveRegen > 0 && player.hp < player.maxHp) healPlayer(effectiveRegen * dt);
+
+        // Axiora: Measured Recovery — a burst of extra regen after being hit, independent of the base regen stat.
+        regenBursts = regenBursts.filter((burst) => {
+            healPlayer(burst.perSec * dt);
+            burst.remaining -= dt;
+            return burst.remaining > 0;
+        });
 
         // Movement: keyboard first, pointer-hold overrides when active (clamped to world bounds).
         const b = bounds();
@@ -765,15 +962,112 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
         if (isMoving) hammerG.rotation = Math.atan2(dirY, dirX) + Math.PI / 2;
         camera.update(player.x, player.y, dt);
 
+        // Aeona: Momentum — tracks how long the player has moved without stopping.
+        movingStreak = isMoving ? movingStreak + dt : 0;
+
         if (player.invuln > 0) player.invuln -= dt;
         if (player.hitFlash > 0) {
             player.hitFlash -= dt;
             playerG.tint = 0xff6b6b;
         } else {
-            playerG.tint = 0xffffff;
+            playerG.tint = aegisRemaining > 0 ? 0xfacc15 : 0xffffff;
         }
+        if (aegisRemaining > 0) aegisRemaining -= dt;
+
+        // Decay every timed skill-tree buff in one place.
+        if (encoreRemaining > 0) {
+            encoreRemaining -= dt;
+            if (encoreRemaining <= 0) encoreStacks = 0;
+        }
+        if (dodgeReflexRemaining > 0) dodgeReflexRemaining -= dt;
+        if (mutationRemaining > 0) mutationRemaining -= dt;
+        if (vitalSurgeRemaining > 0) vitalSurgeRemaining -= dt;
+        if (chaoticSurgeRemaining > 0) chaoticSurgeRemaining -= dt;
 
         if (phase === 'combat') {
+            combatTimeThisFloor += dt;
+
+            // Axiora: Aegis of Axiora — fixed-interval full immunity window.
+            if (aegis) {
+                aegisTimer -= dt;
+                if (aegisTimer <= 0) {
+                    aegisTimer = aegis.amount;
+                    aegisRemaining = aegis.amount2;
+                    floatingText(player.x, player.y - 40, 'Aegis!', 0xfacc15);
+                }
+            }
+
+            // Vitalis: Vital Surge — auto-triggers below 30% HP; needs to recover above 50% once before it can fire again.
+            if (vitalSurge) {
+                const hpFrac = player.hp / Math.max(1, player.maxHp);
+                if (hpFrac < 0.3 && vitalSurgeReady) {
+                    vitalSurgeReady = false;
+                    vitalSurgeRemaining = 4;
+                    floatingText(player.x, player.y - 40, 'Vital Surge!', 0x4ade80);
+                } else if (hpFrac > 0.5) {
+                    vitalSurgeReady = true;
+                }
+            }
+
+            // Vitalis: Bonded Spirit — a permanent passive companion ticking damage on the nearest enemy.
+            if (bondedSpirit) {
+                bondedSpiritTimer -= dt;
+                if (bondedSpiritTimer <= 0) {
+                    bondedSpiritTimer = 1;
+                    const nearest = findNearestEnemy();
+                    if (nearest && Math.hypot(nearest.x - player.x, nearest.y - player.y) <= 260) {
+                        damageEnemy(nearest, bondedSpirit.amount, false, 'proc');
+                    }
+                }
+            }
+
+            // Fluxxara: Chaotic Surge — periodic damage-type conversion + a large temporary boost.
+            if (chaoticSurge) {
+                chaoticSurgeTimer -= dt;
+                if (chaoticSurgeTimer <= 0) {
+                    chaoticSurgeTimer = chaoticSurge.amount;
+                    chaoticSurgeRemaining = 3;
+                    floatingText(player.x, player.y - 40, 'Chaotic Surge!', 0xf97316);
+                }
+            }
+
+            // Hyphora: Perfect Recall — periodically re-deals the hardest hit landed this run to the nearest enemy.
+            if (perfectRecall && hardestHit.damage > 0) {
+                perfectRecallTimer -= dt;
+                if (perfectRecallTimer <= 0) {
+                    perfectRecallTimer = perfectRecall.amount;
+                    const nearest = findNearestEnemy();
+                    if (nearest) damageEnemy(nearest, hardestHit.damage, false, 'proc');
+                }
+            }
+
+            // Rhynekra: Elemental Cascade — statused enemies have a chance to spread one status to a nearby enemy.
+            if (elementalCascade) {
+                elementalCascadeTimer -= dt;
+                if (elementalCascadeTimer <= 0) {
+                    elementalCascadeTimer = 1;
+                    for (const e of enemies) {
+                        if (e.statuses.length === 0 || Math.random() >= elementalCascade.amount) continue;
+                        const spread = e.statuses[Math.floor(Math.random() * e.statuses.length)];
+                        for (const other of enemies) {
+                            if (other === e || Math.hypot(other.x - e.x, other.y - e.y) > elementalCascade.amount2) continue;
+                            applyStatus(other, { status: spread.status, magnitude: spread.magnitude, duration: spread.remaining });
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Aeona: Rewind — periodically snapshot position/HP so a lethal hit can be undone once per floor.
+            if (rewind && !rewindUsedThisFloor) {
+                rewindSnapshotTimer -= dt;
+                if (rewindSnapshotTimer <= 0) {
+                    rewindSnapshotTimer = REWIND_SNAPSHOT_INTERVAL;
+                    rewindBuffer.push({ x: player.x, y: player.y, hp: player.hp });
+                    if (rewindBuffer.length > Math.ceil(rewind.amount / REWIND_SNAPSHOT_INTERVAL) + 1) rewindBuffer.shift();
+                }
+            }
+
             // Move trails: drop a hazard on an interval while moving.
             moveTrailConfigs.forEach((cfg, i) => {
                 moveTrailTimers[i] -= dt;
@@ -801,6 +1095,7 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
                 for (const e of enemies) {
                     if (Math.hypot(e.x - hz.x, e.y - hz.y) <= hz.radius + e.radius) {
                         applyStatus(e, { status: hz.status, magnitude: hz.magnitude, duration: hz.statusDuration });
+                        if (deepAttunement) applyStatus(e, { status: 'poison', magnitude: deepAttunement.amount, duration: 3 * buffDurationMult });
                     }
                 }
                 return true;
@@ -814,6 +1109,7 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
                 for (const e of enemies) {
                     if (Math.hypot(e.x - player.x, e.y - player.y) <= cfg.radius) {
                         applyStatus(e, { status: cfg.status, magnitude: cfg.magnitude, duration: cfg.duration });
+                        if (deepAttunement) applyStatus(e, { status: 'poison', magnitude: deepAttunement.amount, duration: 3 * buffDurationMult });
                     }
                 }
             });
@@ -832,7 +1128,7 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
                         if (s.tickTimer <= 0) {
                             s.tickTimer += 0.5;
                             const dotElement: Element = s.status === 'burn' ? 'fire' : 'poison';
-                            damageEnemy(e, s.magnitude * 0.5 * elementAmp(dotElement), false, 'dot');
+                            damageEnemy(e, s.magnitude * 0.5 * elementAmp(dotElement) * elementalDamageMult, false, 'dot');
                         }
                     }
                     return s.remaining > 0;
@@ -849,19 +1145,50 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
                 e.g.position.set(e.x, e.y);
 
                 if (dist <= e.radius + 18 && player.invuln <= 0) {
+                    if (aegisRemaining > 0) continue; // total immunity — not even a dodge/block roll happens
+
                     player.invuln = 0.6 + stats.invulnDuration;
-                    if (Math.random() < stats.dodgeChance) {
+                    const dodgeBoost = dodgeReflexRemaining > 0 && adaptiveReflexes ? adaptiveReflexes.amount : 0;
+                    const dodged = Math.random() < stats.dodgeChance + dodgeBoost;
+                    const blocked = !dodged && Math.random() < stats.blockChance;
+                    if (dodged) {
                         floatingText(player.x, player.y - 30, 'Dodge!', 0x38bdf8);
+                        if (adaptiveReflexes) dodgeReflexRemaining = adaptiveReflexes.amount2;
+                        if (briefReprieve && Math.random() < briefReprieve.amount) {
+                            for (const other of enemies) {
+                                if (Math.hypot(other.x - player.x, other.y - player.y) <= briefReprieve.amount2) {
+                                    applyStatus(other, { status: 'slow', magnitude: 0.4, duration: 1.2 });
+                                }
+                            }
+                        }
+                    } else if (blocked) {
+                        floatingText(player.x, player.y - 30, 'Block!', 0x818cf8);
+                        if (retribution) damageEnemy(e, retribution.amount, false, 'proc');
                     } else {
                         const afterArmor = Math.max(1, e.damage * statMultForFloor(floor) * pillarEnemyDamageMult - stats.armor);
-                        const afterReduction = afterArmor * (1 - stats.damageReduction);
+                        const flatDr = stats.damageReduction + (resilientFlesh && player.hp / player.maxHp > 0.5 ? resilientFlesh.amount : 0);
+                        let afterReduction = afterArmor * (1 - flatDr);
+                        if (unbroken) afterReduction = Math.min(afterReduction, player.maxHp * unbroken.amount);
                         player.hp = Math.max(0, player.hp - afterReduction);
                         player.hitFlash = 0.2;
                         opts.onHpChange(player.hp, player.maxHp);
                         if (stats.thorns > 0) damageEnemy(e, stats.thorns, false, 'thorns');
+                        if (stats.thornsPercent > 0) damageEnemy(e, afterReduction * stats.thornsPercent, false, 'thorns');
+                        if (retribution) damageEnemy(e, retribution.amount, false, 'proc');
+                        if (measuredRecovery) regenBursts.push({ remaining: measuredRecovery.amount2, perSec: measuredRecovery.amount / measuredRecovery.amount2 });
                         runItemProcs('onBeingHit', player.x, player.y, e);
                         if (player.hp <= 0) {
-                            if (!revivedThisFloor && Math.random() < stats.reviveChance) {
+                            if (rewind && !rewindUsedThisFloor && rewindBuffer.length > 0) {
+                                rewindUsedThisFloor = true;
+                                const snapshot = rewindBuffer[0];
+                                player.x = snapshot.x;
+                                player.y = snapshot.y;
+                                player.hp = Math.max(1, snapshot.hp);
+                                player.invuln = 1.5;
+                                playerLayer.position.set(player.x, player.y);
+                                opts.onHpChange(player.hp, player.maxHp);
+                                floatingText(player.x, player.y - 40, 'Rewind!', 0xfacc15);
+                            } else if (!revivedThisFloor && Math.random() < stats.reviveChance) {
                                 revivedThisFloor = true;
                                 player.hp = 1;
                                 opts.onHpChange(player.hp, player.maxHp);
@@ -879,7 +1206,8 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
             opts.weapons.forEach((weapon, i) => {
                 weaponCooldowns[i] -= dt;
                 if (weaponCooldowns[i] > 0) return;
-                const rate = Math.max(0.2, weapon.stats.fireRate ?? 1);
+                const steadyRecallBonus = steadyRecall ? Math.min(steadyRecall.amount2, steadyRecall.amount * combatTimeThisFloor) : 0;
+                const rate = Math.max(0.2, 1 + stats.fireRate + steadyRecallBonus);
                 weaponCooldowns[i] = 1 / rate;
                 if (weapon.role === 'melee') fireMelee(weapon);
                 else if (weapon.role === 'ranged') fireRanged(weapon);
@@ -897,7 +1225,10 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
                 for (const e of enemies) {
                     if (p.hitIds.has(e)) continue;
                     if (Math.hypot(e.x - p.x, e.y - p.y) <= e.radius + 6) {
-                        damageEnemy(e, p.damage, p.crit, p.source);
+                        damageEnemy(e, p.damage, p.crit, p.source, p.element);
+                        if (p.source === 'weapon' && lingeringEcho && Math.random() < lingeringEcho.amount) {
+                            damageEnemy(e, p.damage, p.crit, p.source, p.element);
+                        }
                         p.hitIds.add(e);
                         if (p.splashRadius > 0) {
                             for (const other of [...enemies]) {

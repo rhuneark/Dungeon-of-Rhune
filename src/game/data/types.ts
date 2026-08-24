@@ -92,6 +92,8 @@ export interface StatBlock {
     knockback?: number; // design units enemies are pushed back on hit
     regen?: number; // HP restored per second
     splashRadius?: number; // design units — ranged hits also damage enemies in this radius
+    blockChance?: number; // 0..1 chance to block contact damage entirely (Axiora)
+    thornsPercent?: number; // 0..1 fraction of damage taken reflected to the attacker (Axiora)
 }
 
 export const STAT_LABELS: Record<keyof StatBlock, string> = {
@@ -125,6 +127,8 @@ export const STAT_LABELS: Record<keyof StatBlock, string> = {
     knockback: 'Knockback',
     regen: 'HP Regen',
     splashRadius: 'Splash Radius',
+    blockChance: 'Block Chance',
+    thornsPercent: 'Thorns %',
 };
 
 export interface BaseTypeDef {
@@ -279,9 +283,6 @@ export interface BountyInstance {
     claimed: boolean;
 }
 
-/** Player build style — persistent, points spent freely and respec'd for free (new-player-friendly). */
-export type BuildStyle = 'berserker' | 'ranger' | 'warden';
-
 export interface SaveData {
     version: 1;
     currency: number;
@@ -295,6 +296,8 @@ export interface SaveData {
     chestUpgradeLevel: number;
     equipped: Record<GearSlot, string | null>;
     equippedRhunes: [string | null, string | null, string | null];
+    /** A 4th Rhune socket — inert (and hidden in the UI) until the Rhynekra capstone "The Fourth Rhune" is allocated. */
+    bonusRhuneSocket: string | null;
     selectedTier: number;
     unlockedTiers: number[];
     bestFloorByTier: Record<number, number>;
@@ -306,12 +309,16 @@ export interface SaveData {
     weeklyBounties: BountyInstance[];
     dailyBountiesGeneratedAt: number;
     weeklyBountiesGeneratedAt: number;
-    /** Lifetime XP (levels + available points are always derived from this — see systems/build.ts) plus points already committed per style. */
+    /**
+     * The passive skill tree (see data/skillTree.ts + systems/skillTree.ts).
+     * Lifetime XP — level and points available are always DERIVED from xp,
+     * never stored, so they can't drift out of sync — plus the list of
+     * allocated node ids. Respec clears `allocated` and refunds nothing but
+     * the points (it costs Scrap, see respecCost()).
+     */
     build: {
         xp: number;
-        berserker: number;
-        ranger: number;
-        warden: number;
+        allocated: string[];
     };
 }
 
@@ -340,6 +347,7 @@ export function defaultSaveData(): SaveData {
         chestUpgradeLevel: 0,
         equipped: emptyEquipped(),
         equippedRhunes: [null, null, null],
+        bonusRhuneSocket: null,
         selectedTier: 1,
         unlockedTiers: [1],
         bestFloorByTier: {},
@@ -348,6 +356,6 @@ export function defaultSaveData(): SaveData {
         weeklyBounties: [],
         dailyBountiesGeneratedAt: 0,
         weeklyBountiesGeneratedAt: 0,
-        build: { xp: 0, berserker: 0, ranger: 0, warden: 0 },
+        build: { xp: 0, allocated: [] },
     };
 }

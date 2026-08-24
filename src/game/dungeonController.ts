@@ -11,7 +11,7 @@ import type { PillarDef } from './data/pillars.ts';
 import { recordRunEnd } from './systems/progress.ts';
 import { saveGame } from './systems/save.ts';
 import { addLootToBag } from './systems/inventory.ts';
-import { buildLevel } from './systems/build.ts';
+import { buildLevel } from './systems/skillTree.ts';
 
 export const dungeonSceneRef: { current: DungeonScene | null } = { current: null };
 

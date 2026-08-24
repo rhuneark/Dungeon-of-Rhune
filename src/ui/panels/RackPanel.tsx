@@ -11,9 +11,9 @@ import { RARITIES } from '../../game/data/rarity.ts';
 import { getBaseType } from '../../game/data/baseTypes.ts';
 import { getRhuneDef } from '../../game/data/rhunes.ts';
 import { itemDisplayName } from '../../game/data/nameGen.ts';
-import { aggregateStats } from '../../game/systems/inventory.ts';
+import { aggregateStats, hasFourthRhuneSocket } from '../../game/systems/inventory.ts';
 import { TIERS } from '../../game/data/tiers.ts';
-import { buildLevel } from '../../game/systems/build.ts';
+import { buildLevel } from '../../game/systems/skillTree.ts';
 
 const SLOT_LABEL: Record<GearSlot, string> = {
     head: 'Head',
@@ -31,13 +31,15 @@ export default function RackPanel() {
     const { stats } = aggregateStats(save);
 
     const totalBestFloors = Object.values(save.bestFloorByTier).reduce((sum, f) => sum + f, 0);
-    const equippedCount = GEAR_SLOTS.filter((slot) => save.equipped[slot]).length + save.equippedRhunes.filter(Boolean).length;
+    const fourthSocket = hasFourthRhuneSocket(save);
+    const rhuneSockets = fourthSocket ? [...save.equippedRhunes, save.bonusRhuneSocket] : save.equippedRhunes;
+    const equippedCount = GEAR_SLOTS.filter((slot) => save.equipped[slot]).length + rhuneSockets.filter(Boolean).length;
 
     return (
         <Modal title="Armor Rack" subtitle="Your gear, your stats, your bragging rights.">
             <div className="space-y-5">
                 <section>
-                    <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-white/40">Equipped ({equippedCount}/11)</h3>
+                    <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-white/40">Equipped ({equippedCount}/{fourthSocket ? 12 : 11})</h3>
                     <div className="grid grid-cols-2 gap-2">
                         {GEAR_SLOTS.map((slot) => {
                             const itemId = save.equipped[slot];
@@ -62,7 +64,7 @@ export default function RackPanel() {
                         })}
                     </div>
                     <div className="mt-2 grid grid-cols-3 gap-2">
-                        {save.equippedRhunes.map((rhuneId, i) => {
+                        {rhuneSockets.map((rhuneId, i) => {
                             const rhune = rhuneId ? save.rhunes.find((r) => r.instanceId === rhuneId) : null;
                             const rarity = rhune ? RARITIES[rhune.rarity] : null;
                             return (

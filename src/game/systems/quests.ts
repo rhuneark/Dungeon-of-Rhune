@@ -5,6 +5,11 @@
  * timezone or when the player's day starts) and progress resets with it.
  */
 import type { BountyInstance, BountyKind, SaveData } from '../data/types.ts';
+import { grantXp } from './skillTree.ts';
+
+/** Flat XP for claiming one bounty — daily bounties are quick, weekly ones are the bigger payoff. */
+const DAILY_BOUNTY_XP = 15;
+const WEEKLY_BOUNTY_XP = 40;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WEEK_MS = 7 * DAY_MS;
@@ -99,10 +104,11 @@ export function claimBounty(save: SaveData, instanceId: string): SaveData {
     if (!bounty || bounty.claimed || bounty.progress < bounty.target) return save;
 
     const mark = (list: BountyInstance[]) => list.map((b) => (b.instanceId === instanceId ? { ...b, claimed: true } : b));
-    return {
+    const next = {
         ...save,
         currency: save.currency + bounty.reward,
         dailyBounties: inDaily ? mark(save.dailyBounties) : save.dailyBounties,
         weeklyBounties: inDaily ? save.weeklyBounties : mark(save.weeklyBounties),
     };
+    return grantXp(next, inDaily ? DAILY_BOUNTY_XP : WEEKLY_BOUNTY_XP);
 }

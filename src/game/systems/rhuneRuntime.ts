@@ -22,7 +22,11 @@ export interface ResolvedRhune {
 
 export function resolveEquippedRhunes(save: SaveData): ResolvedRhune[] {
     const out: ResolvedRhune[] = [];
-    for (const rhuneId of save.equippedRhunes) {
+    // The 4th socket only functions once the Rhynekra capstone is allocated — see systems/skillTree.ts.
+    const sockets = save.build.allocated.includes('rhynekra_capstone_fourth_rhune')
+        ? [...save.equippedRhunes, save.bonusRhuneSocket]
+        : save.equippedRhunes;
+    for (const rhuneId of sockets) {
         if (!rhuneId) continue;
         const instance = save.rhunes.find((r) => r.instanceId === rhuneId);
         if (!instance) continue;
@@ -38,6 +42,20 @@ export function statModContribution(resolved: ResolvedRhune): Partial<StatBlock>
     if (resolved.def.effect.kind !== 'statMod') return {};
     const { stat, baseValue } = resolved.def.effect;
     return { [stat]: baseValue * resolved.rarityMult } as Partial<StatBlock>;
+}
+
+/**
+ * Optional run-wide multipliers the Rhynekra skill-tree branch applies on
+ * top of a Rhune's own rarity scaling — kept separate from `rarityMult` so
+ * "effect magnitude", "proc chance", and "duration" can each be tuned
+ * independently (Attuned Socket / Resonance / Arcane Reservoir). Every
+ * function below defaults all three to 1 when omitted, so existing callers
+ * (and existing behavior) are unaffected.
+ */
+export interface RhuneAmplifiers {
+    effectMult?: number;
+    chanceMult?: number;
+    durationMult?: number;
 }
 
 const STATUS_CAPS: Record<StatusType, { magnitude: number; duration: number }> = {
@@ -63,14 +81,16 @@ export interface StatusApplication {
 }
 
 /** Roll every onHitStatus rhune for one weapon hit; returns the ones that proc'd this hit. */
-export function rollOnHitStatuses(resolved: ResolvedRhune[], isCrit: boolean): StatusApplication[] {
+export function rollOnHitStatuses(resolved: ResolvedRhune[], isCrit: boolean, amp?: RhuneAmplifiers): StatusApplication[] {
     const out: StatusApplication[] = [];
     for (const r of resolved) {
         if (r.def.effect.kind !== 'onHitStatus') continue;
         const { chance, status, magnitude, duration, critOnly } = r.def.effect;
         if (critOnly && !isCrit) continue;
-        const scaledChance = Math.min(0.9, chance * r.rarityMult);
-        if (Math.random() < scaledChance) out.push({ status, ...scaleStatus(status, magnitude, duration, r.rarityMult) });
+        const scaledChance = Math.min(0.9, chance * r.rarityMult * (amp?.chanceMult ?? 1));
+        if (Math.random() < scaledChance) {
+            out.push({ status, ...scaleStatus(status, magnitude * (amp?.effectMult ?? 1), duration * (amp?.durationMult ?? 1), r.rarityMult) });
+        }
     }
     return out;
 }
@@ -80,13 +100,13 @@ export interface KillProc {
     magnitude: number;
 }
 
-export function rollOnKillProcs(resolved: ResolvedRhune[]): KillProc[] {
+export function rollOnKillProcs(resolved: ResolvedRhune[], amp?: RhuneAmplifiers): KillProc[] {
     const out: KillProc[] = [];
     for (const r of resolved) {
         if (r.def.effect.kind !== 'onKill') continue;
         const { chance, result, magnitude } = r.def.effect;
-        const scaledChance = Math.min(0.9, chance * r.rarityMult);
-        if (Math.random() < scaledChance) out.push({ result, magnitude: magnitude * r.rarityMult });
+        const scaledChance = Math.min(0.9, chance * r.rarityMult * (amp?.chanceMult ?? 1));
+        if (Math.random() < scaledChance) out.push({ result, magnitude: magnitude * r.rarityMult * (amp?.effectMult ?? 1) });
     }
     return out;
 }
@@ -101,12 +121,12 @@ export interface MoveTrailConfig {
     tickInterval: number;
 }
 
-export function getMoveTrailConfigs(resolved: ResolvedRhune[]): MoveTrailConfig[] {
+export function getMoveTrailConfigs(resolved: ResolvedRhune[], amp?: RhuneAmplifiers): MoveTrailConfig[] {
     const out: MoveTrailConfig[] = [];
     for (const r of resolved) {
         if (r.def.effect.kind !== 'moveTrail') continue;
         const { element, status, magnitude, radius, hazardLifetime, tickInterval } = r.def.effect;
-        const scaled = scaleStatus(status, magnitude, hazardLifetime, r.rarityMult);
+        const scaled = scaleStatus(status, magnitude * (amp?.effectMult ?? 1), hazardLifetime * (amp?.durationMult ?? 1), r.rarityMult);
         out.push({ element, status, magnitude: scaled.magnitude, duration: STATUS_CAPS[status].duration, radius, hazardLifetime: scaled.duration, tickInterval });
     }
     return out;
@@ -120,25 +140,25 @@ export interface AuraConfig {
     tickInterval: number;
 }
 
-export function getAuraConfigs(resolved: ResolvedRhune[]): AuraConfig[] {
+export function getAuraConfigs(resolved: ResolvedRhune[], amp?: RhuneAmplifiers): AuraConfig[] {
     const out: AuraConfig[] = [];
     for (const r of resolved) {
         if (r.def.effect.kind !== 'aura') continue;
         const { radius, status, magnitude, duration, tickInterval } = r.def.effect;
-        const scaled = scaleStatus(status, magnitude, duration, r.rarityMult);
+        const scaled = scaleStatus(status, magnitude * (amp?.effectMult ?? 1), duration * (amp?.durationMult ?? 1), r.rarityMult);
         out.push({ radius, status, magnitude: scaled.magnitude, duration: scaled.duration, tickInterval });
     }
     return out;
 }
 
 /** Combined multiplier for one element from all equipped elementAmp rhunes (compounds if more than one). */
-export function makeElementAmplifier(resolved: ResolvedRhune[]): (element: Element) => number {
+export function makeElementAmplifier(resolved: ResolvedRhune[], amp?: RhuneAmplifiers): (element: Element) => number {
     return (element: Element) => {
         let mult = 1;
         for (const r of resolved) {
             if (r.def.effect.kind !== 'elementAmp' || r.def.effect.element !== element) continue;
             const bonus = r.def.effect.mult - 1;
-            mult *= 1 + bonus * r.rarityMult;
+            mult *= 1 + bonus * r.rarityMult * (amp?.effectMult ?? 1);
         }
         return mult;
     };

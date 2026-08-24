@@ -104,6 +104,16 @@ export default function Hud() {
                             Build
                         </button>
                     )}
+                    {location === 'hub' && (
+                        <button
+                            type="button"
+                            className="pointer-events-auto rounded-xl bg-black/50 px-3 py-2 text-sm font-bold transition-transform active:scale-95"
+                            onClick={() => store.patch({ panel: 'menu' })}
+                            title="Character"
+                        >
+                            Character
+                        </button>
+                    )}
                     {location === 'dungeon' && (
                         <button
                             type="button"

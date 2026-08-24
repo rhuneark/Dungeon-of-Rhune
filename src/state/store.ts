@@ -12,8 +12,13 @@ import { defaultSaveData, type ItemInstance, type RhuneInstance, type SaveData }
 
 export type Phase = 'loading' | 'menu' | 'playing';
 export type Location = 'hub' | 'dungeon';
-/** 'inventory' is the bounded bag (I key); 'chest' is permanent tabbed storage (walk to the Chest station); 'build' is the level/style panel (C key). */
-export type PanelId = 'inventory' | 'chest' | 'rack' | 'statue' | 'portal' | 'blacksmith' | 'merchant' | 'quests' | 'build' | 'death' | null;
+/**
+ * 'inventory' is the bounded bag (I key); 'chest' is permanent tabbed storage (walk to the Chest station);
+ * 'menu' is the Character/Stats/Gear menu (HUD button, replaces the old Armor Rack station);
+ * 'tierSelect' is the dungeon-entry popup (walk to the Dungeon Entrance, replaces the old Tier Statue station);
+ * 'build' is the skill tree (C key or walk to the Pillars station).
+ */
+export type PanelId = 'inventory' | 'chest' | 'menu' | 'tierSelect' | 'portal' | 'blacksmith' | 'merchant' | 'quests' | 'build' | 'death' | null;
 
 export interface RunHud {
     floor: number;

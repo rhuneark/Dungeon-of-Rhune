@@ -1,9 +1,12 @@
 /**
  * The hub: a free-roam room (Diablo-camp style) — walk anywhere with
- * WASD/arrows or by holding the pointer, camera follows you. Eight stations
- * sit in three well-spaced rows (top: Statue/Dungeon/Portal, middle:
- * Chest/Rack/Quest Board, bottom: Merchant/Blacksmith) so nothing crowds —
+ * WASD/arrows or by holding the pointer, camera follows you. Seven stations
+ * sit in three well-spaced rows (top: Pillars/Dungeon/Portal, middle:
+ * Chest/Quest Board, bottom: Merchant/Blacksmith) so nothing crowds —
  * Dungeon Entrance stays top-center regardless of what else changes here.
+ * Tapping Dungeon Entrance opens a tier-select popup rather than diving
+ * straight in; Character/Stats/Gear live behind a HUD button instead of a
+ * station (see ui/Hud.tsx) now that the Armor Rack is gone.
  * Stations are always tappable (reliable on PC/mobile alike) via an
  * explicit circular hitArea sized to the full glow radius, not just the
  * icon's drawn pixels — walking close to one glows it, echoing "go to it
@@ -17,8 +20,7 @@ import { createInputTracker, pointerMoveDirection } from '../input.ts';
 
 export interface HubSceneOptions {
     onOpenChest(): void;
-    onOpenRack(): void;
-    onOpenStatue(): void;
+    onOpenPillars(): void;
     onOpenPortal(): void;
     onOpenBlacksmith(): void;
     onOpenMerchant(): void;
@@ -26,7 +28,7 @@ export interface HubSceneOptions {
     onEnterDungeon(): void;
 }
 
-type StationKind = 'statue' | 'dungeon' | 'chest' | 'rack' | 'portal' | 'blacksmith' | 'merchant' | 'questboard';
+type StationKind = 'pillars' | 'dungeon' | 'chest' | 'portal' | 'blacksmith' | 'merchant' | 'questboard';
 
 interface StationDef {
     kind: StationKind;
@@ -44,10 +46,11 @@ const INTERACT_GLOW_PAD = 55;
 function drawStationIcon(kind: StationKind, color: number): Graphics {
     const g = new Graphics();
     switch (kind) {
-        case 'statue': {
-            // Cross/shrine silhouette.
-            g.roundRect(-16, -60, 32, 100, 4).fill(color);
-            g.roundRect(-38, -34, 76, 44, 4).fill(color);
+        case 'pillars': {
+            // Two stone columns with a lintel across the top — "pillars of the six skill branches".
+            g.roundRect(-46, -60, 20, 100, 3).fill(color);
+            g.roundRect(26, -60, 20, 100, 3).fill(color);
+            g.roundRect(-52, -68, 104, 16, 3).fill(color);
             break;
         }
         case 'dungeon': {
@@ -62,10 +65,6 @@ function drawStationIcon(kind: StationKind, color: number): Graphics {
         }
         case 'chest': {
             g.roundRect(-50, -24, 100, 48, 8).fill(color);
-            break;
-        }
-        case 'rack': {
-            g.moveTo(-42, -34).lineTo(42, -34).lineTo(0, 40).closePath().fill(color);
             break;
         }
         case 'portal': {
@@ -118,13 +117,12 @@ export function createHubScene(app: Application, stage: Stage, opts: HubSceneOpt
     // Dungeon Entrance is the one fixed point everything else is arranged around.
     const stations: StationDef[] = [
         // top row
-        { kind: 'statue', label: 'Tier Statue', x: 300, y: 240, radius: 70, color: 0x818cf8, onInteract: opts.onOpenStatue },
+        { kind: 'pillars', label: 'Pillars (Skills)', x: 300, y: 240, radius: 70, color: 0x818cf8, onInteract: opts.onOpenPillars },
         { kind: 'dungeon', label: 'Enter Dungeon', x: WORLD_WIDTH / 2, y: 220, radius: 80, color: 0xef4444, onInteract: opts.onEnterDungeon },
         { kind: 'portal', label: 'Multiplayer Portal', x: 1620, y: 240, radius: 75, color: 0x475569, onInteract: opts.onOpenPortal },
         // middle row
-        { kind: 'chest', label: 'Chest', x: 280, y: 580, radius: 65, color: 0xd97706, onInteract: opts.onOpenChest },
-        { kind: 'rack', label: 'Armor Rack', x: WORLD_WIDTH / 2, y: 580, radius: 65, color: 0x64748b, onInteract: opts.onOpenRack },
-        { kind: 'questboard', label: 'Quest Board', x: 1640, y: 580, radius: 65, color: 0xca8a04, onInteract: opts.onOpenQuestBoard },
+        { kind: 'chest', label: 'Chest', x: 480, y: 580, radius: 65, color: 0xd97706, onInteract: opts.onOpenChest },
+        { kind: 'questboard', label: 'Quest Board', x: 1440, y: 580, radius: 65, color: 0xca8a04, onInteract: opts.onOpenQuestBoard },
         // bottom row
         { kind: 'merchant', label: 'Merchant', x: 620, y: 880, radius: 65, color: 0x16a34a, onInteract: opts.onOpenMerchant },
         { kind: 'blacksmith', label: 'Blacksmith', x: 1300, y: 880, radius: 70, color: 0x7c3aed, onInteract: opts.onOpenBlacksmith },

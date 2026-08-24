@@ -28,7 +28,9 @@ export function rerollItem(save: SaveData, itemId: string): SaveData {
             const value =
                 def.kind === 'proc'
                     ? Number(Math.min(0.9, randRange(def.chanceMin, def.chanceMax) * mult).toFixed(3))
-                    : Number((randRange(def.min, def.max) * mult).toFixed(def.isPercent || def.max < 1 ? 3 : 1));
+                    : def.kind === 'nodeLevel'
+                      ? (mult >= 2 ? 2 : 1)
+                      : Number((randRange(def.min, def.max) * mult).toFixed(def.isPercent || def.max < 1 ? 3 : 1));
             return { affixId: rolled.affixId, value };
         }),
     };

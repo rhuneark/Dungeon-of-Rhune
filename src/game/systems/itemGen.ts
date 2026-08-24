@@ -67,6 +67,10 @@ export function rollSpecificItem(baseTypeId: string, tier: number, forcedRarity?
         if (def.kind === 'proc') {
             return { affixId: def.id, value: Number(Math.min(0.9, randRange(def.chanceMin, def.chanceMax) * mult).toFixed(3)) };
         }
+        if (def.kind === 'nodeLevel') {
+            // Flat +1 node level, +2 at epic/legendary rarity — deliberately not fractional like other affixes.
+            return { affixId: def.id, value: mult >= 2 ? 2 : 1 };
+        }
         return { affixId: def.id, value: Number((randRange(def.min, def.max) * mult).toFixed(def.isPercent || def.max < 1 ? 3 : 1)) };
     });
 

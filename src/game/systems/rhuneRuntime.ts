@@ -13,6 +13,7 @@
 import type { Element, Rarity, RhuneDef, RhuneInstance, SaveData, StatBlock, StatusType } from '../data/types.ts';
 import { RARITIES } from '../data/rarity.ts';
 import { getRhuneDef } from '../data/rhunes.ts';
+import { isNodeOwned } from './skillTree.ts';
 
 export interface ResolvedRhune {
     instance: RhuneInstance;
@@ -22,8 +23,8 @@ export interface ResolvedRhune {
 
 export function resolveEquippedRhunes(save: SaveData): ResolvedRhune[] {
     const out: ResolvedRhune[] = [];
-    // The 4th socket only functions once the Rhynekra capstone is allocated — see systems/skillTree.ts.
-    const sockets = save.build.allocated.includes('rhynekra_capstone_fourth_rhune')
+    // The 4th socket only functions once Rhunekra's Final Convergence has unlocked — see systems/skillTree.ts.
+    const sockets = isNodeOwned(save, 'rhunekra_capstone_fourth_rhune')
         ? [...save.equippedRhunes, save.bonusRhuneSocket]
         : save.equippedRhunes;
     for (const rhuneId of sockets) {

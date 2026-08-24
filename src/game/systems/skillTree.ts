@@ -1,18 +1,22 @@
 /**
  * Leveling, point allocation, and respec for the passive skill tree (see
- * data/skillTree.ts for the branch/node definitions). Level — and therefore
+ * data/skillTree.ts for the pillar/node definitions). Level — and therefore
  * points available — is always DERIVED from lifetime xp rather than stored,
- * so it can never drift out of sync with a saved node list. Points are
- * soft-capped: xp (and the level number) can keep climbing forever since
- * floors are endless, but points stop being granted past POINT_CAP — "the
- * tree stops growing," not the character.
+ * so it can never drift out of sync with a saved node list.
+ *
+ * Max level is 30, one point per level (level 1 already has its first
+ * point), and every purchasable node costs exactly 1 — 15 nodes per pillar,
+ * so a level-30 character can fully clear two pillars. Allocating a node
+ * needs BOTH its `levelReq` and every `prereq` node already owned — no
+ * banking points to skip ahead. A pillar's Final Convergence node is never
+ * bought: it silently unlocks (for free) the instant every other node in
+ * that pillar is owned — see `isNodeOwned`.
  */
 import type { SaveData } from '../data/types.ts';
-import { getSkillNode, type SkillBranchId, type SkillNodeDef } from '../data/skillTree.ts';
+import { getSkillNode, SKILL_NODES, type SkillBranchId, type SkillNodeDef } from '../data/skillTree.ts';
 import type { StatBlock } from '../data/types.ts';
 
-/** Roughly level 50-60 worth of points, depending on how XP is earned — the soft cap the brief asked for. */
-export const POINT_CAP = 55;
+export const MAX_LEVEL = 30;
 
 function xpForLevel(level: number): number {
     return 100 + (level - 1) * 40;
@@ -21,10 +25,11 @@ function xpForLevel(level: number): number {
 export function buildLevelInfo(xp: number): { level: number; into: number; need: number } {
     let level = 1;
     let remaining = xp;
-    while (remaining >= xpForLevel(level)) {
+    while (level < MAX_LEVEL && remaining >= xpForLevel(level)) {
         remaining -= xpForLevel(level);
         level += 1;
     }
+    if (level >= MAX_LEVEL) return { level: MAX_LEVEL, into: 0, need: 0 };
     return { level, into: remaining, need: xpForLevel(level) };
 }
 
@@ -32,8 +37,9 @@ export function buildLevel(xp: number): number {
     return buildLevelInfo(xp).level;
 }
 
+/** One point per level — level 1 already grants its first point. */
 function totalPointsEarned(xp: number): number {
-    return Math.min(buildLevel(xp) - 1, POINT_CAP);
+    return buildLevel(xp);
 }
 
 function spentPoints(save: SaveData): number {
@@ -58,26 +64,36 @@ export function pointsSpentInBranch(save: SaveData, branch: SkillBranchId): numb
     return total;
 }
 
-export function allocatedCapstone(save: SaveData): SkillNodeDef | null {
-    for (const id of save.build.allocated) {
-        const node = getSkillNode(id);
-        if (node && node.tier === 'capstone') return node;
-    }
-    return null;
+/** Purchasable nodes per pillar (everything but the free Final Convergence). */
+export function purchasableNodeCountForBranch(branch: SkillBranchId): number {
+    return SKILL_NODES.filter((n) => n.branch === branch && n.position !== 'final').length;
+}
+
+function isAllocated(save: SaveData, nodeId: string): boolean {
+    return save.build.allocated.includes(nodeId);
+}
+
+/** A Final Convergence node is "owned" the instant every node it lists as a prereq is allocated — no point ever spent on it. */
+export function isNodeOwned(save: SaveData, nodeId: string): boolean {
+    const node = getSkillNode(nodeId);
+    if (!node) return false;
+    if (node.position === 'final') return node.prereq.every((p) => isAllocated(save, p));
+    return isAllocated(save, nodeId);
 }
 
 export function canAllocate(save: SaveData, nodeId: string): { ok: boolean; reason: string } {
     const node = getSkillNode(nodeId);
     if (!node) return { ok: false, reason: 'Unknown node' };
-    if (save.build.allocated.includes(nodeId)) return { ok: false, reason: 'Already allocated' };
+    if (node.position === 'final') return { ok: false, reason: 'Unlocks automatically once the rest of the pillar is learned' };
+    if (isAllocated(save, nodeId)) return { ok: false, reason: 'Already allocated' };
+    const level = buildLevel(save.build.xp);
+    if (level < node.levelReq) return { ok: false, reason: `Requires level ${node.levelReq}` };
+    for (const prereqId of node.prereq) {
+        if (!isAllocated(save, prereqId)) {
+            return { ok: false, reason: `Requires ${getSkillNode(prereqId)?.name ?? 'a prior node'} first` };
+        }
+    }
     if (availablePoints(save) < node.cost) return { ok: false, reason: `Need ${node.cost} point${node.cost === 1 ? '' : 's'}` };
-    if (pointsSpentInBranch(save, node.branch) < node.requiresBranchPoints) {
-        return { ok: false, reason: `Requires ${node.requiresBranchPoints} points spent in this branch` };
-    }
-    if (node.tier === 'capstone') {
-        const existing = allocatedCapstone(save);
-        if (existing && existing.id !== node.id) return { ok: false, reason: `Already committed to ${existing.name}` };
-    }
     return { ok: true, reason: '' };
 }
 
@@ -114,38 +130,47 @@ export interface SkillSpecial {
 }
 
 export interface SkillTreeRuntime {
-    /** Flat StatBlock contribution from every allocated 'stat' effect — folds into aggregateStats. */
+    /** Flat StatBlock contribution from every owned 'stat' effect, already scaled by each node's effective level. */
     stats: Partial<StatBlock>;
     has(nodeId: string): boolean;
-    /** Magnitude(s) for an allocated 'special' node by its effect key, or null if not allocated. */
+    /** Magnitude(s) for an owned 'special' node by its effect key (level-scaled), or null if not owned. */
     special(key: string): SkillSpecial | null;
-    capstoneId: string | null;
 }
 
-/** Resolves the whole tree into what dungeonScene.ts needs once per run — mirrors resolveEquippedRhunes. */
-export function resolveSkillTree(save: SaveData): SkillTreeRuntime {
+/**
+ * Resolves the whole tree into what dungeonScene.ts needs once per run —
+ * mirrors resolveEquippedRhunes. `nodeLevelBonuses` comes from equipped
+ * gear's "nodeLevel" affixes (see systems/inventory.ts): a node's effective
+ * level is 1 (owned) + its gear bonus, and every effect on that node scales
+ * linearly with that level — level 2 doubles it, level 3 triples it, etc.
+ */
+export function resolveSkillTree(save: SaveData, nodeLevelBonuses: Record<string, number> = {}): SkillTreeRuntime {
     const stats: Partial<StatBlock> = {};
     const specials = new Map<string, SkillSpecial>();
-    const allocated = new Set(save.build.allocated);
-    let capstoneId: string | null = null;
+    const owned = new Set<string>();
 
-    for (const id of save.build.allocated) {
-        const node = getSkillNode(id);
-        if (!node) continue; // stale id from a since-rebalanced tree — skip rather than crash
-        if (node.tier === 'capstone') capstoneId = node.id;
+    for (const node of SKILL_NODES) {
+        if (!isNodeOwned(save, node.id)) continue;
+        owned.add(node.id);
+        const level = 1 + (nodeLevelBonuses[node.id] ?? 0);
         for (const effect of node.effects) {
             if (effect.kind === 'stat') {
-                stats[effect.stat] = (stats[effect.stat] ?? 0) + effect.amount;
+                stats[effect.stat] = (stats[effect.stat] ?? 0) + effect.amount * level;
             } else {
-                specials.set(effect.key, { amount: effect.amount ?? 0, amount2: effect.amount2 ?? 0 });
+                const prev = specials.get(effect.key);
+                const amount = (effect.amount ?? 0) * level;
+                const amount2 = (effect.amount2 ?? 0) * level;
+                // No two nodes currently share a special key, but add rather than overwrite in case that ever changes.
+                specials.set(effect.key, prev ? { amount: prev.amount + amount, amount2: prev.amount2 + amount2 } : { amount, amount2 });
             }
         }
     }
 
     return {
         stats,
-        has: (nodeId: string) => allocated.has(nodeId),
+        has: (nodeId: string) => owned.has(nodeId),
         special: (key: string) => specials.get(key) ?? null,
-        capstoneId,
     };
 }
+
+export type { SkillNodeDef };

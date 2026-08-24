@@ -21,7 +21,6 @@ import { store, useStore } from '../state/store.ts';
 import { aggregateStats } from './systems/inventory.ts';
 import {
     dungeonSceneRef,
-    enterDungeon,
     onCurrencyEarned,
     onDeath,
     onFloorCleared,
@@ -36,13 +35,12 @@ function mountSceneFor(location: 'hub' | 'dungeon', app: Application, stage: Sta
     if (location === 'hub') {
         return createHubScene(app, stage, {
             onOpenChest: () => store.patch({ panel: 'chest' }),
-            onOpenRack: () => store.patch({ panel: 'rack' }),
-            onOpenStatue: () => store.patch({ panel: 'statue' }),
+            onOpenPillars: () => store.patch({ panel: 'build' }),
             onOpenPortal: () => store.patch({ panel: 'portal' }),
             onOpenBlacksmith: () => store.patch({ panel: 'blacksmith' }),
             onOpenMerchant: () => store.patch({ panel: 'merchant' }),
             onOpenQuestBoard: () => store.patch({ panel: 'quests' }),
-            onEnterDungeon: enterDungeon,
+            onEnterDungeon: () => store.patch({ panel: 'tierSelect' }),
         });
     }
 

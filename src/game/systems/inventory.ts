@@ -5,7 +5,7 @@ import { findAffixDef } from '../data/affixes.ts';
 import { RARITIES } from '../data/rarity.ts';
 import { resolveEquippedRhunes, statModContribution, type ResolvedRhune } from './rhuneRuntime.ts';
 import { resolveItemProcAffixes, type ResolvedProcAffix } from './procAffixRuntime.ts';
-import { resolveSkillTree, type SkillTreeRuntime } from './skillTree.ts';
+import { isNodeOwned, resolveSkillTree, type SkillTreeRuntime } from './skillTree.ts';
 
 /** Base combat stats before any gear/rhunes are applied. */
 export const BASE_PLAYER_STATS: Required<StatBlock> = {
@@ -42,6 +42,19 @@ export const BASE_PLAYER_STATS: Required<StatBlock> = {
     blockChance: 0,
     thornsPercent: 0,
 };
+
+/** +N effective level per skill node id, summed from every equipped item's "nodeLevel" affixes (see systems/skillTree.ts's resolveSkillTree). */
+function computeNodeLevelBonuses(items: ItemInstance[]): Record<string, number> {
+    const bonuses: Record<string, number> = {};
+    for (const item of items) {
+        for (const rolled of item.affixes) {
+            const def = findAffixDef(rolled.affixId);
+            if (!def || def.kind !== 'nodeLevel') continue;
+            bonuses[def.nodeId] = (bonuses[def.nodeId] ?? 0) + rolled.value;
+        }
+    }
+    return bonuses;
+}
 
 /** Flat stat contribution of one item instance: base stats + rolled STAT affixes (proc affixes are behavioral, not summed here). */
 export function itemStats(item: ItemInstance): Partial<StatBlock> {
@@ -108,7 +121,8 @@ export function aggregateStats(save: SaveData): AggregateResult {
         }
     }
 
-    const skillTree = resolveSkillTree(save);
+    const nodeLevelBonuses = computeNodeLevelBonuses(equippedItems);
+    const skillTree = resolveSkillTree(save, nodeLevelBonuses);
     for (const [k, v] of Object.entries(skillTree.stats)) {
         (stats as any)[k] = ((stats as any)[k] ?? 0) + (v as number);
     }
@@ -168,9 +182,9 @@ export function unequipRhune(save: SaveData, socket: 0 | 1 | 2 | 3): SaveData {
     return { ...save, equippedRhunes: next };
 }
 
-/** The Rhynekra capstone "The Fourth Rhune" — hidden in the UI until allocated. */
+/** Rhunekra's Final Convergence, "The Fourth Rhune" — hidden in the UI until it unlocks. */
 export function hasFourthRhuneSocket(save: SaveData): boolean {
-    return save.build.allocated.includes('rhynekra_capstone_fourth_rhune');
+    return isNodeOwned(save, 'rhunekra_capstone_fourth_rhune');
 }
 
 export function salvageValue(item: ItemInstance, salvageBonus = 0): number {

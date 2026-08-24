@@ -184,7 +184,23 @@ export interface ProcAffixDef {
     effect: ProcEffect;
 }
 
-export type AffixDef = StatAffixDef | ProcAffixDef;
+/**
+ * "+N levels" to a specific named skill node (see data/skillTree.ts) — the
+ * rare, flashy affix kind: a node's effect scales linearly with its
+ * effective level (1 = base, 2 = double, 3 = triple...), so this is a
+ * deliberately huge, build-defining roll rather than an incremental stat.
+ * Only rolls on jewelry, and only targets a pillar's Final Convergence node
+ * (see AFFIX_POOLS.jewelry) — exactly the "crazy buff, highly sought after"
+ * gear the brief asked for.
+ */
+export interface NodeLevelAffixDef {
+    kind: 'nodeLevel';
+    id: string;
+    nodeId: string;
+    label: string;
+}
+
+export type AffixDef = StatAffixDef | ProcAffixDef | NodeLevelAffixDef;
 
 export interface RolledAffix {
     affixId: string;

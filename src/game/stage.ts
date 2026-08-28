@@ -20,12 +20,13 @@ export interface Scene {
 }
 
 /**
- * ADAPT: the game's design height, in units. 405 pairs with the 16:9 frame
- * to put design width at 720 (405 * 16/9) — the same art scale the template
- * shipped with, just measured off height instead of width now that the
- * frame is landscape-primary.
+ * ADAPT: the game's design height, in units — matches WORLD_HEIGHT (see
+ * world.ts) exactly, so 1 design unit = 1 world unit and the 1920x1080 hub/
+ * dungeon world fills the 16:9 frame edge-to-edge with NO camera zoom (a
+ * smaller value here was the earlier "massively enlarged" bug: it made
+ * every world unit map to far more screen pixels than intended).
  */
-export const DESIGN_HEIGHT = 405;
+export const DESIGN_HEIGHT = 1080;
 
 /** What createStage returns — the surface scenes build against. */
 export interface Stage {

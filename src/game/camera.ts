@@ -23,8 +23,8 @@ export function createCamera(stage: Stage, worldWidth: number, worldHeight: numb
 
     const apply = () => {
         const s = stage.scale();
-        const viewportW = stage.width;
-        const viewportH = stage.designHeight();
+        const viewportW = stage.designWidth();
+        const viewportH = stage.height;
         const halfW = viewportW / 2;
         const halfH = viewportH / 2;
         const clampedX = worldWidth <= viewportW ? worldWidth / 2 : Math.min(Math.max(camX, halfW), worldWidth - halfW);

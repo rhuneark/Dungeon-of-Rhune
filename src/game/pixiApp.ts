@@ -7,7 +7,7 @@ import { Application } from 'pixi.js';
 /**
  * Create and mount a Pixi app inside a host element. The canvas auto-resizes
  * to the host (the device-frame div), so the game is sized by CSS — the same
- * `--game-w` column that sizes the DOM UI.
+ * `--frame-w`/`--frame-h` 16:9 box that sizes the DOM UI.
  *
  * @param host element the canvas fills (position: relative/absolute)
  */

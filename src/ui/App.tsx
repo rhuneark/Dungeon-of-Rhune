@@ -2,8 +2,8 @@
  * Screen router. One phase visible at a time; the 'playing' phase stacks the
  * React HUD + panel overlays above the Pixi canvas.
  *
- * #app-frame (styled in styles/app.css) is the device frame: a centered
- * portrait column that fills phones edge-to-edge and letterboxes on desktop.
+ * #app-frame (styled in styles/app.css) is the device frame: a fixed 16:9
+ * box, centered in the viewport, letterboxed on any other aspect ratio.
  * Everything — canvas and DOM UI — lives inside it, so they always align.
  */
 import { useStore } from '../state/store.ts';

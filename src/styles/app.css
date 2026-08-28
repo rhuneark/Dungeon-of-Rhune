@@ -8,26 +8,23 @@
 }
 
 /* ---------------------------------------------------------------------------
-   Viewport + device frame — the pattern production RUN games use. The app is a
-   centered portrait column: full-width on phones, letterboxed 9:16 on
-   desktop/landscape, page scroll and zoom fully locked.
+   Viewport + device frame — PC-first, landscape-primary: the app is a fixed
+   16:9 box, centered in the viewport, that fills whichever axis is tighter
+   and letterboxes the other (bars on left/right on an ultrawide, bars on
+   top/bottom on a portrait phone) — never stretched, never fluid-resized to
+   anything but 16:9. Page scroll and zoom are fully locked.
 --------------------------------------------------------------------------- */
 
 :root {
-    --game-w: 100vw;
+    /* The largest 16:9 box that fits the viewport, on both axes at once —
+       ADAPT: swap 16/9 for a different target ratio (and stage.ts's
+       DESIGN_HEIGHT, camera.ts's viewport math) if that ever changes. */
+    --frame-w: min(100vw, calc(100dvh * 16 / 9));
+    --frame-h: min(100dvh, calc(100vw * 9 / 16));
     /* The RUN host already pads below its native header, so we deliberately
        do NOT use env(safe-area-inset-top) — it double-pads on Android.
        Consume via the pt-safe-top utility below. */
     --safe-top: 0px;
-}
-
-@media (orientation: landscape) {
-    /* ADAPT: 9/16 assumes a portrait game (game.config orientation:
-       "portrait"). For a landscape game, drop this override and set
-       "orientation": "landscape" in game.config.prod.json instead. */
-    :root {
-        --game-w: min(100vw, calc(100dvh * 9 / 16));
-    }
 }
 
 html,
@@ -55,11 +52,11 @@ body {
 /* The device frame every screen renders inside (see ui/App.jsx). */
 #app-frame {
     position: fixed;
-    top: 0;
-    bottom: 0;
+    top: 50%;
     left: 50%;
-    transform: translateX(-50%);
-    width: var(--game-w);
+    transform: translate(-50%, -50%);
+    width: var(--frame-w);
+    height: var(--frame-h);
     overflow: hidden;
 }
 

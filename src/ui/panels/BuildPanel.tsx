@@ -30,7 +30,10 @@ function NodeButton({ save, node, hex }: { save: SaveData; node: SkillNodeDef; h
     const owned = isNodeOwned(save, node.id);
     const isFinal = node.position === 'final';
     const check = isFinal ? null : canAllocate(save, node.id);
-    const crossLinkId = node.prereq.length > 1 ? node.prereq[1] : null;
+    // Final's prereq list is every other node in the pillar (15 entries) — the
+    // "cross-link" callout only makes sense for a regular path node that has
+    // exactly one extra prereq alongside its same-path predecessor.
+    const crossLinkId = !isFinal && node.prereq.length > 1 ? node.prereq[1] : null;
     const crossLinkName = crossLinkId ? getSkillNode(crossLinkId)?.name : null;
 
     const stateClass = owned
@@ -71,6 +74,7 @@ function NodeButton({ save, node, hex }: { save: SaveData; node: SkillNodeDef; h
             </div>
             <p className="mt-1 text-xs leading-snug text-white/60">{node.description}</p>
             <div className="mt-auto pt-1.5">
+                {isFinal && !owned && <p className="text-[10px] font-bold text-amber-300/70">Unlocks once every other node here is learned</p>}
                 {crossLinkName && !owned && <p className="text-[10px] font-bold text-sky-300/70">⇢ also requires {crossLinkName}</p>}
                 {!isFinal && !owned && check && !check.ok && <p className="text-[10px] font-bold text-red-400/70">{check.reason}</p>}
             </div>
@@ -150,54 +154,67 @@ export default function BuildPanel() {
                     </div>
                 </div>
 
-                {/* --- main canvas: the active pillar's node graph --- */}
-                <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
-                    <div className="mx-auto max-w-3xl">
-                        <div className="mb-4">
-                            <div className="text-xl font-bold" style={{ color: hex }}>
-                                {branch.name} <span className="text-xs font-normal uppercase tracking-wide text-white/40">· {branch.pillar}</span>
-                            </div>
-                            <p className="text-sm text-white/50">{branch.tagline}</p>
-                            <p className="mt-1 text-xs font-bold text-white/40">
-                                {spent}/{totalPurchasable} learned
-                            </p>
+                {/* --- main canvas: the active pillar's node graph, laid out as a
+                     horizontal ARPG-style progression — Start on the left, three
+                     lanes (one per path) flowing left-to-right by level, Final
+                     Convergence on the right spanning all three lanes. --- */}
+                <div className="min-h-0 flex-1 overflow-auto p-4 md:p-6">
+                    <div className="mb-4">
+                        <div className="text-xl font-bold" style={{ color: hex }}>
+                            {branch.name} <span className="text-xs font-normal uppercase tracking-wide text-white/40">· {branch.pillar}</span>
                         </div>
+                        <p className="text-sm text-white/50">{branch.tagline}</p>
+                        <p className="mt-1 text-xs font-bold text-white/40">
+                            {spent}/{totalPurchasable} learned
+                        </p>
+                    </div>
 
-                        <div className="space-y-3">
+                    <div
+                        className="grid min-w-max gap-3"
+                        style={{
+                            gridTemplateColumns: `220px repeat(${maxRows}, minmax(200px, 1fr)) 220px`,
+                            gridTemplateRows: 'repeat(3, minmax(110px, auto))',
+                        }}
+                    >
+                        <div style={{ gridColumn: 1, gridRow: '1 / span 3' }}>
                             <NodeButton save={save} node={start} hex={hex} />
-                            {Array.from({ length: maxRows }).map((_, i) => {
-                                const depth = i + 1;
-                                const a = pathA.find((n) => n.depth === depth);
-                                const b = pathB.find((n) => n.depth === depth);
-                                const c = pathC.find((n) => n.depth === depth);
-                                return (
-                                    <div key={depth} className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                                        <div>{a && <NodeButton save={save} node={a} hex={hex} />}</div>
-                                        <div>{b && <NodeButton save={save} node={b} hex={hex} />}</div>
-                                        <div>{c && <NodeButton save={save} node={c} hex={hex} />}</div>
-                                    </div>
-                                );
-                            })}
+                        </div>
+                        {pathA.map((n) => (
+                            <div key={n.id} style={{ gridColumn: n.depth + 1, gridRow: 1 }}>
+                                <NodeButton save={save} node={n} hex={hex} />
+                            </div>
+                        ))}
+                        {pathB.map((n) => (
+                            <div key={n.id} style={{ gridColumn: n.depth + 1, gridRow: 2 }}>
+                                <NodeButton save={save} node={n} hex={hex} />
+                            </div>
+                        ))}
+                        {pathC.map((n) => (
+                            <div key={n.id} style={{ gridColumn: n.depth + 1, gridRow: 3 }}>
+                                <NodeButton save={save} node={n} hex={hex} />
+                            </div>
+                        ))}
+                        <div style={{ gridColumn: maxRows + 2, gridRow: '1 / span 3' }}>
                             <NodeButton save={save} node={final} hex={hex} />
                         </div>
-
-                        <button
-                            type="button"
-                            disabled={!canRespec}
-                            className={`mt-6 w-full rounded-lg py-2 text-xs font-bold active:scale-95 ${
-                                canRespec ? 'bg-white/10 text-white' : 'cursor-not-allowed bg-white/5 text-white/30'
-                            }`}
-                            onClick={() => {
-                                if (!canRespec) return;
-                                const next = respecSkillTree(save);
-                                store.patch({ save: next });
-                                void saveGame(next);
-                                store.pushToast('Skill tree reset.');
-                            }}
-                        >
-                            {save.build.allocated.length === 0 ? 'Nothing to respec' : `Respec all pillars (${cost}◆)`}
-                        </button>
                     </div>
+
+                    <button
+                        type="button"
+                        disabled={!canRespec}
+                        className={`mt-6 w-full max-w-md rounded-lg py-2 text-xs font-bold active:scale-95 ${
+                            canRespec ? 'bg-white/10 text-white' : 'cursor-not-allowed bg-white/5 text-white/30'
+                        }`}
+                        onClick={() => {
+                            if (!canRespec) return;
+                            const next = respecSkillTree(save);
+                            store.patch({ save: next });
+                            void saveGame(next);
+                            store.pushToast('Skill tree reset.');
+                        }}
+                    >
+                        {save.build.allocated.length === 0 ? 'Nothing to respec' : `Respec all pillars (${cost}◆)`}
+                    </button>
                 </div>
             </div>
         </Modal>

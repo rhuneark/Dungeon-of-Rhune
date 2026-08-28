@@ -375,7 +375,7 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
     }
 
     function statMultForFloor(f: number): number {
-        return tierDef.enemyStatMult * (1 + f * 0.035);
+        return tierDef.enemyStatMult * (1 + f * (tierDef.floorScaleRate ?? 0.035));
     }
 
     function spawnFloorEnemies(f: number) {

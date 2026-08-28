@@ -51,10 +51,25 @@ export const TIERS: TierDef[] = [
         name: 'The Undiluted',
         tagline: 'Same numbers as Oblivion. None of the Pillar nonsense.',
         enemyStatMult: 4,
-        unlockAtFloor: 9999, // deepest tier — no further gate
+        unlockAtFloor: 25, // clear this to unlock The Ascent
         lootWeights: { common: 15, uncommon: 30, rare: 32, epic: 17, legendary: 6 },
         color: 0xe5e7eb,
         pillarsEnabled: false,
+    },
+    {
+        id: 6,
+        name: 'The Ascent',
+        tagline: 'Floor 1 is a courtesy. Floor 100 is a question about your build.',
+        // Deliberately gentle at floor 1 (same baseline as The Whimper) — the
+        // climb itself is the difficulty, via a much steeper per-floor curve
+        // (floorScaleRate) instead of a harsh starting multiplier. No ceiling:
+        // unlockAtFloor stays 9999, so this is the deepest tier there is.
+        enemyStatMult: 1,
+        floorScaleRate: 0.1,
+        unlockAtFloor: 9999,
+        lootWeights: { common: 8, uncommon: 22, rare: 32, epic: 26, legendary: 12 },
+        color: 0xfbbf24,
+        pillarsEnabled: true,
     },
 ];
 

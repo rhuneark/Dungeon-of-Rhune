@@ -1,12 +1,16 @@
 /**
  * The Build panel: the passive skill tree. Full-screen (it's a real menu,
- * not a quick popup, and 16 nodes per pillar got crowded in the small
- * card) — a left sidebar for level/points/pillar-picking, and a big scrolling
- * canvas on the right for the active pillar's graph (Start -> 3 paths -> a
- * free Final Convergence once everything else in the pillar is learned).
- * Nodes are level-gated on top of their prereq chain, so there's no
- * banking points to skip ahead — see systems/skillTree.ts. Opened with the
- * "C" key or by walking to the Pillars station in the hub.
+ * not a quick popup) — a left sidebar for level/points/pillar-picking,
+ * centered vertically, next to the active pillar's graph on the right
+ * (Start -> 3 paths -> a free Final Convergence once everything else in
+ * the pillar is learned), also centered so it reads as one composed
+ * screen instead of content pinned to the top. Nodes are compact — name
+ * and a status badge only; the description, level-gate, and any
+ * cross-link/lock reason live in a hover tooltip so all 16 nodes fit on
+ * one page without scrolling. Nodes are level-gated on top of their
+ * prereq chain, so there's no banking points to skip ahead — see
+ * systems/skillTree.ts. Opened with the "C" key or by walking to the
+ * Pillars station in the hub.
  */
 import { useState } from 'react';
 import Modal from './Modal.tsx';
@@ -44,12 +48,23 @@ function NodeButton({ save, node, hex }: { save: SaveData; node: SkillNodeDef; h
             ? 'border border-white/20 bg-white/[0.07] hover:bg-white/[0.1] active:scale-[0.98]'
             : 'border border-white/5 bg-white/[0.02] opacity-60';
 
+    const badge = isFinal ? (
+        <span className="shrink-0 rounded-full bg-amber-400/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-amber-300">
+            {owned ? '✓' : 'Free'}
+        </span>
+    ) : owned ? (
+        <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold" style={{ color: hex, backgroundColor: hex + '22' }}>
+            ✓
+        </span>
+    ) : (
+        <span className="shrink-0 rounded-full bg-white/10 px-1.5 py-0.5 text-[9px] font-bold text-white/50">{node.levelReq}</span>
+    );
+
     return (
         <button
             type="button"
             disabled={isFinal || owned || !check?.ok}
-            title={!isFinal && !owned && check ? check.reason : ''}
-            className={`flex h-full w-full flex-col rounded-xl p-3 text-left ${stateClass}`}
+            className={`group relative flex h-full w-full items-center justify-between gap-1.5 rounded-lg px-2.5 py-2 text-left ${stateClass}`}
             style={owned ? { borderColor: hex } : undefined}
             onClick={() => {
                 if (isFinal || owned || !check?.ok) return;
@@ -58,25 +73,27 @@ function NodeButton({ save, node, hex }: { save: SaveData; node: SkillNodeDef; h
                 void saveGame(next);
             }}
         >
-            <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-bold text-white">{node.name}</span>
+            <span className="truncate text-xs font-bold text-white">{node.name}</span>
+            {badge}
+
+            {/* hover-only detail card — keeps the compact grid readable while still
+                surfacing the full description, level gate, and lock/cross-link reason */}
+            <div className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 hidden w-56 -translate-x-1/2 rounded-lg border border-white/10 bg-[#0b1020] p-3 text-left shadow-2xl group-hover:block">
+                <div className="text-xs font-bold text-white">{node.name}</div>
+                <p className="mt-1 text-[11px] leading-snug text-white/70">{node.description}</p>
                 {isFinal ? (
-                    <span className="shrink-0 rounded-full bg-amber-400/15 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-300">
-                        {owned ? 'Converged' : 'Free'}
-                    </span>
-                ) : owned ? (
-                    <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase" style={{ color: hex, backgroundColor: hex + '22' }}>
-                        Owned
-                    </span>
+                    !owned && <p className="mt-1.5 text-[10px] font-bold text-amber-300/80">Free — unlocks once every other node here is learned.</p>
                 ) : (
-                    <span className="shrink-0 rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-bold uppercase text-white/50">Lv {node.levelReq}</span>
+                    !owned && (
+                        <>
+                            <p className="mt-1.5 text-[10px] font-bold text-white/50">
+                                Requires level {node.levelReq}
+                                {crossLinkName ? `, and ${crossLinkName}` : ''}.
+                            </p>
+                            {check && !check.ok && <p className="mt-1 text-[10px] font-bold text-red-400/80">{check.reason}</p>}
+                        </>
+                    )
                 )}
-            </div>
-            <p className="mt-1 text-xs leading-snug text-white/60">{node.description}</p>
-            <div className="mt-auto pt-1.5">
-                {isFinal && !owned && <p className="text-[10px] font-bold text-amber-300/70">Unlocks once every other node here is learned</p>}
-                {crossLinkName && !owned && <p className="text-[10px] font-bold text-sky-300/70">⇢ also requires {crossLinkName}</p>}
-                {!isFinal && !owned && check && !check.ok && <p className="text-[10px] font-bold text-red-400/70">{check.reason}</p>}
             </div>
         </button>
     );
@@ -108,9 +125,9 @@ export default function BuildPanel() {
         <Modal fullScreen title="Build" subtitle="Your passive skill tree — earned from runs, respec for Scrap.">
             <div className="flex h-full min-h-0 flex-col md:flex-row">
                 {/* --- sidebar: level/points, pillar picker, respec — a compact strip on
-                     narrow screens (chips scroll horizontally) so it never pushes the
-                     actual tree below the fold; a full vertical list once there's room. --- */}
-                <div className="flex shrink-0 flex-col gap-3 border-b border-white/10 p-4 md:w-72 md:overflow-y-auto md:border-b-0 md:border-r">
+                     narrow screens (chips scroll horizontally); a vertically centered
+                     column once there's room. --- */}
+                <div className="flex shrink-0 flex-col justify-center gap-3 border-b border-white/10 p-4 md:w-72 md:border-b-0 md:border-r">
                     <div className="rounded-xl bg-white/5 p-3">
                         <div className="flex items-center justify-between">
                             <span className="text-lg font-bold">Level {level}{maxed ? ' (Max)' : ''}</span>
@@ -122,7 +139,7 @@ export default function BuildPanel() {
                         <div className="mt-1 text-[11px] text-white/40">{maxed ? 'Max level reached.' : `${into}/${need} XP to level ${level + 1}`}</div>
                     </div>
 
-                    <div className="flex gap-1.5 overflow-x-auto pb-1 md:flex-1 md:flex-col md:overflow-visible md:pb-0">
+                    <div className="flex gap-1.5 overflow-x-auto pb-1 md:flex-col md:overflow-visible md:pb-0">
                         {SKILL_BRANCHES.map((b) => {
                             const bHex = `#${b.color.toString(16).padStart(6, '0')}`;
                             const isActive = active === b.id;
@@ -152,57 +169,11 @@ export default function BuildPanel() {
                             );
                         })}
                     </div>
-                </div>
-
-                {/* --- main canvas: the active pillar's node graph, laid out as a
-                     horizontal ARPG-style progression — Start on the left, three
-                     lanes (one per path) flowing left-to-right by level, Final
-                     Convergence on the right spanning all three lanes. --- */}
-                <div className="min-h-0 flex-1 overflow-auto p-4 md:p-6">
-                    <div className="mb-4">
-                        <div className="text-xl font-bold" style={{ color: hex }}>
-                            {branch.name} <span className="text-xs font-normal uppercase tracking-wide text-white/40">· {branch.pillar}</span>
-                        </div>
-                        <p className="text-sm text-white/50">{branch.tagline}</p>
-                        <p className="mt-1 text-xs font-bold text-white/40">
-                            {spent}/{totalPurchasable} learned
-                        </p>
-                    </div>
-
-                    <div
-                        className="grid min-w-max gap-3"
-                        style={{
-                            gridTemplateColumns: `220px repeat(${maxRows}, minmax(200px, 1fr)) 220px`,
-                            gridTemplateRows: 'repeat(3, minmax(110px, auto))',
-                        }}
-                    >
-                        <div style={{ gridColumn: 1, gridRow: '1 / span 3' }}>
-                            <NodeButton save={save} node={start} hex={hex} />
-                        </div>
-                        {pathA.map((n) => (
-                            <div key={n.id} style={{ gridColumn: n.depth + 1, gridRow: 1 }}>
-                                <NodeButton save={save} node={n} hex={hex} />
-                            </div>
-                        ))}
-                        {pathB.map((n) => (
-                            <div key={n.id} style={{ gridColumn: n.depth + 1, gridRow: 2 }}>
-                                <NodeButton save={save} node={n} hex={hex} />
-                            </div>
-                        ))}
-                        {pathC.map((n) => (
-                            <div key={n.id} style={{ gridColumn: n.depth + 1, gridRow: 3 }}>
-                                <NodeButton save={save} node={n} hex={hex} />
-                            </div>
-                        ))}
-                        <div style={{ gridColumn: maxRows + 2, gridRow: '1 / span 3' }}>
-                            <NodeButton save={save} node={final} hex={hex} />
-                        </div>
-                    </div>
 
                     <button
                         type="button"
                         disabled={!canRespec}
-                        className={`mt-6 w-full max-w-md rounded-lg py-2 text-xs font-bold active:scale-95 ${
+                        className={`w-full rounded-lg py-2 text-xs font-bold active:scale-95 ${
                             canRespec ? 'bg-white/10 text-white' : 'cursor-not-allowed bg-white/5 text-white/30'
                         }`}
                         onClick={() => {
@@ -215,6 +186,56 @@ export default function BuildPanel() {
                     >
                         {save.build.allocated.length === 0 ? 'Nothing to respec' : `Respec all pillars (${cost}◆)`}
                     </button>
+                </div>
+
+                {/* --- main canvas: the active pillar's node graph, laid out as a
+                     horizontal ARPG-style progression — Start on the left, three
+                     lanes (one per path) flowing left-to-right by level, Final
+                     Convergence on the right spanning all three lanes. Small
+                     enough now (compact cards, no inline descriptions) to fit one
+                     page, so the whole block is centered rather than top-anchored. --- */}
+                <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-auto p-4 md:p-6">
+                    <div>
+                        <div className="mb-3">
+                            <div className="text-xl font-bold" style={{ color: hex }}>
+                                {branch.name} <span className="text-xs font-normal uppercase tracking-wide text-white/40">· {branch.pillar}</span>
+                            </div>
+                            <p className="text-sm text-white/50">{branch.tagline}</p>
+                            <p className="mt-1 text-xs font-bold text-white/40">
+                                {spent}/{totalPurchasable} learned
+                            </p>
+                        </div>
+
+                        <div
+                            className="grid gap-2"
+                            style={{
+                                gridTemplateColumns: `150px repeat(${maxRows}, minmax(120px, 1fr)) 150px`,
+                                gridTemplateRows: 'repeat(3, minmax(52px, auto))',
+                            }}
+                        >
+                            <div style={{ gridColumn: 1, gridRow: '1 / span 3' }}>
+                                <NodeButton save={save} node={start} hex={hex} />
+                            </div>
+                            {pathA.map((n) => (
+                                <div key={n.id} style={{ gridColumn: n.depth + 1, gridRow: 1 }}>
+                                    <NodeButton save={save} node={n} hex={hex} />
+                                </div>
+                            ))}
+                            {pathB.map((n) => (
+                                <div key={n.id} style={{ gridColumn: n.depth + 1, gridRow: 2 }}>
+                                    <NodeButton save={save} node={n} hex={hex} />
+                                </div>
+                            ))}
+                            {pathC.map((n) => (
+                                <div key={n.id} style={{ gridColumn: n.depth + 1, gridRow: 3 }}>
+                                    <NodeButton save={save} node={n} hex={hex} />
+                                </div>
+                            ))}
+                            <div style={{ gridColumn: maxRows + 2, gridRow: '1 / span 3' }}>
+                                <NodeButton save={save} node={final} hex={hex} />
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </Modal>

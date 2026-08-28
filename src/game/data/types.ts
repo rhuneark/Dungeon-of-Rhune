@@ -255,10 +255,18 @@ export interface TierDef {
     id: number;
     name: string;
     tagline: string;
-    /** Multiplies enemy hp + damage. */
+    /** Multiplies enemy hp + damage, at floor 1 of this tier. */
     enemyStatMult: number;
     /** Floors that must be cleared in this tier to unlock the next one. */
     unlockAtFloor: number;
+    /**
+     * Per-floor compounding rate on top of enemyStatMult — see
+     * dungeonScene.ts's statMultForFloor(). Defaults to 0.035 (every tier's
+     * original curve) when omitted; a tier meant as an endless climb (easy
+     * early, brutal deep) sets this much higher instead of raising
+     * enemyStatMult, so floor 1 stays approachable.
+     */
+    floorScaleRate?: number;
     /** Weighted rarity table for loot drops in this tier. */
     lootWeights: Record<Rarity, number>;
     color: number;

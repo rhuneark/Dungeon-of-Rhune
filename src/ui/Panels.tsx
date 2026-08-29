@@ -1,6 +1,5 @@
 import { useStore } from '../state/store.ts';
 import InventoryPanel from './panels/InventoryPanel.tsx';
-import ChestPanel from './panels/ChestPanel.tsx';
 import MenuPanel from './panels/MenuPanel.tsx';
 import DungeonEntryPanel from './panels/DungeonEntryPanel.tsx';
 import PortalPanel from './panels/PortalPanel.tsx';
@@ -13,7 +12,6 @@ import DeathPanel from './panels/DeathPanel.tsx';
 export default function Panels() {
     const panel = useStore((s) => s.panel);
     if (panel === 'inventory') return <InventoryPanel />;
-    if (panel === 'chest') return <ChestPanel />;
     if (panel === 'menu') return <MenuPanel />;
     if (panel === 'tierSelect') return <DungeonEntryPanel />;
     if (panel === 'portal') return <PortalPanel />;

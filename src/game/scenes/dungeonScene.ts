@@ -16,7 +16,7 @@
  */
 import { Circle, Container, Graphics, Text, type Application, type Ticker } from 'pixi.js';
 import type { Stage, Scene } from '../stage.ts';
-import type { Element, ItemInstance, ProcEffect, RhuneInstance, StatBlock, StatusType } from '../data/types.ts';
+import type { Element, ItemInstance, PartKind, ProcEffect, RhuneInstance, StatBlock, StatusType } from '../data/types.ts';
 import { ELEMENT_COLOR } from '../data/types.ts';
 import type { EquippedWeapon } from '../systems/inventory.ts';
 import { pickBoss, pickEnemy } from '../data/enemies.ts';
@@ -66,7 +66,7 @@ export interface DungeonSceneOptions {
     onFloorChange(floor: number, isBoss: boolean): void;
     onKillsChange(kills: number, needed: number): void;
     onBossHpChange(hp: number, maxHp: number): void;
-    onFloorCleared(floor: number, loot: { items: ItemInstance[]; rhunes: RhuneInstance[] }): void;
+    onFloorCleared(floor: number, loot: { items: ItemInstance[]; rhunes: RhuneInstance[]; parts: Partial<Record<PartKind, number>> }): void;
     onDeath(floorReached: number, elapsedSeconds: number, totalKills: number, bossKills: number): void;
     onCurrencyEarned(amount: number): void;
     onPillarChosen(pillar: PillarDef): void;
@@ -314,7 +314,7 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
     let lootOrbs: LootOrb[] = [];
     let hazards: Hazard[] = [];
     let pillarPicks: PillarPick[] = [];
-    let lastFloorLoot: { items: ItemInstance[]; rhunes: RhuneInstance[] } = { items: [], rhunes: [] };
+    let lastFloorLoot: { items: ItemInstance[]; rhunes: RhuneInstance[]; parts: Partial<Record<PartKind, number>> } = { items: [], rhunes: [], parts: {} };
 
     let floor = 1;
     let kills = 0;
@@ -837,6 +837,13 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
             stats[stat] = (stats[stat] ?? 0) + (v as number);
         }
         // Re-clamp the same way aggregateStats does, so stacked pillar picks can't blow past sane caps.
+        // moveSpeed/fireRate aren't in aggregateStats's clamp list because gear/skill-tree sources are
+        // naturally bounded — but Pillars stack every floor with no limit on an endless run, so on a
+        // long climb they need their own ceiling. Without one, moveSpeed keeps growing until the player
+        // crosses the whole arena in a single frame; the camera's smoothed follow (camera.ts) can't keep
+        // up with that, so the world visibly detaches and "parallaxes" behind the player. Uncapped
+        // fireRate does the same thing to the attack loop — cooldown collapses toward 0 and the weapon
+        // fires every frame, flooding the screen with overlapping floating damage numbers.
         stats.critChance = Math.min(stats.critChance, 0.75);
         stats.lifesteal = Math.min(stats.lifesteal, 0.5);
         stats.dodgeChance = Math.min(stats.dodgeChance, 0.6);
@@ -844,6 +851,8 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
         stats.reviveChance = Math.min(stats.reviveChance, 0.75);
         stats.blockChance = Math.min(stats.blockChance, 0.6);
         stats.thornsPercent = Math.min(stats.thornsPercent, 0.75);
+        stats.moveSpeed = Math.min(stats.moveSpeed, 900);
+        stats.fireRate = Math.min(stats.fireRate, 11); // attack rate is 1 + fireRate (+ small skill-tree bonuses on top)
 
         if (def.playerMods.maxHp) {
             player.maxHp = stats.maxHp;
@@ -851,10 +860,11 @@ export function createDungeonScene(app: Application, stage: Stage, opts: Dungeon
         }
 
         if (def.enemyMods) {
-            pillarEnemyHpMult *= def.enemyMods.hpMult ?? 1;
-            pillarEnemyDamageMult *= def.enemyMods.damageMult ?? 1;
-            pillarEnemySpeedMult *= def.enemyMods.speedMult ?? 1;
-            pillarEnemySpawnMult *= def.enemyMods.spawnMult ?? 1;
+            // Same reasoning, same fix: cap the compounding multiplier itself, not just its inputs.
+            pillarEnemyHpMult = Math.min(pillarEnemyHpMult * (def.enemyMods.hpMult ?? 1), 10);
+            pillarEnemyDamageMult = Math.min(pillarEnemyDamageMult * (def.enemyMods.damageMult ?? 1), 6);
+            pillarEnemySpeedMult = Math.min(pillarEnemySpeedMult * (def.enemyMods.speedMult ?? 1), 4);
+            pillarEnemySpawnMult = Math.min(pillarEnemySpawnMult * (def.enemyMods.spawnMult ?? 1), 3);
         }
 
         opts.onPillarChosen(def);

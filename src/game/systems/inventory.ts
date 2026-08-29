@@ -1,4 +1,4 @@
-import type { GearSlot, ItemInstance, RhuneInstance, SaveData, StatBlock, WeaponRole, Element } from '../data/types.ts';
+import type { GearSlot, ItemInstance, Rarity, RhuneInstance, SaveData, StatBlock, WeaponRole, Element } from '../data/types.ts';
 import { slotAcceptsKind } from '../data/types.ts';
 import { getBaseType } from '../data/baseTypes.ts';
 import { findAffixDef } from '../data/affixes.ts';
@@ -142,7 +142,16 @@ export function equipItem(save: SaveData, itemId: string, slot: GearSlot): SaveD
     const base = fromBag
         ? { ...save, bag: save.bag.filter((i) => i.instanceId !== itemId), items: [...save.items, item] }
         : save;
-    return { ...base, equipped: { ...base.equipped, [slot]: itemId } };
+    // Clear this item out of any OTHER slot first — without this, the same instance could end up
+    // pointed to by two slots at once (e.g. re-equipping it "into" a full jewelry row bumps whichever
+    // slot autoEquipSlot picked, but nothing stopped the item from also still being the OTHER slot's
+    // pointer), which double-counts its stats in aggregateStats and reads as gear randomly vanishing.
+    const equipped = { ...base.equipped };
+    for (const s of Object.keys(equipped) as GearSlot[]) {
+        if (equipped[s] === itemId) equipped[s] = null;
+    }
+    equipped[slot] = itemId;
+    return { ...base, equipped };
 }
 
 export function unequipSlot(save: SaveData, slot: GearSlot): SaveData {
@@ -155,10 +164,12 @@ export function equipRhune(save: SaveData, rhuneId: string, socket: 0 | 1 | 2 | 
     const base = fromBag
         ? { ...save, bagRhunes: save.bagRhunes.filter((r) => r.instanceId !== rhuneId), rhunes: [...save.rhunes, fromBag] }
         : save;
-    if (socket === 3) return { ...base, bonusRhuneSocket: rhuneId };
-    const next = [...base.equippedRhunes] as SaveData['equippedRhunes'];
-    next[socket] = rhuneId;
-    return { ...base, equippedRhunes: next };
+    // Same guard as equipItem: clear this Rhune out of any other socket first so it can never occupy two at once.
+    const equippedRhunes = base.equippedRhunes.map((id) => (id === rhuneId ? null : id)) as SaveData['equippedRhunes'];
+    const bonusRhuneSocket = base.bonusRhuneSocket === rhuneId ? null : base.bonusRhuneSocket;
+    if (socket === 3) return { ...base, equippedRhunes, bonusRhuneSocket: rhuneId };
+    equippedRhunes[socket] = rhuneId;
+    return { ...base, equippedRhunes, bonusRhuneSocket };
 }
 
 export function unequipRhune(save: SaveData, socket: 0 | 1 | 2 | 3): SaveData {
@@ -241,6 +252,40 @@ export function salvageRhune(save: SaveData, rhuneId: string): SaveData {
         equippedRhunes,
         bonusRhuneSocket,
     };
+}
+
+/** Bulk salvage: every item + Rhune of one rarity, across both Bag and Chest — equipped gear is always spared. */
+export function salvageAllByRarity(save: SaveData, rarity: Rarity): { save: SaveData; count: number; scrapEarned: number } {
+    const bonus = aggregateStats(save).stats.salvageBonus;
+    let currency = save.currency;
+    let count = 0;
+
+    const items = save.items.filter((item) => {
+        if (item.rarity !== rarity || isItemEquipped(save, item.instanceId) !== null) return true;
+        currency += salvageValue(item, bonus);
+        count += 1;
+        return false;
+    });
+    const bag = save.bag.filter((item) => {
+        if (item.rarity !== rarity) return true;
+        currency += salvageValue(item, bonus);
+        count += 1;
+        return false;
+    });
+    const rhunes = save.rhunes.filter((rhune) => {
+        if (rhune.rarity !== rarity || isRhuneEquipped(save, rhune.instanceId) !== -1) return true;
+        currency += Math.round(RARITIES[rhune.rarity].salvageValue * (1 + bonus));
+        count += 1;
+        return false;
+    });
+    const bagRhunes = save.bagRhunes.filter((rhune) => {
+        if (rhune.rarity !== rarity) return true;
+        currency += Math.round(RARITIES[rhune.rarity].salvageValue * (1 + bonus));
+        count += 1;
+        return false;
+    });
+
+    return { save: { ...save, items, bag, rhunes, bagRhunes, currency }, count, scrapEarned: currency - save.currency };
 }
 
 // --- Bag (Inventory) <-> Chest capacity, upgrades, and transfers ---

@@ -1,4 +1,5 @@
-import type { ItemInstance, ItemKind, RhuneInstance, Rarity } from '../data/types.ts';
+import type { ItemInstance, ItemKind, PartKind, RhuneInstance, Rarity } from '../data/types.ts';
+import { PART_KINDS } from '../data/types.ts';
 import { BASE_TYPES, baseTypesForSlotKind } from '../data/baseTypes.ts';
 import { AFFIX_POOLS } from '../data/affixes.ts';
 import { RARITIES, rollRarity } from '../data/rarity.ts';
@@ -90,17 +91,30 @@ export function rollRhune(tier: number, forcedRarity?: Rarity, luck = 0): RhuneI
     };
 }
 
-/** Roll a small floor-clear loot batch: 1-3 drops, richer at deeper tiers. Boss floors drop more, at guaranteed-better odds. */
-export function rollFloorLoot(tier: number, floor: number, luck = 0, isBoss = false): { items: ItemInstance[]; rhunes: RhuneInstance[] } {
+/** Roll a small floor-clear loot batch: 1-3 drops, richer at deeper tiers. Boss floors drop more, at guaranteed-better odds — plus a guaranteed parts stash. */
+export function rollFloorLoot(
+    tier: number,
+    floor: number,
+    luck = 0,
+    isBoss = false
+): { items: ItemInstance[]; rhunes: RhuneInstance[]; parts: Partial<Record<PartKind, number>> } {
     const dropCount = isBoss ? 3 + Math.floor(Math.random() * 2) : 1 + Math.floor(Math.random() * 2) + (floor % 5 === 0 ? 1 : 0);
     const effectiveLuck = isBoss ? luck + 1.2 : luck;
     const items: ItemInstance[] = [];
     const rhunes: RhuneInstance[] = [];
+    const parts: Partial<Record<PartKind, number>> = {};
+    const grantParts = (min: number, max: number) => {
+        const kind = PART_KINDS[Math.floor(Math.random() * PART_KINDS.length)];
+        parts[kind] = (parts[kind] ?? 0) + min + Math.floor(Math.random() * (max - min + 1));
+    };
     for (let i = 0; i < dropCount; i++) {
-        if (Math.random() < 0.22) rhunes.push(rollRhune(tier, undefined, effectiveLuck));
+        const roll = Math.random();
+        if (roll < 0.18) grantParts(1, 2 + Math.floor(tier / 2));
+        else if (roll < 0.4) rhunes.push(rollRhune(tier, undefined, effectiveLuck));
         else items.push(rollItem(tier, undefined, effectiveLuck));
     }
-    return { items, rhunes };
+    if (isBoss) grantParts(2, 4 + Math.floor(tier / 2));
+    return { items, rhunes, parts };
 }
 
 export { BASE_TYPES };

@@ -1,11 +1,11 @@
 /**
  * The passive skill tree: six branches, each a FREEFORM grid — no forced
  * node order, no prerequisites, no level-gating per node. Every regular
- * node can be ranked up to 3 times (1 point per rank, so 21 points fully
- * maxes a branch's 7 regular nodes) whenever the player has a free point;
+ * node can be ranked up to 3 times (1 point per rank, so 24 points fully
+ * maxes a branch's 8 regular nodes) whenever the player has a free point;
  * spend it on whatever you want, whenever you want. Each branch also has 2
  * single-point Mastery nodes, unlocked once at least 9 points total are
- * spent among that branch's 7 regular nodes (any combination of nodes/
+ * spent among that branch's 8 regular nodes (any combination of nodes/
  * ranks counts) — no other prerequisite. See systems/skillTree.ts for the
  * point-spend/unlock logic; nothing here is level- or order-gated.
  *
@@ -82,6 +82,7 @@ export const SKILL_NODES: SkillNodeDef[] = [
     regular('hardpass', 'measured_recovery', 'Measured Recovery', 'Being hit grants a brief burst of regen afterward. Scales with rank.', [{ kind: 'special', key: 'measuredRecovery', amount: 1.5, amount2: 2 }]),
     regular('hardpass', 'lawful_reprisal', 'Lawful Reprisal', 'Per rank: +1.5% of damage taken reflected to the attacker.', [{ kind: 'stat', stat: 'thornsPercent', amount: 0.015 }]),
     regular('hardpass', 'retribution', 'Retribution', 'Chance of a guaranteed counter-strike whenever you block or take a hit. Scales with rank.', [{ kind: 'special', key: 'retribution', amount: 6, amount2: 0.12 }]),
+    regular('hardpass', 'plate_layer', 'Plate Layer', 'Per rank: +2 armor (flat damage reduction per hit).', [{ kind: 'stat', stat: 'armor', amount: 2 }]),
     mastery('hardpass', 'zero_tolerance', 'Zero Tolerance', 'Mastery — thorns triggers twice per hit taken instead of once.', [{ kind: 'special', key: 'thornsDoubleTrigger' }]),
     mastery('hardpass', 'no_exceptions', 'No Exceptions', 'Mastery — no single hit can ever deal more than 25% of your max HP.', [{ kind: 'special', key: 'unbroken', amount: 0.25 }]),
 
@@ -93,6 +94,7 @@ export const SKILL_NODES: SkillNodeDef[] = [
     regular('glowup', 'kindling', 'Kindling', 'Chance to apply a random status on hit, even without a matching Rhune. Scales with rank.', [{ kind: 'special', key: 'kindling', amount: 0.03 }]),
     regular('glowup', 'resonance', 'Resonance', 'Per rank: +4% Rhune proc chance.', [{ kind: 'special', key: 'rhuneProcChanceMult', amount: 0.04 }]),
     regular('glowup', 'deep_attunement', 'Deep Attunement', 'Rhune effects also apply a small stacking DoT. Scales with rank.', [{ kind: 'special', key: 'deepAttunement', amount: 1.5 }]),
+    regular('glowup', 'runic_overcharge', 'Runic Overcharge', 'Per rank: +3 flat arcane damage.', [{ kind: 'stat', stat: 'arcaneDamage', amount: 3 }]),
     mastery('glowup', 'chain_reaction', 'Chain Reaction', 'Mastery — status effects have a chance to spread to nearby enemies on their own.', [{ kind: 'special', key: 'elementalCascade', amount: 0.12, amount2: 90 }]),
     mastery('glowup', 'fourth_rhune', 'The Fourth Rhune', 'Mastery — unlocks a 4th Rhune socket.', [{ kind: 'special', key: 'fourthRhune' }]),
 
@@ -104,6 +106,7 @@ export const SKILL_NODES: SkillNodeDef[] = [
     regular('dejavu', 'faded_scars', 'Faded Scars', 'Regen scales with kills landed on this floor. Scales with rank.', [{ kind: 'special', key: 'fadedScars', amount: 0.15 }]),
     regular('dejavu', 'steady_recall', 'Steady Recall', 'Attack speed builds with every kill this floor, resets on floor change. Scales with rank.', [{ kind: 'special', key: 'steadyRecall', amount: 0.01, amount2: 0.4 }]),
     regular('dejavu', 'undying_recollection', 'Undying Recollection', "Encore's stacking kill-buff persists across floor transitions instead of resetting.", [{ kind: 'special', key: 'undyingRecollection' }]),
+    regular('dejavu', 'repeat_strike', 'Repeat Strike', 'Per rank: +1 pierce — your hits carry on to hit again.', [{ kind: 'stat', stat: 'pierce', amount: 1 }]),
     mastery('dejavu', 'twice_as_nice', 'Twice as Nice', 'Mastery — every attack now hits twice, guaranteed.', [{ kind: 'special', key: 'echoingStrikes' }]),
     mastery('dejavu', 'groundhog_day', 'Groundhog Day', '+1% damage per floor reached this run, caps at 100%.', [{ kind: 'special', key: 'groundhogDay' }]),
 
@@ -115,6 +118,7 @@ export const SKILL_NODES: SkillNodeDef[] = [
     regular('bonkytown', 'shifting_form', 'Shifting Form', 'Per rank: +2 move speed.', [{ kind: 'stat', stat: 'moveSpeed', amount: 2 }]),
     regular('bonkytown', 'entropy', 'Entropy', 'Per rank: +4% damage vs. enemies afflicted with 2+ status types.', [{ kind: 'special', key: 'entropy', amount: 0.04 }]),
     regular('bonkytown', 'wild_conversion', "Wild Conversion", "Chance per hit that its damage type shifts, applying that element's status rider. Scales with rank.", [{ kind: 'special', key: 'wildConversion', amount: 0.3 }]),
+    regular('bonkytown', 'sledgehammer', 'Sledgehammer', 'Per rank: +6 knockback on hit.', [{ kind: 'stat', stat: 'knockback', amount: 6 }]),
     mastery('bonkytown', 'double_or_nothing', 'Double or Nothing', 'Mastery — projectiles split into two, guaranteed.', [{ kind: 'special', key: 'doubleOrNothing' }]),
     mastery('bonkytown', 'finders_keepers', 'Finders Keepers', 'Mastery — +50% item find.', [{ kind: 'stat', stat: 'luck', amount: 0.5 }]),
 
@@ -126,6 +130,7 @@ export const SKILL_NODES: SkillNodeDef[] = [
     regular('thoughtsprayers', 'second_breath', 'Second Breath', 'Per rank: +0.7 heal burst on kill.', [{ kind: 'stat', stat: 'healOnKill', amount: 0.7 }]),
     regular('thoughtsprayers', 'overgrowth', 'Overgrowth', 'Regen scales up the lower your HP is. Scales with rank.', [{ kind: 'special', key: 'overgrowth', amount: 1 }]),
     regular('thoughtsprayers', 'lifes_grip', "Life's Grip", 'Per rank: +3% effectiveness of all healing.', [{ kind: 'special', key: 'healMult', amount: 0.03 }]),
+    regular('thoughtsprayers', 'clean_slate', 'Clean Slate', 'Per rank: +4% max HP restored on floor clear.', [{ kind: 'stat', stat: 'floorHealPct', amount: 0.04 }]),
     mastery('thoughtsprayers', 'bring_a_friend', 'Bring a Friend', 'Mastery — summon a permanent companion dealing passive damage.', [{ kind: 'special', key: 'bondedSpirit', amount: 4 }]),
     mastery('thoughtsprayers', 'unkillable', 'Unkillable (For a Bit)', 'Mastery — once per floor, surviving a killing blow at 1 HP instead of dying.', [{ kind: 'special', key: 'unkillable' }]),
 
@@ -137,6 +142,7 @@ export const SKILL_NODES: SkillNodeDef[] = [
     regular('zoomies', 'brief_reprieve', 'Brief Reprieve', 'Dodging has a chance to briefly slow nearby enemies. Scales with rank.', [{ kind: 'special', key: 'briefReprieve', amount: 0.1, amount2: 35 }]),
     regular('zoomies', 'tick_tock', 'Tick Tock', 'Per rank: +3% chance your temporary effects refresh instead of expiring.', [{ kind: 'special', key: 'tickTock', amount: 0.03 }]),
     regular('zoomies', 'borrowed_moments', 'Borrowed Moments', 'Kills have a chance to reduce all weapon cooldowns. Scales with rank.', [{ kind: 'special', key: 'borrowedMoments', amount: 0.06, amount2: 0.15 }]),
+    regular('zoomies', 'quick_draw', 'Quick Draw', 'Per rank: +40 projectile speed.', [{ kind: 'stat', stat: 'projectileSpeed', amount: 40 }]),
     mastery('zoomies', 'do_over', 'Do-Over', 'Mastery — once per floor, dying instead rewinds a few seconds, restoring your health and position from before the hit.', [{ kind: 'special', key: 'rewind', amount: 3 }]),
     mastery('zoomies', 'overclocked', 'Overclocked', 'Mastery — a large permanent boost to attack speed and move speed.', [
         { kind: 'stat', stat: 'moveSpeed', amount: 15 },
@@ -160,5 +166,5 @@ export function masteryNodesForBranch(branch: SkillBranchId): SkillNodeDef[] {
     return SKILL_NODES.filter((n) => n.branch === branch && n.kind === 'mastery');
 }
 
-/** Points that must be spent among a branch's 7 regular nodes (any combination) before its Masteries unlock. */
+/** Points that must be spent among a branch's 8 regular nodes (any combination) before its Masteries unlock. */
 export const MASTERY_UNLOCK_THRESHOLD = 9;

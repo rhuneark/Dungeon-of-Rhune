@@ -1,19 +1,18 @@
 /**
  * The Character menu: replaces the old walk-to Armor Rack station with a
- * simple always-available menu (HUD button, hub only) covering Character,
- * Stats, and Gear inline, plus quick jumps into the existing Inventory (bag)
- * and Quest Board panels rather than duplicating their UI here.
+ * simple always-available menu (HUD button, hub only) covering Character
+ * and Stats inline, plus quick jumps into the Inventory (paperdoll + Bag/
+ * Chest — see InventoryPanel.tsx, which now owns all gear management) and
+ * Quest Board panels rather than duplicating their UI here.
  */
 import { useState } from 'react';
 import Modal from './Modal.tsx';
-import { ActionButton, ItemStatLines } from './ItemCard.tsx';
+import { ItemStatLines } from './ItemCard.tsx';
 import { store, useStore } from '../../state/store.ts';
-import { saveGame } from '../../game/systems/save.ts';
 import { GEAR_SLOTS, STAT_LABELS, type GearSlot } from '../../game/data/types.ts';
 import { RARITIES } from '../../game/data/rarity.ts';
-import { getRhuneDef } from '../../game/data/rhunes.ts';
 import { itemDisplayName } from '../../game/data/nameGen.ts';
-import { aggregateStats, hasFourthRhuneSocket, unequipRhune, unequipSlot } from '../../game/systems/inventory.ts';
+import { aggregateStats, hasFourthRhuneSocket } from '../../game/systems/inventory.ts';
 import { TIERS } from '../../game/data/tiers.ts';
 import { buildLevel } from '../../game/systems/skillTree.ts';
 
@@ -28,11 +27,10 @@ const SLOT_LABEL: Record<GearSlot, string> = {
     jewelry2: 'Jewelry 2',
 };
 
-type Tab = 'character' | 'stats' | 'gear';
+type Tab = 'character' | 'stats';
 const TABS: { tab: Tab; label: string }[] = [
     { tab: 'character', label: 'Character' },
     { tab: 'stats', label: 'Stats' },
-    { tab: 'gear', label: 'Gear' },
 ];
 
 export default function MenuPanel() {
@@ -46,8 +44,8 @@ export default function MenuPanel() {
     const equippedCount = GEAR_SLOTS.filter((slot) => save.equipped[slot]).length + rhuneSockets.filter(Boolean).length;
 
     return (
-        <Modal title="Character" subtitle="Your build, your stats, your gear — all in one place.">
-            <div className="mb-3 grid grid-cols-5 gap-1">
+        <Modal title="Character" subtitle="Your build and your stats — for gear, see Inventory.">
+            <div className="mb-3 grid grid-cols-4 gap-1">
                 {TABS.map(({ tab: t, label }) => (
                     <button
                         key={t}
@@ -58,7 +56,11 @@ export default function MenuPanel() {
                         {label}
                     </button>
                 ))}
-                <button type="button" className="rounded-lg bg-white/10 py-2 text-[11px] font-bold text-white" onClick={() => store.patch({ panel: 'inventory' })}>
+                <button
+                    type="button"
+                    className="rounded-lg bg-white/10 py-2 text-[11px] font-bold text-white"
+                    onClick={() => store.patch({ invTab: 'bag', panel: 'inventory' })}
+                >
                     Inventory
                 </button>
                 <button type="button" className="rounded-lg bg-white/10 py-2 text-[11px] font-bold text-white" onClick={() => store.patch({ panel: 'quests' })}>
@@ -152,62 +154,6 @@ export default function MenuPanel() {
                     <div className="text-xs text-white/70">{STAT_LABELS.moveSpeed} {Math.round(stats.moveSpeed)}</div>
                     <div className="text-xs text-white/70">{STAT_LABELS.armor} {stats.armor}</div>
                     <div className="text-xs text-white/70">{STAT_LABELS.magnetRadius} {Math.round(stats.magnetRadius)}</div>
-                </div>
-            )}
-
-            {tab === 'gear' && (
-                <div className="space-y-2">
-                    {GEAR_SLOTS.map((slot) => {
-                        const itemId = save.equipped[slot];
-                        const item = itemId ? save.items.find((i) => i.instanceId === itemId) : null;
-                        const rarity = item ? RARITIES[item.rarity] : null;
-                        return (
-                            <div key={slot} className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 p-2.5">
-                                <div className="min-w-0">
-                                    <div className="text-[10px] uppercase tracking-wide text-white/40">{SLOT_LABEL[slot]}</div>
-                                    <div className="truncate text-xs font-bold" style={{ color: rarity?.hex ?? '#ffffff55' }}>
-                                        {item ? itemDisplayName(item) : 'Empty'}
-                                    </div>
-                                </div>
-                                {item && (
-                                    <ActionButton
-                                        label="Unequip"
-                                        onClick={() => {
-                                            const next = unequipSlot(save, slot);
-                                            store.patch({ save: next });
-                                            void saveGame(next);
-                                        }}
-                                    />
-                                )}
-                            </div>
-                        );
-                    })}
-                    <div className="mb-1 mt-4 text-[11px] font-bold uppercase tracking-wide text-white/40">Rhune Sockets</div>
-                    {(fourthSocket ? [0, 1, 2, 3] : [0, 1, 2]).map((socket) => {
-                        const rhuneId = socket === 3 ? save.bonusRhuneSocket : save.equippedRhunes[socket];
-                        const rhune = rhuneId ? save.rhunes.find((r) => r.instanceId === rhuneId) : null;
-                        const rarity = rhune ? RARITIES[rhune.rarity] : null;
-                        return (
-                            <div key={socket} className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 p-2.5">
-                                <div className="min-w-0">
-                                    <div className="text-[10px] uppercase tracking-wide text-white/40">Rhune {socket + 1}</div>
-                                    <div className="truncate text-xs font-bold" style={{ color: rarity?.hex ?? '#ffffff55' }}>
-                                        {rhune ? getRhuneDef(rhune.rhuneDefId)?.name ?? 'Unknown Rhune' : 'Empty'}
-                                    </div>
-                                </div>
-                                {rhune && (
-                                    <ActionButton
-                                        label="Unclip"
-                                        onClick={() => {
-                                            const next = unequipRhune(save, socket as 0 | 1 | 2 | 3);
-                                            store.patch({ save: next });
-                                            void saveGame(next);
-                                        }}
-                                    />
-                                )}
-                            </div>
-                        );
-                    })}
                 </div>
             )}
         </Modal>

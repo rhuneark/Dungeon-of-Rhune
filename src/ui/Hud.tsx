@@ -23,7 +23,7 @@ function useHotkeys(phase: string) {
             const key = e.key.toLowerCase();
             if (key === 'i') {
                 e.preventDefault();
-                store.patch({ panel: panel === 'inventory' ? null : 'inventory' });
+                store.patch(panel === 'inventory' ? { panel: null } : { invTab: 'bag', panel: 'inventory' });
             } else if (key === 'c') {
                 e.preventDefault();
                 store.patch({ panel: panel === 'build' ? null : 'build' });
@@ -89,7 +89,7 @@ export default function Hud() {
                     <button
                         type="button"
                         className="pointer-events-auto rounded-xl bg-black/50 px-3 py-2 text-sm font-bold transition-transform active:scale-95"
-                        onClick={() => store.patch({ panel: 'inventory' })}
+                        onClick={() => store.patch({ invTab: 'bag', panel: 'inventory' })}
                         title="Inventory (I)"
                     >
                         Bag

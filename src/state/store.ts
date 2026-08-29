@@ -13,12 +13,14 @@ import { defaultSaveData, type ItemInstance, type RhuneInstance, type SaveData }
 export type Phase = 'loading' | 'menu' | 'playing';
 export type Location = 'hub' | 'dungeon';
 /**
- * 'inventory' is the bounded bag (I key); 'chest' is permanent tabbed storage (walk to the Chest station);
+ * 'inventory' is the unified paperdoll + Bag/Chest storage screen (I key defaults it to
+ * the 'bag' sub-tab via invTab, the Chest station defaults it to 'chest');
  * 'menu' is the Character/Stats/Gear menu (HUD button, replaces the old Armor Rack station);
  * 'tierSelect' is the dungeon-entry popup (walk to the Dungeon Entrance, replaces the old Tier Statue station);
  * 'build' is the skill tree (C key or walk to the Pillars station).
  */
-export type PanelId = 'inventory' | 'chest' | 'menu' | 'tierSelect' | 'portal' | 'blacksmith' | 'merchant' | 'quests' | 'build' | 'death' | null;
+export type PanelId = 'inventory' | 'menu' | 'tierSelect' | 'portal' | 'blacksmith' | 'merchant' | 'quests' | 'build' | 'death' | null;
+export type InventoryTab = 'bag' | 'chest';
 
 export interface RunHud {
     floor: number;
@@ -49,6 +51,8 @@ export interface AppState {
     location: Location;
     /** Which React overlay panel is open, if any */
     panel: PanelId;
+    /** Which sub-tab the Inventory panel opens on — set this right before patching panel:'inventory' */
+    invTab: InventoryTab;
     /** The whole persisted save blob: inventory, equipped gear, tier progress, currency */
     save: SaveData;
     /** Live HUD numbers for the current dungeon run, null while in the hub */
@@ -68,6 +72,7 @@ let state: AppState = {
     paused: false,
     location: 'hub',
     panel: null,
+    invTab: 'bag',
     save: defaultSaveData(),
     run: null,
     deathSummary: null,

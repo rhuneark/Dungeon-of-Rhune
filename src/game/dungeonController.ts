@@ -6,7 +6,7 @@
  */
 import { store } from '../state/store.ts';
 import type { DungeonScene } from './scenes/dungeonScene.ts';
-import type { ItemInstance, RhuneInstance } from './data/types.ts';
+import type { ItemInstance, PartKind, RhuneInstance } from './data/types.ts';
 import type { PillarDef } from './data/pillars.ts';
 import { recordRunEnd } from './systems/progress.ts';
 import { saveGame } from './systems/save.ts';
@@ -48,18 +48,26 @@ export function onRunBossHpChange(hp: number, maxHp: number): void {
     store.patch({ run: { ...run, bossHp: hp, bossMaxHp: maxHp } });
 }
 
-export function onFloorCleared(floor: number, loot: { items: ItemInstance[]; rhunes: RhuneInstance[] }): void {
+export function onFloorCleared(floor: number, loot: { items: ItemInstance[]; rhunes: RhuneInstance[]; parts: Partial<Record<PartKind, number>> }): void {
     const { save } = store.get();
-    const { save: nextSave, overflowScrap } = addLootToBag(save, loot);
+    const { save: afterLoot, overflowScrap } = addLootToBag(save, loot);
+    // Parts are a plain counter (like currency), not bag/chest items — they never overflow, they just add.
+    const parts = { ...afterLoot.parts };
+    let partsGained = 0;
+    for (const [kind, amount] of Object.entries(loot.parts) as [PartKind, number | undefined][]) {
+        if (!amount) continue;
+        parts[kind] += amount;
+        partsGained += amount;
+    }
+    const nextSave = { ...afterLoot, parts };
     store.patch({ save: nextSave });
     void saveGame(nextSave);
     const dropCount = loot.items.length + loot.rhunes.length;
-    if (dropCount > 0) {
-        const overflowNote = overflowScrap > 0 ? ` (bag full — ${overflowScrap}◆ auto-salvaged)` : '';
-        store.pushToast(`Floor ${floor} cleared — ${dropCount} drop${dropCount === 1 ? '' : 's'}!${overflowNote}`);
-    } else {
-        store.pushToast(`Floor ${floor} cleared!`);
-    }
+    const bits: string[] = [];
+    if (dropCount > 0) bits.push(`${dropCount} drop${dropCount === 1 ? '' : 's'}`);
+    if (partsGained > 0) bits.push(`${partsGained} part${partsGained === 1 ? '' : 's'}`);
+    const overflowNote = overflowScrap > 0 ? ` (bag full — ${overflowScrap}◆ auto-salvaged)` : '';
+    store.pushToast(bits.length > 0 ? `Floor ${floor} cleared — ${bits.join(', ')}!${overflowNote}` : `Floor ${floor} cleared!`);
 }
 
 export function onPillarChosen(pillar: PillarDef): void {

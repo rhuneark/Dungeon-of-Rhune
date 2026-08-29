@@ -235,6 +235,18 @@ export interface RhuneInstance {
     rarity: Rarity;
 }
 
+/**
+ * Parts: plain stackable crafting materials, dropped alongside items/rhunes
+ * on floor clear. Deliberately NOT items — no instance id, no affixes, no
+ * bag/chest slot; just a counter per kind, same posture as Scrap currency.
+ * Consumed at the Blacksmith by the Craft and Transmute recipes (see
+ * systems/crafting.ts).
+ */
+export type PartKind = 'bolt' | 'cog' | 'shard';
+export const PART_KINDS: PartKind[] = ['bolt', 'cog', 'shard'];
+export const PART_LABELS: Record<PartKind, string> = { bolt: 'Bolts', cog: 'Cogs', shard: 'Runeshards' };
+export const PART_COLOR: Record<PartKind, number> = { bolt: 0x94a3b8, cog: 0xd97706, shard: 0xc084fc };
+
 export interface TierDef {
     id: number;
     name: string;
@@ -317,6 +329,8 @@ export interface SaveData {
     weeklyBounties: BountyInstance[];
     dailyBountiesGeneratedAt: number;
     weeklyBountiesGeneratedAt: number;
+    /** Crafting materials — see PartKind. Uncapped stackable counters, same posture as currency. */
+    parts: Record<PartKind, number>;
     /**
      * The passive skill tree (see data/skillTree.ts + systems/skillTree.ts).
      * Lifetime XP — level and points available are always DERIVED from xp,
@@ -365,6 +379,7 @@ export function defaultSaveData(): SaveData {
         weeklyBounties: [],
         dailyBountiesGeneratedAt: 0,
         weeklyBountiesGeneratedAt: 0,
+        parts: { bolt: 0, cog: 0, shard: 0 },
         build: { xp: 0, ranks: {} },
     };
 }

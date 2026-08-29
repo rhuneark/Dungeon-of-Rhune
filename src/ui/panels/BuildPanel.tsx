@@ -1,10 +1,10 @@
 /**
  * The Build panel: the passive skill tree. Freeform — every branch is just
- * a grid of 7 rankable nodes (3 ranks each, 1 point per rank) plus 2
+ * a grid of 8 rankable nodes (3 ranks each, 1 point per rank) plus 2
  * single-point Masteries, no forced order and no prerequisites between
  * regular nodes. Spend a point on whatever you want, whenever you have
  * one; a branch's Masteries unlock once MASTERY_UNLOCK_THRESHOLD points
- * are spent among its 7 regular nodes (any combination). Respec refunds
+ * are spent among its 8 regular nodes (any combination). Respec refunds
  * one point at a time for Scrap — there's no full-tree reset. Full-screen
  * (it's a real menu) with a left sidebar for level/points/branch-picking
  * and the active branch's grid centered on the right. Opened with the "C"
@@ -141,6 +141,7 @@ export default function BuildPanel() {
                             const bHex = `#${b.color.toString(16).padStart(6, '0')}`;
                             const isActive = active === b.id;
                             const bSpent = pointsSpentInBranchRegular(save, b.id);
+                            const bRegularMax = regularNodesForBranch(b.id).length * 3;
                             const bMasteries = masteryNodesForBranch(b.id);
                             const masteriesOwned = bMasteries.filter((n) => isNodeOwned(save, n.id)).length;
                             return (
@@ -161,7 +162,7 @@ export default function BuildPanel() {
                                         {masteriesOwned > 0 && <span className="text-xs text-amber-300">{'★'.repeat(masteriesOwned)}</span>}
                                     </div>
                                     <div className="whitespace-nowrap text-[10px] uppercase tracking-wide text-white/40">{b.pillar}</div>
-                                    <div className="mt-1 whitespace-nowrap text-[11px] font-bold text-white/40">{bSpent}/21 in regular nodes</div>
+                                    <div className="mt-1 whitespace-nowrap text-[11px] font-bold text-white/40">{bSpent}/{bRegularMax} in regular nodes</div>
                                 </button>
                             );
                         })}

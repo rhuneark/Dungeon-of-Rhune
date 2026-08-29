@@ -6,7 +6,7 @@
  *
  * The tree itself is freeform: any node can be ranked up any time a point
  * is free, in any order. The only gate at all is Masteries, which need
- * MASTERY_UNLOCK_THRESHOLD points already spent among their branch's 7
+ * MASTERY_UNLOCK_THRESHOLD points already spent among their branch's 8
  * regular nodes (checked once, at allocation time — see canAllocateRank).
  * Max level is 33, one point per level.
  */
@@ -58,7 +58,7 @@ export function availablePoints(save: SaveData): number {
     return totalPointsEarned(save.build.xp) - spentPoints(save);
 }
 
-/** Points spent among a branch's 7 REGULAR nodes only — what gates that branch's Masteries. Mastery points themselves don't count. */
+/** Points spent among a branch's 8 REGULAR nodes only — what gates that branch's Masteries. Mastery points themselves don't count. */
 export function pointsSpentInBranchRegular(save: SaveData, branch: SkillBranchId): number {
     let total = 0;
     for (const node of SKILL_NODES) {

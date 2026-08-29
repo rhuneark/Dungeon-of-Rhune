@@ -184,23 +184,7 @@ export interface ProcAffixDef {
     effect: ProcEffect;
 }
 
-/**
- * "+N levels" to a specific named skill node (see data/skillTree.ts) — the
- * rare, flashy affix kind: a node's effect scales linearly with its
- * effective level (1 = base, 2 = double, 3 = triple...), so this is a
- * deliberately huge, build-defining roll rather than an incremental stat.
- * Only rolls on jewelry, and only targets a pillar's Final Convergence node
- * (see AFFIX_POOLS.jewelry) — exactly the "crazy buff, highly sought after"
- * gear the brief asked for.
- */
-export interface NodeLevelAffixDef {
-    kind: 'nodeLevel';
-    id: string;
-    nodeId: string;
-    label: string;
-}
-
-export type AffixDef = StatAffixDef | ProcAffixDef | NodeLevelAffixDef;
+export type AffixDef = StatAffixDef | ProcAffixDef;
 
 export interface RolledAffix {
     affixId: string;
@@ -320,7 +304,7 @@ export interface SaveData {
     chestUpgradeLevel: number;
     equipped: Record<GearSlot, string | null>;
     equippedRhunes: [string | null, string | null, string | null];
-    /** A 4th Rhune socket — inert (and hidden in the UI) until the Rhynekra capstone "The Fourth Rhune" is allocated. */
+    /** A 4th Rhune socket — inert (and hidden in the UI) until Glow Up's "The Fourth Rhune" Mastery is unlocked. */
     bonusRhuneSocket: string | null;
     selectedTier: number;
     unlockedTiers: number[];
@@ -336,13 +320,14 @@ export interface SaveData {
     /**
      * The passive skill tree (see data/skillTree.ts + systems/skillTree.ts).
      * Lifetime XP — level and points available are always DERIVED from xp,
-     * never stored, so they can't drift out of sync — plus the list of
-     * allocated node ids. Respec clears `allocated` and refunds nothing but
-     * the points (it costs Scrap, see respecCost()).
+     * never stored, so they can't drift out of sync — plus each node's
+     * current rank (0 if absent/unspent; up to 3 for a regular node, up to 1
+     * for a Mastery). Respec refunds one point on one node at a time for
+     * Scrap (see refundRankCost()) — there's no full-tree reset.
      */
     build: {
         xp: number;
-        allocated: string[];
+        ranks: Record<string, number>;
     };
 }
 
@@ -380,6 +365,6 @@ export function defaultSaveData(): SaveData {
         weeklyBounties: [],
         dailyBountiesGeneratedAt: 0,
         weeklyBountiesGeneratedAt: 0,
-        build: { xp: 0, allocated: [] },
+        build: { xp: 0, ranks: {} },
     };
 }

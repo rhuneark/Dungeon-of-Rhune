@@ -33,10 +33,10 @@ function sanitizeSave(save: SaveData): SaveData {
     const equippedRhunes = save.equippedRhunes.map((id) => (id && rhuneIds.has(id) ? id : null)) as SaveData['equippedRhunes'];
     const bonusRhuneSocket = save.bonusRhuneSocket && rhuneIds.has(save.bonusRhuneSocket) ? save.bonusRhuneSocket : null;
 
-    // The skill tree gets rebalanced over time too — drop allocated ids that no longer exist.
-    const allocated = save.build.allocated.filter((id) => getSkillNode(id) !== undefined);
+    // The skill tree gets rebalanced over time too — drop ranks on node ids that no longer exist.
+    const ranks = Object.fromEntries(Object.entries(save.build.ranks).filter(([id]) => getSkillNode(id) !== undefined));
 
-    return { ...save, items, rhunes, bag, bagRhunes, equipped, equippedRhunes, bonusRhuneSocket, build: { ...save.build, allocated } };
+    return { ...save, items, rhunes, bag, bagRhunes, equipped, equippedRhunes, bonusRhuneSocket, build: { ...save.build, ranks } };
 }
 
 export async function loadGame(): Promise<SaveData> {

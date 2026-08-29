@@ -1,4 +1,4 @@
-import type { AffixDef, NodeLevelAffixDef, ProcAffixDef } from './types.ts';
+import type { AffixDef, ProcAffixDef } from './types.ts';
 
 /**
  * "X% chance on [cause] to [effect]" — the out-there proc affixes any piece
@@ -201,22 +201,6 @@ export const PROC_AFFIXES: ProcAffixDef[] = [
 ];
 
 /**
- * "+N levels" to one specific pillar's Final Convergence node — see
- * data/types.ts's NodeLevelAffixDef and systems/skillTree.ts's node-level
- * scaling. Deliberately only 6 of these exist (one per pillar's capstone),
- * jewelry-only, and diluted into a pool of ~40 other possible rolls — the
- * rarity is the point.
- */
-export const NODE_LEVEL_AFFIXES: NodeLevelAffixDef[] = [
-    { kind: 'nodeLevel', id: 'nl_axiora', nodeId: 'axiora_capstone_aegis', label: 'Empowered Aegis of Axiora' },
-    { kind: 'nodeLevel', id: 'nl_rhunekra', nodeId: 'rhunekra_capstone_fourth_rhune', label: 'Empowered Fourth Rhune' },
-    { kind: 'nodeLevel', id: 'nl_hyphora', nodeId: 'hyphora_capstone_perfect_recall', label: 'Empowered Perfect Recall' },
-    { kind: 'nodeLevel', id: 'nl_fluxxara', nodeId: 'fluxxara_capstone_chaotic_surge', label: 'Empowered Chaotic Surge' },
-    { kind: 'nodeLevel', id: 'nl_vitalis', nodeId: 'vitalis_capstone_overflowing_life', label: 'Empowered Overflowing Life' },
-    { kind: 'nodeLevel', id: 'nl_aeona', nodeId: 'aeona_capstone_rewind', label: 'Empowered Rewind' },
-];
-
-/**
  * Affix pools keyed by BaseTypeDef.affixPoolId. Same base name -> same
  * pool -> same possible rolls, but each ItemInstance rolls its own subset
  * and its own values within each affix's [min, max] range. Split by weapon
@@ -302,7 +286,6 @@ export const AFFIX_POOLS: Record<string, AffixDef[]> = {
         { kind: 'stat', id: 'j_salvage', stat: 'salvageBonus', label: 'Salvage Bonus', min: 0.05, max: 0.15 },
         { kind: 'stat', id: 'j_revive', stat: 'reviveChance', label: 'Revive Chance', min: 0.03, max: 0.08 },
         ...PROC_AFFIXES,
-        ...NODE_LEVEL_AFFIXES,
     ],
 };
 

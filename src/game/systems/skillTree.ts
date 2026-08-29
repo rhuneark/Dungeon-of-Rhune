@@ -1,22 +1,20 @@
 /**
- * Leveling, point allocation, and respec for the passive skill tree (see
- * data/skillTree.ts for the pillar/node definitions). Level — and therefore
- * points available — is always DERIVED from lifetime xp rather than stored,
- * so it can never drift out of sync with a saved node list.
+ * Leveling, point allocation, and per-point respec for the passive skill
+ * tree (see data/skillTree.ts for the branch/node definitions). Level — and
+ * therefore points available — is always DERIVED from lifetime xp rather
+ * than stored, so it can never drift out of sync with a saved rank map.
  *
- * Max level is 30, one point per level (level 1 already has its first
- * point), and every purchasable node costs exactly 1 — 15 nodes per pillar,
- * so a level-30 character can fully clear two pillars. Allocating a node
- * needs BOTH its `levelReq` and every `prereq` node already owned — no
- * banking points to skip ahead. A pillar's Final Convergence node is never
- * bought: it silently unlocks (for free) the instant every other node in
- * that pillar is owned — see `isNodeOwned`.
+ * The tree itself is freeform: any node can be ranked up any time a point
+ * is free, in any order. The only gate at all is Masteries, which need
+ * MASTERY_UNLOCK_THRESHOLD points already spent among their branch's 7
+ * regular nodes (checked once, at allocation time — see canAllocateRank).
+ * Max level is 33, one point per level.
  */
 import type { SaveData } from '../data/types.ts';
-import { getSkillNode, SKILL_NODES, type SkillBranchId, type SkillNodeDef } from '../data/skillTree.ts';
+import { getSkillNode, MASTERY_UNLOCK_THRESHOLD, SKILL_NODES, type SkillBranchId, type SkillNodeDef } from '../data/skillTree.ts';
 import type { StatBlock } from '../data/types.ts';
 
-export const MAX_LEVEL = 30;
+export const MAX_LEVEL = 33;
 
 function xpForLevel(level: number): number {
     return 100 + (level - 1) * 40;
@@ -42,12 +40,17 @@ function totalPointsEarned(xp: number): number {
     return buildLevel(xp);
 }
 
+export function rankOf(save: SaveData, nodeId: string): number {
+    return save.build.ranks[nodeId] ?? 0;
+}
+
+export function isNodeOwned(save: SaveData, nodeId: string): boolean {
+    return rankOf(save, nodeId) > 0;
+}
+
 function spentPoints(save: SaveData): number {
     let total = 0;
-    for (const id of save.build.allocated) {
-        const node = getSkillNode(id);
-        if (node) total += node.cost;
-    }
+    for (const amount of Object.values(save.build.ranks)) total += amount;
     return total;
 }
 
@@ -55,63 +58,55 @@ export function availablePoints(save: SaveData): number {
     return totalPointsEarned(save.build.xp) - spentPoints(save);
 }
 
-export function pointsSpentInBranch(save: SaveData, branch: SkillBranchId): number {
+/** Points spent among a branch's 7 REGULAR nodes only — what gates that branch's Masteries. Mastery points themselves don't count. */
+export function pointsSpentInBranchRegular(save: SaveData, branch: SkillBranchId): number {
     let total = 0;
-    for (const id of save.build.allocated) {
-        const node = getSkillNode(id);
-        if (node && node.branch === branch) total += node.cost;
+    for (const node of SKILL_NODES) {
+        if (node.branch !== branch || node.kind !== 'regular') continue;
+        total += rankOf(save, node.id);
     }
     return total;
 }
 
-/** Purchasable nodes per pillar (everything but the free Final Convergence). */
-export function purchasableNodeCountForBranch(branch: SkillBranchId): number {
-    return SKILL_NODES.filter((n) => n.branch === branch && n.position !== 'final').length;
-}
-
-function isAllocated(save: SaveData, nodeId: string): boolean {
-    return save.build.allocated.includes(nodeId);
-}
-
-/** A Final Convergence node is "owned" the instant every node it lists as a prereq is allocated — no point ever spent on it. */
-export function isNodeOwned(save: SaveData, nodeId: string): boolean {
-    const node = getSkillNode(nodeId);
-    if (!node) return false;
-    if (node.position === 'final') return node.prereq.every((p) => isAllocated(save, p));
-    return isAllocated(save, nodeId);
-}
-
-export function canAllocate(save: SaveData, nodeId: string): { ok: boolean; reason: string } {
+export function canAllocateRank(save: SaveData, nodeId: string): { ok: boolean; reason: string } {
     const node = getSkillNode(nodeId);
     if (!node) return { ok: false, reason: 'Unknown node' };
-    if (node.position === 'final') return { ok: false, reason: 'Unlocks automatically once the rest of the pillar is learned' };
-    if (isAllocated(save, nodeId)) return { ok: false, reason: 'Already allocated' };
-    const level = buildLevel(save.build.xp);
-    if (level < node.levelReq) return { ok: false, reason: `Requires level ${node.levelReq}` };
-    for (const prereqId of node.prereq) {
-        if (!isAllocated(save, prereqId)) {
-            return { ok: false, reason: `Requires ${getSkillNode(prereqId)?.name ?? 'a prior node'} first` };
-        }
+    const current = rankOf(save, nodeId);
+    if (current >= node.maxRank) return { ok: false, reason: 'Already at max rank' };
+    if (node.kind === 'mastery' && pointsSpentInBranchRegular(save, node.branch) < MASTERY_UNLOCK_THRESHOLD) {
+        return { ok: false, reason: `Requires ${MASTERY_UNLOCK_THRESHOLD} points spent in this branch's regular nodes` };
     }
-    if (availablePoints(save) < node.cost) return { ok: false, reason: `Need ${node.cost} point${node.cost === 1 ? '' : 's'}` };
+    if (availablePoints(save) < 1) return { ok: false, reason: 'No points available' };
     return { ok: true, reason: '' };
 }
 
-export function allocateNode(save: SaveData, nodeId: string): SaveData {
-    if (!canAllocate(save, nodeId).ok) return save;
-    return { ...save, build: { ...save.build, allocated: [...save.build.allocated, nodeId] } };
+export function allocateRank(save: SaveData, nodeId: string): SaveData {
+    if (!canAllocateRank(save, nodeId).ok) return save;
+    const current = rankOf(save, nodeId);
+    return { ...save, build: { ...save.build, ranks: { ...save.build.ranks, [nodeId]: current + 1 } } };
 }
 
-/** Cheap early, scales with level — matches the brief. Nothing to charge for with an empty tree. */
-export function respecCost(save: SaveData): number {
-    return Math.round(20 + buildLevel(save.build.xp) * 8);
+/** Refunding one point costs Scrap and scales with level — cheap early, real money once you're deep into a run of levels. */
+export function refundRankCost(save: SaveData): number {
+    return Math.round(8 + buildLevel(save.build.xp) * 3);
 }
 
-export function respecSkillTree(save: SaveData): SaveData {
-    if (save.build.allocated.length === 0) return save;
-    const cost = respecCost(save);
-    if (save.currency < cost) return save;
-    return { ...save, currency: save.currency - cost, build: { ...save.build, allocated: [] } };
+export function canRefundRank(save: SaveData, nodeId: string): { ok: boolean; reason: string } {
+    if (rankOf(save, nodeId) <= 0) return { ok: false, reason: 'No points here to refund' };
+    const cost = refundRankCost(save);
+    if (save.currency < cost) return { ok: false, reason: `Need ${cost}◆` };
+    return { ok: true, reason: '' };
+}
+
+/** Refunds exactly one point off one node — never a full branch/tree reset. A Mastery already unlocked stays unlocked even if a later regular-node refund drops the branch below the threshold; the gate is only checked when spending a new point. */
+export function refundRank(save: SaveData, nodeId: string): SaveData {
+    if (!canRefundRank(save, nodeId).ok) return save;
+    const cost = refundRankCost(save);
+    const current = rankOf(save, nodeId);
+    const ranks = { ...save.build.ranks };
+    if (current <= 1) delete ranks[nodeId];
+    else ranks[nodeId] = current - 1;
+    return { ...save, currency: save.currency - cost, build: { ...save.build, ranks } };
 }
 
 /** XP for one run: kills matter most in bulk, floors and bosses are the reliable milestones. */
@@ -130,36 +125,28 @@ export interface SkillSpecial {
 }
 
 export interface SkillTreeRuntime {
-    /** Flat StatBlock contribution from every owned 'stat' effect, already scaled by each node's effective level. */
+    /** Flat StatBlock contribution from every ranked 'stat' effect, already scaled by each node's current rank. */
     stats: Partial<StatBlock>;
     has(nodeId: string): boolean;
-    /** Magnitude(s) for an owned 'special' node by its effect key (level-scaled), or null if not owned. */
+    /** Magnitude(s) for a ranked 'special' node by its effect key (rank-scaled), or null if unranked. */
     special(key: string): SkillSpecial | null;
 }
 
-/**
- * Resolves the whole tree into what dungeonScene.ts needs once per run —
- * mirrors resolveEquippedRhunes. `nodeLevelBonuses` comes from equipped
- * gear's "nodeLevel" affixes (see systems/inventory.ts): a node's effective
- * level is 1 (owned) + its gear bonus, and every effect on that node scales
- * linearly with that level — level 2 doubles it, level 3 triples it, etc.
- */
-export function resolveSkillTree(save: SaveData, nodeLevelBonuses: Record<string, number> = {}): SkillTreeRuntime {
+/** Resolves the whole tree into what dungeonScene.ts needs once per run — mirrors resolveEquippedRhunes. */
+export function resolveSkillTree(save: SaveData): SkillTreeRuntime {
     const stats: Partial<StatBlock> = {};
     const specials = new Map<string, SkillSpecial>();
-    const owned = new Set<string>();
 
     for (const node of SKILL_NODES) {
-        if (!isNodeOwned(save, node.id)) continue;
-        owned.add(node.id);
-        const level = 1 + (nodeLevelBonuses[node.id] ?? 0);
+        const rank = rankOf(save, node.id);
+        if (rank <= 0) continue;
         for (const effect of node.effects) {
             if (effect.kind === 'stat') {
-                stats[effect.stat] = (stats[effect.stat] ?? 0) + effect.amount * level;
+                stats[effect.stat] = (stats[effect.stat] ?? 0) + effect.amount * rank;
             } else {
                 const prev = specials.get(effect.key);
-                const amount = (effect.amount ?? 0) * level;
-                const amount2 = (effect.amount2 ?? 0) * level;
+                const amount = (effect.amount ?? 0) * rank;
+                const amount2 = (effect.amount2 ?? 0) * rank;
                 // No two nodes currently share a special key, but add rather than overwrite in case that ever changes.
                 specials.set(effect.key, prev ? { amount: prev.amount + amount, amount2: prev.amount2 + amount2 } : { amount, amount2 });
             }
@@ -168,7 +155,7 @@ export function resolveSkillTree(save: SaveData, nodeLevelBonuses: Record<string
 
     return {
         stats,
-        has: (nodeId: string) => owned.has(nodeId),
+        has: (nodeId: string) => rankOf(save, nodeId) > 0,
         special: (key: string) => specials.get(key) ?? null,
     };
 }

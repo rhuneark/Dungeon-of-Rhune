@@ -23,8 +23,8 @@ export interface ResolvedRhune {
 
 export function resolveEquippedRhunes(save: SaveData): ResolvedRhune[] {
     const out: ResolvedRhune[] = [];
-    // The 4th socket only functions once Rhunekra's Final Convergence has unlocked — see systems/skillTree.ts.
-    const sockets = isNodeOwned(save, 'rhunekra_capstone_fourth_rhune')
+    // The 4th socket only functions once Glow Up's "The Fourth Rhune" Mastery has unlocked — see systems/skillTree.ts.
+    const sockets = isNodeOwned(save, 'glowup_fourth_rhune')
         ? [...save.equippedRhunes, save.bonusRhuneSocket]
         : save.equippedRhunes;
     for (const rhuneId of sockets) {

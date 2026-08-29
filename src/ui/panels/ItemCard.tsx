@@ -5,7 +5,6 @@ import { RARITIES } from '../../game/data/rarity.ts';
 import { getBaseType } from '../../game/data/baseTypes.ts';
 import { getRhuneDef } from '../../game/data/rhunes.ts';
 import { findAffixDef } from '../../game/data/affixes.ts';
-import { getSkillNode } from '../../game/data/skillTree.ts';
 import { itemDisplayName } from '../../game/data/nameGen.ts';
 import { itemStats } from '../../game/systems/inventory.ts';
 import { describeRhuneEffect } from '../../game/systems/rhuneRuntime.ts';
@@ -49,10 +48,6 @@ export function ItemCard({
         .map((rolled) => findAffixDef(rolled.affixId))
         .filter((def) => def?.kind === 'proc')
         .map((def) => describeProcAffix(def!, item.rarity));
-    const nodeLevelLines = item.affixes
-        .map((rolled) => ({ def: findAffixDef(rolled.affixId), value: rolled.value }))
-        .filter((x) => x.def?.kind === 'nodeLevel')
-        .map(({ def, value }) => `+${value} Node Level: ${getSkillNode((def as { nodeId: string }).nodeId)?.name ?? 'Unknown Node'}`);
     return (
         <div className="rounded-xl border p-3" style={{ borderColor: rarity.hex + '55', backgroundColor: rarity.hex + '14' }}>
             <div className="flex items-center justify-between gap-2">
@@ -70,11 +65,6 @@ export function ItemCard({
                 <ItemStatLines stats={stats} />
                 {procLines.map((line, i) => (
                     <div key={i} className="text-xs font-bold text-white/80">
-                        {line}
-                    </div>
-                ))}
-                {nodeLevelLines.map((line, i) => (
-                    <div key={i} className="text-xs font-bold text-amber-300">
                         {line}
                     </div>
                 ))}

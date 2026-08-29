@@ -1,132 +1,129 @@
 /**
- * The Build panel: the passive skill tree. Full-screen (it's a real menu,
- * not a quick popup) — a left sidebar for level/points/pillar-picking,
- * centered vertically, next to the active pillar's graph on the right
- * (Start -> 3 paths -> a free Final Convergence once everything else in
- * the pillar is learned), also centered so it reads as one composed
- * screen instead of content pinned to the top. Nodes are compact — name
- * and a status badge only; the description, level-gate, and any
- * cross-link/lock reason live in a hover tooltip so all 16 nodes fit on
- * one page without scrolling. Nodes are level-gated on top of their
- * prereq chain, so there's no banking points to skip ahead — see
- * systems/skillTree.ts. Opened with the "C" key or by walking to the
- * Pillars station in the hub.
+ * The Build panel: the passive skill tree. Freeform — every branch is just
+ * a grid of 7 rankable nodes (3 ranks each, 1 point per rank) plus 2
+ * single-point Masteries, no forced order and no prerequisites between
+ * regular nodes. Spend a point on whatever you want, whenever you have
+ * one; a branch's Masteries unlock once MASTERY_UNLOCK_THRESHOLD points
+ * are spent among its 7 regular nodes (any combination). Respec refunds
+ * one point at a time for Scrap — there's no full-tree reset. Full-screen
+ * (it's a real menu) with a left sidebar for level/points/branch-picking
+ * and the active branch's grid centered on the right. Opened with the "C"
+ * key or by walking to the Pillars station in the hub.
  */
 import { useState } from 'react';
 import Modal from './Modal.tsx';
 import { store, useStore, type SaveData } from '../../state/store.ts';
 import { saveGame } from '../../game/systems/save.ts';
-import { getSkillNode, SKILL_BRANCHES, nodesForBranch, type SkillBranchId, type SkillNodeDef } from '../../game/data/skillTree.ts';
+import { MASTERY_UNLOCK_THRESHOLD, masteryNodesForBranch, regularNodesForBranch, SKILL_BRANCHES, type SkillBranchId, type SkillNodeDef } from '../../game/data/skillTree.ts';
 import {
-    allocateNode,
+    allocateRank,
     availablePoints,
     buildLevelInfo,
-    canAllocate,
+    canAllocateRank,
+    canRefundRank,
     isNodeOwned,
     MAX_LEVEL,
-    pointsSpentInBranch,
-    purchasableNodeCountForBranch,
-    respecCost,
-    respecSkillTree,
+    pointsSpentInBranchRegular,
+    rankOf,
+    refundRank,
+    refundRankCost,
 } from '../../game/systems/skillTree.ts';
 
-function NodeButton({ save, node, hex }: { save: SaveData; node: SkillNodeDef; hex: string }) {
-    const owned = isNodeOwned(save, node.id);
-    const isFinal = node.position === 'final';
-    const check = isFinal ? null : canAllocate(save, node.id);
-    // Final's prereq list is every other node in the pillar (15 entries) — the
-    // "cross-link" callout only makes sense for a regular path node that has
-    // exactly one extra prereq alongside its same-path predecessor.
-    const crossLinkId = !isFinal && node.prereq.length > 1 ? node.prereq[1] : null;
-    const crossLinkName = crossLinkId ? getSkillNode(crossLinkId)?.name : null;
-
-    const stateClass = owned
-        ? 'border-2 bg-white/10'
-        : isFinal
-          ? 'border border-dashed border-amber-400/40 bg-amber-400/5'
-          : check?.ok
-            ? 'border border-white/20 bg-white/[0.07] hover:bg-white/[0.1] active:scale-[0.98]'
-            : 'border border-white/5 bg-white/[0.02] opacity-60';
-
-    const badge = isFinal ? (
-        <span className="shrink-0 rounded-full bg-amber-400/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-amber-300">
-            {owned ? '✓' : 'Free'}
-        </span>
-    ) : owned ? (
-        <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold" style={{ color: hex, backgroundColor: hex + '22' }}>
-            ✓
-        </span>
-    ) : (
-        <span className="shrink-0 rounded-full bg-white/10 px-1.5 py-0.5 text-[9px] font-bold text-white/50">{node.levelReq}</span>
-    );
+function NodeCard({ save, node, hex }: { save: SaveData; node: SkillNodeDef; hex: string }) {
+    const rank = rankOf(save, node.id);
+    const maxed = rank >= node.maxRank;
+    const owned = rank > 0;
+    const allocCheck = canAllocateRank(save, node.id);
+    const refundCheck = canRefundRank(save, node.id);
+    const refundCost = refundRankCost(save);
+    const isMastery = node.kind === 'mastery';
 
     return (
-        <button
-            type="button"
-            disabled={isFinal || owned || !check?.ok}
-            className={`group relative flex h-full w-full items-center justify-between gap-1.5 rounded-lg px-2.5 py-2 text-left ${stateClass}`}
+        <div
+            className={`flex flex-col rounded-xl border p-3 ${owned ? 'border-2 bg-white/10' : 'border-white/10 bg-white/[0.03]'}`}
             style={owned ? { borderColor: hex } : undefined}
-            onClick={() => {
-                if (isFinal || owned || !check?.ok) return;
-                const next = allocateNode(save, node.id);
-                store.patch({ save: next });
-                void saveGame(next);
-            }}
         >
-            <span className="truncate text-xs font-bold text-white">{node.name}</span>
-            {badge}
-
-            {/* hover-only detail card — keeps the compact grid readable while still
-                surfacing the full description, level gate, and lock/cross-link reason */}
-            <div className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 hidden w-56 -translate-x-1/2 rounded-lg border border-white/10 bg-[#0b1020] p-3 text-left shadow-2xl group-hover:block">
-                <div className="text-xs font-bold text-white">{node.name}</div>
-                <p className="mt-1 text-[11px] leading-snug text-white/70">{node.description}</p>
-                {isFinal ? (
-                    !owned && <p className="mt-1.5 text-[10px] font-bold text-amber-300/80">Free — unlocks once every other node here is learned.</p>
+            <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-bold text-white">{node.name}</span>
+                {isMastery ? (
+                    <span
+                        className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase"
+                        style={owned ? { color: hex, backgroundColor: hex + '22' } : undefined}
+                    >
+                        {owned ? 'Unlocked' : 'Mastery'}
+                    </span>
                 ) : (
-                    !owned && (
-                        <>
-                            <p className="mt-1.5 text-[10px] font-bold text-white/50">
-                                Requires level {node.levelReq}
-                                {crossLinkName ? `, and ${crossLinkName}` : ''}.
-                            </p>
-                            {check && !check.ok && <p className="mt-1 text-[10px] font-bold text-red-400/80">{check.reason}</p>}
-                        </>
-                    )
+                    <span className="shrink-0 text-xs font-bold text-white/50">
+                        {rank}/{node.maxRank}
+                    </span>
                 )}
             </div>
-        </button>
+            <p className="mt-1 text-xs leading-snug text-white/60">{node.description}</p>
+            {isMastery && !owned && (
+                <p className="mt-1 text-[10px] font-bold text-amber-300/70">
+                    Requires {MASTERY_UNLOCK_THRESHOLD} points spent in this branch's regular nodes
+                    {allocCheck.ok ? '' : ` (you have ${pointsSpentInBranchRegular(save, node.branch)})`}
+                </p>
+            )}
+            <div className="mt-2 flex gap-1.5">
+                <button
+                    type="button"
+                    disabled={!refundCheck.ok}
+                    title={refundCheck.ok ? `Refund 1 point (${refundCost}◆)` : refundCheck.reason}
+                    className={`flex-1 rounded-lg py-1.5 text-[11px] font-bold active:scale-95 ${
+                        refundCheck.ok ? 'bg-white/10 text-white' : 'cursor-not-allowed bg-white/5 text-white/25'
+                    }`}
+                    onClick={() => {
+                        if (!refundCheck.ok) return;
+                        const next = refundRank(save, node.id);
+                        store.patch({ save: next });
+                        void saveGame(next);
+                    }}
+                >
+                    −1 ({refundCost}◆)
+                </button>
+                <button
+                    type="button"
+                    disabled={maxed || !allocCheck.ok}
+                    title={maxed ? 'Already at max rank' : allocCheck.ok ? '' : allocCheck.reason}
+                    className={`flex-1 rounded-lg py-1.5 text-[11px] font-bold active:scale-95 ${
+                        !maxed && allocCheck.ok ? 'bg-primary text-black' : 'cursor-not-allowed bg-white/5 text-white/25'
+                    }`}
+                    onClick={() => {
+                        if (maxed || !allocCheck.ok) return;
+                        const next = allocateRank(save, node.id);
+                        store.patch({ save: next });
+                        void saveGame(next);
+                    }}
+                >
+                    {maxed ? 'Maxed' : isMastery ? 'Unlock' : '+1'}
+                </button>
+            </div>
+        </div>
     );
 }
 
 export default function BuildPanel() {
     const save = useStore((s) => s.save);
-    const [active, setActive] = useState<SkillBranchId>('axiora');
+    const [active, setActive] = useState<SkillBranchId>('hardpass');
     const { level, into, need } = buildLevelInfo(save.build.xp);
     const points = availablePoints(save);
     const maxed = level >= MAX_LEVEL;
     const pct = maxed ? 100 : Math.min(100, Math.round((into / need) * 100));
-    const cost = respecCost(save);
-    const canRespec = save.build.allocated.length > 0 && save.currency >= cost;
 
     const branch = SKILL_BRANCHES.find((b) => b.id === active)!;
     const hex = `#${branch.color.toString(16).padStart(6, '0')}`;
-    const nodes = nodesForBranch(active);
-    const start = nodes.find((n) => n.position === 'start')!;
-    const pathA = nodes.filter((n) => n.path === 'A').sort((a, b) => a.depth - b.depth);
-    const pathB = nodes.filter((n) => n.path === 'B').sort((a, b) => a.depth - b.depth);
-    const pathC = nodes.filter((n) => n.path === 'C').sort((a, b) => a.depth - b.depth);
-    const final = nodes.find((n) => n.position === 'final')!;
-    const spent = pointsSpentInBranch(save, active);
-    const totalPurchasable = purchasableNodeCountForBranch(active);
-    const maxRows = Math.max(pathA.length, pathB.length, pathC.length);
+    const regularNodes = regularNodesForBranch(active);
+    const masteryNodes = masteryNodesForBranch(active);
+    const spentRegular = pointsSpentInBranchRegular(save, active);
+    const REGULAR_MAX = regularNodes.length * 3;
 
     return (
-        <Modal fullScreen title="Build" subtitle="Your passive skill tree — earned from runs, respec for Scrap.">
+        <Modal fullScreen title="Build" subtitle="Your passive skill tree — earned from runs, respec one point at a time for Scrap.">
             <div className="flex h-full min-h-0 flex-col md:flex-row">
-                {/* --- sidebar: level/points, pillar picker, respec — a compact strip on
-                     narrow screens (chips scroll horizontally); a vertically centered
-                     column once there's room. --- */}
+                {/* --- sidebar: level/points, branch picker — a compact strip on narrow
+                     screens (chips scroll horizontally), a vertically centered column
+                     once there's room. --- */}
                 <div className="flex shrink-0 flex-col justify-center gap-3 border-b border-white/10 p-4 md:w-72 md:border-b-0 md:border-r">
                     <div className="rounded-xl bg-white/5 p-3">
                         <div className="flex items-center justify-between">
@@ -143,9 +140,9 @@ export default function BuildPanel() {
                         {SKILL_BRANCHES.map((b) => {
                             const bHex = `#${b.color.toString(16).padStart(6, '0')}`;
                             const isActive = active === b.id;
-                            const bSpent = pointsSpentInBranch(save, b.id);
-                            const bTotal = purchasableNodeCountForBranch(b.id);
-                            const converged = isNodeOwned(save, nodesForBranch(b.id).find((n) => n.position === 'final')!.id);
+                            const bSpent = pointsSpentInBranchRegular(save, b.id);
+                            const bMasteries = masteryNodesForBranch(b.id);
+                            const masteriesOwned = bMasteries.filter((n) => isNodeOwned(save, n.id)).length;
                             return (
                                 <button
                                     key={b.id}
@@ -161,79 +158,40 @@ export default function BuildPanel() {
                                         <span className="whitespace-nowrap text-sm font-bold" style={{ color: isActive ? bHex : '#ffffffcc' }}>
                                             {b.name}
                                         </span>
-                                        {converged && <span className="text-xs text-amber-300">★</span>}
+                                        {masteriesOwned > 0 && <span className="text-xs text-amber-300">{'★'.repeat(masteriesOwned)}</span>}
                                     </div>
                                     <div className="whitespace-nowrap text-[10px] uppercase tracking-wide text-white/40">{b.pillar}</div>
-                                    <div className="mt-1 whitespace-nowrap text-[11px] font-bold text-white/40">{bSpent}/{bTotal} learned</div>
+                                    <div className="mt-1 whitespace-nowrap text-[11px] font-bold text-white/40">{bSpent}/21 in regular nodes</div>
                                 </button>
                             );
                         })}
                     </div>
-
-                    <button
-                        type="button"
-                        disabled={!canRespec}
-                        className={`w-full rounded-lg py-2 text-xs font-bold active:scale-95 ${
-                            canRespec ? 'bg-white/10 text-white' : 'cursor-not-allowed bg-white/5 text-white/30'
-                        }`}
-                        onClick={() => {
-                            if (!canRespec) return;
-                            const next = respecSkillTree(save);
-                            store.patch({ save: next });
-                            void saveGame(next);
-                            store.pushToast('Skill tree reset.');
-                        }}
-                    >
-                        {save.build.allocated.length === 0 ? 'Nothing to respec' : `Respec all pillars (${cost}◆)`}
-                    </button>
                 </div>
 
-                {/* --- main canvas: the active pillar's node graph, laid out as a
-                     horizontal ARPG-style progression — Start on the left, three
-                     lanes (one per path) flowing left-to-right by level, Final
-                     Convergence on the right spanning all three lanes. Small
-                     enough now (compact cards, no inline descriptions) to fit one
-                     page, so the whole block is centered rather than top-anchored. --- */}
+                {/* --- main canvas: the active branch's freeform node grid --- */}
                 <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-auto p-4 md:p-6">
-                    <div>
-                        <div className="mb-3">
+                    <div className="w-full max-w-4xl">
+                        <div className="mb-4">
                             <div className="text-xl font-bold" style={{ color: hex }}>
                                 {branch.name} <span className="text-xs font-normal uppercase tracking-wide text-white/40">· {branch.pillar}</span>
                             </div>
                             <p className="text-sm text-white/50">{branch.tagline}</p>
                             <p className="mt-1 text-xs font-bold text-white/40">
-                                {spent}/{totalPurchasable} learned
+                                {spentRegular}/{REGULAR_MAX} points in regular nodes
                             </p>
                         </div>
 
-                        <div
-                            className="grid gap-2"
-                            style={{
-                                gridTemplateColumns: `150px repeat(${maxRows}, minmax(120px, 1fr)) 150px`,
-                                gridTemplateRows: 'repeat(3, minmax(52px, auto))',
-                            }}
-                        >
-                            <div style={{ gridColumn: 1, gridRow: '1 / span 3' }}>
-                                <NodeButton save={save} node={start} hex={hex} />
-                            </div>
-                            {pathA.map((n) => (
-                                <div key={n.id} style={{ gridColumn: n.depth + 1, gridRow: 1 }}>
-                                    <NodeButton save={save} node={n} hex={hex} />
-                                </div>
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                            {regularNodes.map((node) => (
+                                <NodeCard key={node.id} save={save} node={node} hex={hex} />
                             ))}
-                            {pathB.map((n) => (
-                                <div key={n.id} style={{ gridColumn: n.depth + 1, gridRow: 2 }}>
-                                    <NodeButton save={save} node={n} hex={hex} />
-                                </div>
+                        </div>
+
+                        <div className="mb-2 mt-6 text-xs font-bold uppercase tracking-wide text-white/40">Masteries</div>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            {masteryNodes.map((node) => (
+                                <NodeCard key={node.id} save={save} node={node} hex={hex} />
                             ))}
-                            {pathC.map((n) => (
-                                <div key={n.id} style={{ gridColumn: n.depth + 1, gridRow: 3 }}>
-                                    <NodeButton save={save} node={n} hex={hex} />
-                                </div>
-                            ))}
-                            <div style={{ gridColumn: maxRows + 2, gridRow: '1 / span 3' }}>
-                                <NodeButton save={save} node={final} hex={hex} />
-                            </div>
                         </div>
                     </div>
                 </div>

@@ -43,19 +43,6 @@ export const BASE_PLAYER_STATS: Required<StatBlock> = {
     thornsPercent: 0,
 };
 
-/** +N effective level per skill node id, summed from every equipped item's "nodeLevel" affixes (see systems/skillTree.ts's resolveSkillTree). */
-function computeNodeLevelBonuses(items: ItemInstance[]): Record<string, number> {
-    const bonuses: Record<string, number> = {};
-    for (const item of items) {
-        for (const rolled of item.affixes) {
-            const def = findAffixDef(rolled.affixId);
-            if (!def || def.kind !== 'nodeLevel') continue;
-            bonuses[def.nodeId] = (bonuses[def.nodeId] ?? 0) + rolled.value;
-        }
-    }
-    return bonuses;
-}
-
 /** Flat stat contribution of one item instance: base stats + rolled STAT affixes (proc affixes are behavioral, not summed here). */
 export function itemStats(item: ItemInstance): Partial<StatBlock> {
     const base = getBaseType(item.baseTypeId);
@@ -121,8 +108,7 @@ export function aggregateStats(save: SaveData): AggregateResult {
         }
     }
 
-    const nodeLevelBonuses = computeNodeLevelBonuses(equippedItems);
-    const skillTree = resolveSkillTree(save, nodeLevelBonuses);
+    const skillTree = resolveSkillTree(save);
     for (const [k, v] of Object.entries(skillTree.stats)) {
         (stats as any)[k] = ((stats as any)[k] ?? 0) + (v as number);
     }
@@ -163,7 +149,7 @@ export function unequipSlot(save: SaveData, slot: GearSlot): SaveData {
     return { ...save, equipped: { ...save.equipped, [slot]: null } };
 }
 
-/** Socket 3 is the bonus Rhynekra-capstone socket — see hasFourthRhuneSocket(). */
+/** Socket 3 is the bonus socket unlocked by Glow Up's "The Fourth Rhune" Mastery — see hasFourthRhuneSocket(). */
 export function equipRhune(save: SaveData, rhuneId: string, socket: 0 | 1 | 2 | 3): SaveData {
     const fromBag = save.bagRhunes.find((r) => r.instanceId === rhuneId);
     const base = fromBag
@@ -182,9 +168,9 @@ export function unequipRhune(save: SaveData, socket: 0 | 1 | 2 | 3): SaveData {
     return { ...save, equippedRhunes: next };
 }
 
-/** Rhunekra's Final Convergence, "The Fourth Rhune" — hidden in the UI until it unlocks. */
+/** Glow Up's "The Fourth Rhune" Mastery — hidden in the UI until it unlocks. */
 export function hasFourthRhuneSocket(save: SaveData): boolean {
-    return isNodeOwned(save, 'rhunekra_capstone_fourth_rhune');
+    return isNodeOwned(save, 'glowup_fourth_rhune');
 }
 
 export function salvageValue(item: ItemInstance, salvageBonus = 0): number {

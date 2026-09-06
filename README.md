@@ -110,3 +110,9 @@ AI-generated names/art, expanded base-type roster, per-tier stat dashboards.
 
 - Use `RundotGameAPI.log()` for debug messages so they show up inside the RUN.game host.
 - Need storage, ads, haptics, or CDN helpers? The [RundotGameAPI docs](https://series-1.gitbook.io/rundot-docs) walk through every API with examples.
+
+## PixelLab MCP (pixel-art generation)
+
+`.mcp.json` wires up the [PixelLab](https://api.pixellab.ai) MCP server for generating pixel-art
+sprites/assets from Claude Code. It needs a `PIXELLAB_API_KEY` env var (set it in a local
+`.env`, which is gitignored — never commit the key itself).

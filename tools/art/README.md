@@ -8,6 +8,7 @@ spec.py      every asset + its prompt (characters, tilesets, props, item icons, 
 gen.py       calls the API for anything missing in out/ (idempotent; delete a file to regenerate it)
 pack.py      out/ → public/art/ sheets + src/assets/art.generated.ts (frame grids, tile corners, sizes)
 pixellab.py  tiny API client
+ref/         approved drafts that steer re-generation of buildings/trees (see below)
 out/         raw generations (kept so pack.py can be re-run without spending generations)
 .cache/      PixelLab ids (characters/tilesets) — lets gen.py add new animations to EXISTING characters
 ```
@@ -26,3 +27,9 @@ Conventions: world tiles 32px ("high top-down"), characters on 64px canvases ("l
 - Tileset corner labels sometimes come back inverted relative to the prompts; `pack.py`
   detects that from the pixels (the grass side must be the greener one).
 - Characters export as a ZIP through `api.pixellab.ai` (the image CDN host may be blocked).
+- Buildings: plain prompts drift into isometric corner views. Workflow that works: generate
+  small drafts in the FRONT style ("low top-down" + `FRONT_STYLE`), pick the best into `ref/`,
+  then the real size is generated with the draft (bilinear-resized) as `init_image`
+  (`REF_STRENGTH`, per-asset overrides) — same composition, native pixel density.
+- Map objects larger than ~40k px² come back on a flat colour; `gen.py` keys it out from the
+  borders (`strip_flat_background`).

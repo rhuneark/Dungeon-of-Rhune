@@ -6,14 +6,36 @@ Edit a prompt, delete the matching file under tools/art/out/, and re-run
 `python3 tools/art/pack.py` to rebuild public/art/.
 
 Conventions
-- World: 32px tiles, "high top-down" props, characters on 64px canvases
-  ("low top-down", 8 directions).
+- World: 32px tiles ("high top-down"), characters on 64px canvases
+  ("low top-down", 8 directions). Buildings/landmarks use the FRONT style:
+  facade toward the camera, roof seen from above, no isometric diamond —
+  the classic 16-bit RPG town look that matches the tiles.
 - UI: item icons are 32px per inventory cell (a 2x3 armor is 64x96).
 """
 
 PROP_STYLE = "dark fantasy medieval frontier village, muted earthy palette, pixel art, top-down rpg map object"
 ICON_STYLE = "dark fantasy arpg inventory item icon, single object centered, crisp pixel art"
 CHAR_STYLE = "dark fantasy rpg townsfolk, pixel art"
+FRONT_STYLE = (
+    "classic 16-bit top-down RPG town building seen from the front at a three-quarter angle, facade facing the viewer, "
+    "roof seen from above, square footprint, no isometric angle, no ground platform, dark fantasy medieval village"
+)
+# Composition references (tools/art/ref/<name>.png): approved smaller drafts.
+# gen.py resizes the reference to the target size (bilinear, over a flat
+# background) and passes it as init_image, so a re-generation keeps the
+# approved front-facing composition while drawing at native pixel density.
+# Buildings are 1.5x the drafts so doors fit the 64px characters.
+REF_STRENGTH = 200
+REF_STRENGTH_OVERRIDES = {"market_stall": 450}
+PROP_REFS = {
+    "smithy", "trader", "herbalist", "lore_tower", "tavern", "house_a", "house_b",
+    "gate", "market_stall", "pit_entrance", "tree_oak", "tree_pine",
+}
+# Props drawn in the FRONT style ("low top-down" view). Everything else uses PROP_STYLE ("high top-down").
+FRONT_FACING = {
+    "smithy", "trader", "herbalist", "lore_tower", "tavern", "house_a", "house_b",
+    "gate", "market_stall", "cart", "pit_entrance",
+}
 
 # ---------------------------------------------------------------- characters
 # name -> (prompt, animations [(template_id, [directions])])
@@ -91,25 +113,25 @@ TILESETS = [
 # name -> (w, h, prompt)
 PROPS = {
     # buildings / landmarks
-    "smithy": (160, 144, "village blacksmith workshop, stone forge with glowing coals under a timber lean-to roof, anvil out front, brick chimney"),
-    "trader": (144, 128, "merchant shop, timber frame house with a striped awning over the door and crates of goods out front"),
-    "herbalist": (128, 128, "herbalist cottage with a mossy thatched roof, bundles of drying herbs hanging by the door, tiny garden"),
-    "lore_tower": (128, 176, "tall narrow stone library tower with a pointed slate roof, a round window and a lantern by the door"),
+    "smithy": (240, 216, "village blacksmith workshop, stone forge with glowing coals under a timber lean-to roof, anvil out front, brick chimney"),
+    "trader": (216, 192, "merchant shop, timber frame house with a striped awning over the door and crates of goods out front"),
+    "herbalist": (192, 192, "herbalist cottage with a mossy thatched roof, bundles of drying herbs hanging by the door, tiny garden"),
+    "lore_tower": (192, 264, "tall narrow stone library tower with a pointed slate roof, a round window and a lantern by the door"),
     "gambler_wagon": (128, 96, "colorful fortune teller wagon with a purple canopy, hanging dice and coins, wooden wheels"),
-    "tavern": (192, 160, "large two story timber tavern inn with a hanging wooden sign and warm lit windows"),
-    "house_a": (128, 128, "small stone cottage with a thatched roof and a wooden door"),
-    "house_b": (112, 112, "timber frame village house with a red clay tiled roof"),
-    "pit_entrance": (144, 128, "dark square pit in the ground with stone stairs descending into blackness, four broken ancient stone pillars with glowing blue runes at the corners, heavy rusted chains across the opening"),
-    "gate": (128, 112, "wooden palisade town gate with two small watchtowers and an open gateway"),
+    "tavern": (288, 240, "large two story timber tavern inn with a hanging wooden sign and warm lit windows"),
+    "house_a": (192, 192, "small stone cottage with a thatched roof and a wooden door"),
+    "house_b": (168, 168, "timber frame village house with a red clay tiled roof"),
+    "pit_entrance": (240, 216, "ancient sealed stone archway set into a low rocky mound, stone stairs descending into darkness, heavy rusted iron chains across the opening, broken pillars carved with glowing blue runes on either side"),
+    "gate": (240, 192, "wooden palisade town gate with two small watchtowers and a closed barred gateway"),
     "waypoint": (96, 96, "circle of small standing stones with glowing cyan runes around a flat carved stone platform"),
     "wishing_well": (64, 80, "old stone wishing well with a little wooden roof and a bucket on a rope"),
     "strongbox": (48, 48, "large iron banded wooden treasure chest, closed"),
     "notice_board": (64, 64, "wooden village notice board with pinned parchment notes"),
     "statue": (64, 112, "weathered stone statue of a hooded warrior holding up a lantern, on a square pedestal"),
-    "market_stall": (96, 80, "market stall with a green and white striped canopy and baskets of fruit"),
+    "market_stall": (144, 120, "market stall with a green and white striped canopy and baskets of fruit, wooden support posts at each corner"),
     # nature
-    "tree_oak": (96, 128, "large leafy oak tree"),
-    "tree_pine": (64, 112, "tall dark green pine tree"),
+    "tree_oak": (144, 192, "large leafy oak tree"),
+    "tree_pine": (96, 168, "tall dark green pine tree"),
     "tree_dead": (80, 112, "twisted dead leafless tree"),
     "bush": (48, 40, "round leafy green bush"),
     "rock_big": (48, 40, "mossy grey boulder"),

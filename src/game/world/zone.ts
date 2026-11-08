@@ -22,6 +22,8 @@ export interface PropPlacement {
     decal?: boolean;
     /** Raise/lower the y-sort line (tiles) — e.g. a wide roof that should sort lower. */
     sortOffset?: number;
+    /** Where you stand to use it, in tiles relative to the base (default: just in front). */
+    approachDy?: number;
 }
 
 export interface NpcPlacement {

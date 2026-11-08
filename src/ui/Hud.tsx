@@ -100,6 +100,7 @@ export default function Hud() {
                             <MenuButton label={unspent ? 'Skills!' : 'Skills'} keyHint="K" active={overlay === 'skills'} onClick={() => toggleOverlay('skills')} />
                             <MenuButton label="Quests" keyHint="Q" active={left === 'quests'} onClick={() => toggleLeft('quests')} />
                             <MenuButton label="Codex" keyHint="L" active={left === 'codex'} onClick={() => toggleLeft('codex')} />
+                            <MenuButton label="Opts" keyHint="O" active={left === 'options'} onClick={() => toggleLeft('options')} />
                             {devTools && <MenuButton label="Lab" keyHint="~" active={left === 'lab'} onClick={() => toggleLeft('lab')} />}
                         </span>
                     </div>

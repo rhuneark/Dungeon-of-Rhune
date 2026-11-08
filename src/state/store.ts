@@ -23,6 +23,7 @@ export type LeftPanel =
     | 'quests'
     | 'well'
     | 'lab'
+    | 'options'
     | null;
 export type RightPanel = 'inventory' | null;
 /** Full-screen overlays. */

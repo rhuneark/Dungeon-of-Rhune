@@ -50,17 +50,17 @@ export function VendorPanel() {
     const isHerbs = npcId === 'ysolde';
     return (
         <Panel title={npc ? `${npc.name}` : 'Trade'} onClose={close} style={LEFT}>
-            <div className="t10 mb-[4px] text-center text-dim">Click to buy. Right-click your own items to sell.</div>
             <div className="flex justify-center">
                 <GridView w={grid.w} h={grid.h} items={grid.items} onClick={(_cx, _cy, uid) => uid && buy(npcId, uid)} tipCtx="buy" price={vendorPrice} />
             </div>
-            {!isHerbs && (
-                <div className="mt-[4px] flex justify-center">
+            <div className="t10 mt-[3px] flex items-center justify-between">
+                <span className="text-dim">Click to buy · right-click your items to sell</span>
+                {!isHerbs && (
                     <button className="pbtn" onClick={() => restock(npcId)}>
-                        Ask Pell for fresh stock
+                        Fresh stock
                     </button>
-                </div>
-            )}
+                )}
+            </div>
         </Panel>
     );
 }

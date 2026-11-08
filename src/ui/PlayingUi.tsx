@@ -9,6 +9,7 @@ import DialogBox from './panels/DialogBox.tsx';
 import InventoryPanel from './panels/InventoryPanel.tsx';
 import { CodexPanel, QuestsPanel } from './panels/JournalPanels.tsx';
 import LabPanel from './panels/LabPanel.tsx';
+import OptionsPanel from './panels/OptionsPanel.tsx';
 import { GamblePanel, SmithPanel, StashPanel, VendorPanel, WellPanel } from './panels/ServicePanels.tsx';
 import SkillsOverlay from './panels/SkillsOverlay.tsx';
 
@@ -32,6 +33,7 @@ function useHotkeys() {
             else if (k === 'k' || k === 't') toggleOverlay('skills');
             else if (k === 'q') toggleLeft('quests');
             else if (k === 'l') toggleLeft('codex');
+            else if (k === 'o') toggleLeft('options');
             else if (k === '`' || k === '~') {
                 const on = !store.get().devTools;
                 store.patch({ devTools: on, left: on ? 'lab' : store.get().left === 'lab' ? null : store.get().left });
@@ -65,6 +67,7 @@ export default function PlayingUi() {
             {left === 'quests' && <QuestsPanel />}
             {left === 'codex' && <CodexPanel />}
             {left === 'lab' && <LabPanel />}
+            {left === 'options' && <OptionsPanel onClose={() => store.patch({ left: null })} />}
             {right === 'inventory' && <InventoryPanel />}
             {overlay === 'skills' && <SkillsOverlay />}
             <DialogBox />

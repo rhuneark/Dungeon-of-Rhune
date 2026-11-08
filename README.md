@@ -20,7 +20,7 @@ npm run build          # type-checks, then builds dist/
 |---|---|
 | Click / hold | walk (A* pathing); click people, objects and loot labels to use them |
 | WASD / arrows | walk directly |
-| I · C · K · Q · L | Inventory · Character · Skills · Quests · Codex |
+| I · C · K · Q · L · O | Inventory · Character · Skills · Quests · Codex · Options |
 | Right-click item | use / equip; sell when a shop is open; move to/from stash or crucible |
 | Esc / Space | close panels (Esc with nothing open → menu) |
 | ~ (backtick) | **Loot Lab** dev tool: roll any treasure class, simulate 5,000 drops, cheats |
@@ -72,7 +72,13 @@ found, plus unlocked lore.
 **Crisp pixels.** World and UI each scale by an integer number of *device* pixels (computed from
 the real DPR), the camera snaps to the device grid, and the UI renders into a fixed "UI canvas"
 with native-size pixel fonts (Jersey 10, Jacquarda Bastarda 9, Silkscreen). World: 32px tiles,
-64px characters; UI: 32px per inventory cell.
+64px characters, buildings sized so doors fit them; UI: 32px per inventory cell. One exception:
+mid-size windows (645–860 device px tall, e.g. a 1366×768 laptop browser) get a 1.5× UI so text
+stays readable. Options (O) lets players pick UI scale and world zoom.
+
+**Perspective.** Classic 16-bit "top-down three-quarter": ground seen from above, buildings and
+characters seen from the front. Isometric (true Diablo) would mean regenerating every tile,
+prop and character and an iso projection in the engine — doable later, but not free.
 
 ## Where things live
 

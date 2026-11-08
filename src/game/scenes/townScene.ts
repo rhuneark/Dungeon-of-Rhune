@@ -86,7 +86,10 @@ export function createTownScene(app: Application, stage: Stage, zone: ZoneDef, c
         const tex = propTexture(p.art);
         const meta = propMeta(p.art);
         const s = new Sprite(tex);
-        s.anchor.set(0.5, 1);
+        // Anchor on the art's visible base (generated art has empty rows under it),
+        // so y is where the building actually meets the ground.
+        const baseY = meta ? meta.bbox[3] : tex.height;
+        s.anchor.set(0.5, meta ? baseY / meta.h : 1);
         if (p.flip) s.scale.x = -1;
         const px = Math.round(p.x * TILE);
         const py = Math.round(p.y * TILE);
@@ -108,11 +111,11 @@ export function createTownScene(app: Application, stage: Stage, zone: ZoneDef, c
             (p.decal ? decals : world).addChild(hl);
             const [bx0, by0, bx1, by1] = meta.bbox;
             const left = px - meta.w / 2;
-            const top = py - meta.h;
+            const top = py - baseY;
             hotspots.push({
                 target: { kind: 'prop', action: p.action, name: p.name ?? p.art },
                 rect: { x0: left + bx0, y0: top + by0, x1: left + bx1, y1: top + by1 },
-                approach: { x: px, y: py + (p.decal ? -meta.h / 2 : 14) },
+                approach: { x: px, y: p.approachDy !== undefined ? py + p.approachDy * TILE : py + (p.decal ? -(by1 - by0) / 2 : 14) },
                 range: p.decal ? 34 : 30,
                 sprite: s,
                 highlight: hl,
@@ -122,7 +125,7 @@ export function createTownScene(app: Application, stage: Stage, zone: ZoneDef, c
             // Named but inert: still shows its name on hover.
             const [bx0, by0, bx1, by1] = meta.bbox;
             const left = px - meta.w / 2;
-            const top = py - meta.h;
+            const top = py - baseY;
             hotspots.push({
                 target: { kind: 'prop', action: 'statue', name: p.name },
                 rect: { x0: left + bx0, y0: top + by0, x1: left + bx1, y1: top + by1 },
@@ -562,6 +565,21 @@ export function createTownScene(app: Application, stage: Stage, zone: ZoneDef, c
         if (pointer.over) setHover(pick(worldPointer()));
     };
 
+    // Dev-only probe: can the player path to every interactable from the spawn?
+    if (import.meta.env.DEV) {
+        const w = window as unknown as { __rhune?: Record<string, unknown> };
+        if (w.__rhune)
+            w.__rhune.reach = () =>
+                hotspots
+                    .filter((h) => h.range >= 0)
+                    .map((h) => {
+                        const label = h.target.kind === 'npc' ? h.target.id : h.target.kind === 'prop' ? h.target.name : 'goose';
+                        const path = nav.findPath({ x: zone.spawn.x * TILE, y: zone.spawn.y * TILE }, h.approach);
+                        const end = path?.[path.length - 1];
+                        const ok = !!end && Math.hypot(end.x - h.approach.x, end.y - h.approach.y) <= h.range * 2.2;
+                        return `${ok ? 'OK ' : 'BAD'} ${label}`;
+                    });
+    }
     let camShift = 0;
     const tick = (t: { deltaMS: number }) => update(t.deltaMS / 1000);
     app.ticker.add(tick);

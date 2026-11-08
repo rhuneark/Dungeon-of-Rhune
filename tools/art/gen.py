@@ -65,28 +65,80 @@ def post_retry(path, body, tries=8):
 
 
 # ---------------------------------------------------------------- map objects
+REF_DIR = os.path.join(HERE, "ref")
+REF_BG = (130, 130, 133, 255)
+
+
+def _b64png(im):
+    import base64
+
+    buf = io.BytesIO()
+    im.save(buf, "PNG")
+    return base64.b64encode(buf.getvalue()).decode()
+
+
+def strip_flat_background(path, tol=22):
+    """Large map objects come back on a flat colour instead of transparent.
+    Flood-fill that colour from the borders (outlines stop the fill)."""
+    from PIL import Image
+
+    im = Image.open(path).convert("RGBA")
+    w, h = im.size
+    px = im.load()
+    corners = [px[0, 0], px[w - 1, 0], px[0, h - 1], px[w - 1, h - 1]]
+    if any(c[3] < 255 for c in corners):
+        return  # already transparent
+    bg = corners[0]
+    close = lambda c: c[3] > 0 and sum(abs(c[i] - bg[i]) for i in range(3)) <= tol
+    stack = [(x, y) for x in range(w) for y in (0, h - 1)] + [(x, y) for y in range(h) for x in (0, w - 1)]
+    seen = set()
+    while stack:
+        x, y = stack.pop()
+        if (x, y) in seen or not (0 <= x < w and 0 <= y < h):
+            continue
+        seen.add((x, y))
+        if not close(px[x, y]):
+            continue
+        px[x, y] = (0, 0, 0, 0)
+        stack.extend(((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)))
+    im.save(path)
+
+
 def map_object(name, w, h, prompt, out_path, view="high top-down"):
     if os.path.exists(out_path):
         return
-    d = post_retry("/map-objects", {
+    body = {
         "description": prompt,
         "image_size": {"width": w, "height": h},
         "view": view,
         "outline": "single color outline",
         "shading": "medium shading",
-        "detail": "medium detail",
-    })
+        "detail": "high detail" if name in getattr(spec, "PROP_REFS", ()) else "medium detail",
+    }
+    ref = os.path.join(REF_DIR, f"{name}.png")
+    if name in getattr(spec, "PROP_REFS", ()) and os.path.exists(ref):
+        from PIL import Image
+
+        canvas = Image.new("RGBA", (w, h), REF_BG)
+        canvas.alpha_composite(Image.open(ref).convert("RGBA").resize((w, h), Image.BILINEAR))
+        body["init_image"] = {"type": "base64", "base64": _b64png(canvas)}
+        body["init_image_strength"] = getattr(spec, "REF_STRENGTH_OVERRIDES", {}).get(name, spec.REF_STRENGTH)
+    d = post_retry("/map-objects", body)
     job = pl.wait_job(d["background_job_id"], label=name)
     if job["status"] != "completed":
         raise RuntimeError(f"{name} failed: {str(job)[:300]}")
     pl.save_b64(job["last_response"]["image"], out_path)
+    strip_flat_background(out_path)
     log("ok", name)
 
 
 def gen_props():
     tasks = []
     for name, (w, h, prompt) in spec.PROPS.items():
-        tasks.append((name, w, h, f"{prompt}, {spec.PROP_STYLE}", os.path.join(OUT, "props", f"{name}.png"), "high top-down"))
+        if name in spec.FRONT_FACING:
+            tasks.append((name, w, h, f"{prompt}, {spec.FRONT_STYLE}", os.path.join(OUT, "props", f"{name}.png"), "low top-down"))
+        else:
+            tasks.append((name, w, h, f"{prompt}, {spec.PROP_STYLE}", os.path.join(OUT, "props", f"{name}.png"), "high top-down"))
     return tasks
 
 

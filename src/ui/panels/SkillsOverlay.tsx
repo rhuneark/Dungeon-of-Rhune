@@ -10,7 +10,7 @@ import type { DisciplineId } from '../../content/skills/disciplineNames.ts';
 import type { SkillDef, SkillNode } from '../../content/skills/types.ts';
 import { describeMod } from '../../content/stats.ts';
 import { session, useSession } from '../../state/session.ts';
-import { store } from '../../state/store.ts';
+import { store, useStore } from '../../state/store.ts';
 import { skillXpToNext } from '../../systems/hero.ts';
 import {
     allocate,
@@ -166,8 +166,10 @@ function Tree({ skill }: { skill: SkillDef }) {
     const st = hero.skills[skill.id];
     const unlocked = isUnlocked(hero, skill);
     const pts = pointsAvailable(hero, skill, sheet.raw);
+    const uiW = useStore((st) => st.view.uiW);
     const NODE = 30;
-    const GX = 74;
+    // Columns shrink on narrow UI canvases (min layout 690 UI px wide).
+    const GX = Math.max(56, Math.min(74, Math.floor((uiW - 472) / 4)));
     const GY = 56;
     const pos = (n: SkillNode) => ({ x: 14 + n.col * GX, y: 8 + n.row * GY });
     const color = getDiscipline(skill.discipline)?.color ?? '#aaa';

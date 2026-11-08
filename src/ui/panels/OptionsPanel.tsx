@@ -2,6 +2,8 @@
  * Display options: UI scale and world zoom. Auto picks crisp integer scales
  * (1.5x for mid-size windows); players on unusual screens can override.
  */
+import { useEffect, useState } from 'react';
+import { platform } from '../../platform/index.ts';
 import { store, useStore } from '../../state/store.ts';
 import { autoUiScale, autoZoom, computeViewMetrics, getViewPrefs, setViewPrefs, UI_SCALE_CHOICES, ZOOM_CHOICES, type ScalePref } from '../../view/viewport.ts';
 import { Panel } from '../kit/Panel.tsx';
@@ -24,8 +26,32 @@ export default function OptionsPanel({ onClose }: { onClose(): void }) {
     const uiOpts = UI_SCALE_CHOICES.filter((s) => v.devH / s >= 330 && v.devW / s >= 560);
     const zoomOpts = ZOOM_CHOICES.filter((z) => v.devH / z >= 220);
     const fmt = (n: number) => `${n}x`;
+    const [fullscreen, setFs] = useState<boolean | null>(null);
+    useEffect(() => {
+        let alive = true;
+        const refresh = () => platform.fullscreen.get().then((on) => alive && setFs(on));
+        refresh();
+        window.addEventListener('resize', refresh);
+        return () => {
+            alive = false;
+            window.removeEventListener('resize', refresh);
+        };
+    }, []);
+    const toggleFs = async (on: boolean) => {
+        await platform.fullscreen.set(on);
+        setFs(await platform.fullscreen.get());
+    };
     return (
         <Panel title="Options" onClose={onClose} style={{ left: 6, top: 6, width: 340 }}>
+            {platform.fullscreen.supported && (
+                <>
+                    <div className="s8 mb-[2px] text-dim">DISPLAY {platform.kind === 'desktop' && '(F11 / ALT+ENTER)'}</div>
+                    <div className="mb-[6px] flex flex-wrap gap-[3px]">
+                        <Choice label="Fullscreen" active={fullscreen === true} onClick={() => toggleFs(true)} />
+                        <Choice label="Windowed" active={fullscreen === false} onClick={() => toggleFs(false)} />
+                    </div>
+                </>
+            )}
             <div className="s8 mb-[2px] text-dim">UI SCALE</div>
             <div className="mb-[2px] flex flex-wrap gap-[3px]">
                 <Choice label={`Auto (${fmt(autoUiScale(v.devW, v.devH))})`} active={prefs.ui === 'auto'} onClick={() => apply({ ui: 'auto' })} />
@@ -54,6 +80,10 @@ export default function OptionsPanel({ onClose }: { onClose(): void }) {
                 </div>
                 <div>
                     World view: {Math.round(v.devW / v.zoom)}x{Math.round(v.devH / v.zoom)} world px at {fmt(v.zoom)}
+                </div>
+                <div>
+                    Platform: {platform.kind}
+                    {platform.kind === 'desktop' && (platform.steam.available ? ` · Steam: ${platform.steam.name ?? 'connected'}` : ' · Steam: offline')}
                 </div>
             </div>
         </Panel>

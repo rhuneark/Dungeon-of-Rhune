@@ -1,13 +1,12 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import RundotGameAPI from '@series-inc/rundot-game-sdk/api';
 import '@fontsource/jersey-10';
 import '@fontsource/jacquarda-bastarda-9';
 import '@fontsource/silkscreen';
 import App from './ui/App.tsx';
 import { store } from './state/store.ts';
 import { session } from './state/session.ts';
-import { initSdk, registerLifecycles, sdkReady } from './sdk/runSdk.ts';
+import { initPlatform, platform } from './platform/index.ts';
 import { warmAssets } from './assets/preload.ts';
 import { loadGame } from './systems/save.ts';
 import { simulateDrops } from './systems/loot.ts';
@@ -18,13 +17,11 @@ import { computeViewMetrics, sameMetrics } from './view/viewport.ts';
 import './styles/app.css';
 
 /**
- * Boot sequence. The ORDER here matters — it's the pattern production RUN
- * games use. Keep the numbered steps in this order; add your own work at the
- * marked points.
+ * Boot sequence. Keep the numbered steps in this order.
  */
 async function boot() {
-    // 0. Wire content cross-references (stat text for "+1 to Cinder Bolt" etc.)
-    //    and keep the pixel-perfect view metrics current.
+    // 0. Content cross-references (stat text for "+1 to Cinder Bolt" etc.)
+    //    and pixel-perfect view metrics that track the window.
     registerStatNameResolvers({
         skill: (id) => getSkill(id)?.name,
         discipline: (id) => getDiscipline(id)?.name,
@@ -41,12 +38,12 @@ async function boot() {
     watchDpr();
 
     // Dev-only handle for poking at state from the console / automated tests.
-    if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__rhune = { session, store, simulateDrops };
+    if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__rhune = { session, store, simulateDrops, platform };
 
-    // 1. SDK first. Nothing may call RundotGameAPI before this resolves.
-    await initSdk();
+    // 1. Platform (desktop shell + Steam, or plain browser). Never throws.
+    await initPlatform();
 
-    // 2. Load persisted progress (hero, shared stash, codex) before first render.
+    // 2. Load the save (hero, shared stash, codex) before first render.
     session.load(await loadGame());
 
     // 3. Mount React. `phase` starts at 'loading'.
@@ -72,29 +69,14 @@ async function boot() {
     // 6. Loading done — hand over to the menu.
     store.patch({ phase: 'menu' });
 
-    // 7. Host lifecycle hooks. Persist on onSleep; never rely on onQuit; no
-    //    fresh SDK RPCs beyond the save from sleep/quit.
-    registerLifecycles({
-        onPause: () => store.patch({ paused: true }),
-        onResume: () => store.patch({ paused: false }),
-        onSleep: async () => {
-            await session.flush();
-        },
-        onQuit: async () => {
-            await session.flush();
-        },
+    // 7. Lifecycle: pause the world while the window is hidden/minimized and
+    //    save on the way out; the desktop shell waits for this flush on close.
+    document.addEventListener('visibilitychange', () => {
+        const hidden = document.visibilityState === 'hidden';
+        store.patch({ paused: hidden });
+        if (hidden) void session.flush();
     });
-    window.addEventListener('beforeunload', () => void session.flush());
-
-    // 8. Fire-and-forget analytics.
-    if (sdkReady()) {
-        try {
-            RundotGameAPI.analytics.recordCustomEvent('game_loaded');
-            RundotGameAPI.analytics.trackFunnelStep(1, 'game_loaded', 'boot', 1);
-        } catch (err) {
-            console.warn('[Main] boot analytics failed', err);
-        }
-    }
+    platform.onFlushRequest(() => session.flush());
 }
 
 if (document.readyState === 'complete') boot();

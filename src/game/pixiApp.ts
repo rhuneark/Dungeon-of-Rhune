@@ -5,6 +5,9 @@
  * (resizeTo would round to CSS px and blur on fractional DPRs).
  */
 import { Application, TextureStyle } from 'pixi.js';
+// The desktop build runs under a strict Content-Security-Policy (no eval);
+// this swaps Pixi's generated shader/uniform code for precompiled versions.
+import 'pixi.js/unsafe-eval';
 import type { ViewMetrics } from '../view/viewport.ts';
 
 TextureStyle.defaultOptions.scaleMode = 'nearest';

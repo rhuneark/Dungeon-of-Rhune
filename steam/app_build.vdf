@@ -1,0 +1,14 @@
+"AppBuild"
+{
+	// Replace 1000000 with your App ID, 1000001/1000002 with your depot IDs.
+	"AppID" "1000000"
+	"Desc" "Dungeon of Rhune"
+	"BuildOutput" "../release/steam-output/"
+	// Set to a branch name (e.g. "beta") to make the build live automatically.
+	"SetLive" ""
+	"Depots"
+	{
+		"1000001" "depot_windows.vdf"
+		"1000002" "depot_linux.vdf"
+	}
+}

@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { session } from '../state/session.ts';
+import { platform } from '../platform/index.ts';
 import { store, useStore } from '../state/store.ts';
 import Hud, { toggleInventory, toggleLeft, toggleOverlay } from './Hud.tsx';
 import { CursorItem, CursorMode, TooltipHost } from './kit/Overlays.tsx';
@@ -34,7 +35,7 @@ function useHotkeys() {
             else if (k === 'q') toggleLeft('quests');
             else if (k === 'l') toggleLeft('codex');
             else if (k === 'o') toggleLeft('options');
-            else if (k === '`' || k === '~') {
+            else if ((k === '`' || k === '~') && platform.devTools) {
                 const on = !store.get().devTools;
                 store.patch({ devTools: on, left: on ? 'lab' : store.get().left === 'lab' ? null : store.get().left });
             } else if (k === ' ') {

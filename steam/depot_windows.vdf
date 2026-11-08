@@ -1,0 +1,13 @@
+"DepotBuild"
+{
+	"DepotID" "1000001"
+	// Output of `npm run dist:win` (build it on Windows for the branded .exe).
+	"ContentRoot" "../release/win-unpacked/"
+	"FileMapping"
+	{
+		"LocalPath" "*"
+		"DepotPath" "."
+		"Recursive" "1"
+	}
+	"FileExclusion" "steam_appid.txt"
+}

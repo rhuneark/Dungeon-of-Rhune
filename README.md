@@ -5,14 +5,22 @@ trees, and Diablo's weird little things — with its own twists. No story mode; 
 explains itself through small lore quests. This build is the **foundation + the main town,
 Thornwick**. Combat, the Wilds and the Pit come next.
 
-Built on Pixi.js v8 + React 19 + Tailwind v4 + Vite + TypeScript + the RundotGameAPI SDK.
-All art is generated with PixelLab (see `tools/art/`).
+**Platforms:** Steam (Windows, Linux/Steam Deck; macOS optional) via an Electron desktop shell,
+and the web (the same build is a static site). Tech: TypeScript, Pixi.js v8 (WebGL), React 19 +
+Tailwind v4 for UI, Vite, Electron + steamworks.js. All art is generated with PixelLab
+(see `tools/art/`).
 
 ```bash
 npm install
-npm run dev            # http://localhost:5173
-npm run build          # type-checks, then builds dist/
+npm run dev            # web, hot reload: http://localhost:5173
+npm run desktop:dev    # desktop shell, hot reload
+npm run desktop        # build + run the desktop app
+npm run build          # type-check + build dist/ (the web build; also what the desktop app loads)
+npm run dist:win       # Steam depot folder for Windows → release/win-unpacked (also dist:linux / dist:mac)
 ```
+
+Shipping on Steam (App ID, depots, SteamPipe upload, Steam Cloud, achievements, Deck): see
+[STEAM.md](STEAM.md). For the web, upload `dist/` to any static host (itch.io, GitHub Pages...).
 
 ## Controls
 
@@ -23,7 +31,8 @@ npm run build          # type-checks, then builds dist/
 | I · C · K · Q · L · O | Inventory · Character · Skills · Quests · Codex · Options |
 | Right-click item | use / equip; sell when a shop is open; move to/from stash or crucible |
 | Esc / Space | close panels (Esc with nothing open → menu) |
-| ~ (backtick) | **Loot Lab** dev tool: roll any treasure class, simulate 5,000 drops, cheats |
+| ~ (backtick) | **Loot Lab** dev tool: roll any treasure class, simulate 5,000 drops, cheats (dev builds, `?dev` on web, `RHUNE_DEVTOOLS=1` on desktop) |
+| F11 / Alt+Enter | fullscreen (desktop) |
 
 ## What's in the foundation
 
@@ -117,8 +126,10 @@ tools/art/              PixelLab pipeline (prompts → generation → packing)
    animations (PixelLab can add them to the existing characters), sound.
 4. Secrets: the Goose's key, a bright-and-cheerful secret level, Omens (temporary Targeted Find).
 
-## RUN.game
+## Platform layer
 
-- Before deploying, run `rundot init` (this is a **landscape** game; `game.config.prod.json` still
-  says portrait — re-init with `--orientation Landscape`).
-- `public/thumbnail.jpg` is a real 512×512 town shot.
+`src/platform/` is the only place the game touches the outside world: saves (files in the OS
+user-data folder on desktop — Steam Auto-Cloud syncs them — localStorage on the web),
+fullscreen, quit, Steam status and achievements (`src/content/achievements.ts`, unlocked from
+save state). `desktop/` is the Electron shell: `main.cjs` (app:// protocol, save files, window,
+Steam), `preload.cjs` (the `window.rhuneHost` bridge), `steam.config.json` (App ID).

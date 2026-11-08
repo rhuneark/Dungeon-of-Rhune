@@ -1,12 +1,11 @@
 /**
- * Persistence via RundotGameAPI.appStorage (cloud) with a localStorage
- * fallback for plain-browser dev. Posture: every SDK call can reject; a
+ * Persistence through the platform layer: a file in the OS user-data folder
+ * on desktop (Steam Auto-Cloud syncs it), localStorage on the web. A
  * save/load failure must never brick the game.
  */
-import RundotGameAPI from '@series-inc/rundot-game-sdk/api';
 import { hasBase } from '../content/items/bases.ts';
 import type { ItemInstance } from '../content/items/types.ts';
-import { sdkReady } from '../sdk/runSdk.ts';
+import { platform } from '../platform/index.ts';
 import { defaultSave, type SaveData } from './hero.ts';
 
 const SAVE_KEY = 'rhune_save_v1';
@@ -37,19 +36,10 @@ function sanitize(raw: Partial<SaveData>): SaveData {
 
 export async function loadGame(): Promise<SaveData> {
     let raw: string | null = null;
-    if (sdkReady()) {
-        try {
-            raw = await RundotGameAPI.appStorage.getItem(SAVE_KEY);
-        } catch (err) {
-            console.warn('[save] appStorage load failed', err);
-        }
-    }
-    if (!raw) {
-        try {
-            raw = localStorage.getItem(SAVE_KEY);
-        } catch {
-            /* private mode */
-        }
+    try {
+        raw = await platform.storage.get(SAVE_KEY);
+    } catch (err) {
+        console.warn('[save] load failed — starting fresh', err);
     }
     if (!raw) return defaultSave();
     try {
@@ -61,29 +51,16 @@ export async function loadGame(): Promise<SaveData> {
 }
 
 export async function saveGame(data: SaveData): Promise<void> {
-    const json = JSON.stringify(data);
     try {
-        localStorage.setItem(SAVE_KEY, json);
-    } catch {
-        /* quota / private mode */
-    }
-    if (!sdkReady()) return;
-    try {
-        await RundotGameAPI.appStorage.setItem(SAVE_KEY, json);
+        await platform.storage.set(SAVE_KEY, JSON.stringify(data));
     } catch (err) {
-        console.warn('[save] appStorage save failed — will retry next save', err);
+        console.warn('[save] save failed — will retry on the next save', err);
     }
 }
 
 export async function wipeSave(): Promise<void> {
     try {
-        localStorage.removeItem(SAVE_KEY);
-    } catch {
-        /* ignore */
-    }
-    if (!sdkReady()) return;
-    try {
-        await RundotGameAPI.appStorage.removeItem(SAVE_KEY);
+        await platform.storage.remove(SAVE_KEY);
     } catch {
         /* ignore */
     }

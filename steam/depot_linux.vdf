@@ -1,0 +1,13 @@
+"DepotBuild"
+{
+	"DepotID" "1000002"
+	// Output of `npm run dist:linux` — also what the Steam Deck runs.
+	"ContentRoot" "../release/linux-unpacked/"
+	"FileMapping"
+	{
+		"LocalPath" "*"
+		"DepotPath" "."
+		"Recursive" "1"
+	}
+	"FileExclusion" "steam_appid.txt"
+}

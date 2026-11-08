@@ -7,6 +7,7 @@ import { startAutoQuests } from '../systems/quests.ts';
 import { defaultSave } from '../systems/hero.ts';
 import { wipeSave } from '../systems/save.ts';
 import OptionsPanel from './panels/OptionsPanel.tsx';
+import { platform } from '../platform/index.ts';
 
 export default function MainMenu() {
     useStore((s) => s.rev);
@@ -84,11 +85,24 @@ export default function MainMenu() {
                     <div className="t10 text-center text-dim">No classes. Choose two Disciplines as you go; everything that makes sense, works.</div>
                 </div>
             )}
-            <button className="pbtn" onClick={() => setOptions(true)}>
-                Options
-            </button>
+            <div className="flex gap-[4px]">
+                <button className="pbtn" onClick={() => setOptions(true)}>
+                    Options
+                </button>
+                {platform.quit && (
+                    <button
+                        className="pbtn"
+                        onClick={async () => {
+                            await session.flush();
+                            platform.quit?.();
+                        }}
+                    >
+                        Quit to desktop
+                    </button>
+                )}
+            </div>
             {options && <OptionsPanel onClose={() => setOptions(false)} />}
-            <div className="s8 absolute bottom-[8px] text-faint">CLICK TO MOVE · I C K Q L O · ~ LOOT LAB · ESC</div>
+            <div className="s8 absolute bottom-[8px] text-faint">CLICK TO MOVE · I C K Q L O · {platform.devTools && '~ LOOT LAB · '}ESC</div>
         </div>
     );
 }

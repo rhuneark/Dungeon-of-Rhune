@@ -1,6 +1,5 @@
 /**
- * Loading screen shown while warmAssets() runs. Rendered by React, revealed
- * when the boot cover lifts, driven by store.loadProgress.
+ * Loading screen shown while warmAssets() runs. Driven by store.loadProgress.
  */
 import { useStore } from '../state/store.ts';
 
@@ -8,23 +7,12 @@ export default function LoadingScreen() {
     const progress = useStore((s) => s.loadProgress);
     const pct = Math.round(progress * 100);
     return (
-        <div className="flex h-full flex-col items-center justify-center gap-6 px-10">
-            <h1 className="text-center text-3xl font-bold tracking-wide text-primary">
-                DUNGEON <span className="text-white">OF</span> RHUNE
-            </h1>
-            <div
-                className="h-3 w-full max-w-xs overflow-hidden rounded-full bg-white/10"
-                role="progressbar"
-                aria-valuenow={pct}
-                aria-valuemin={0}
-                aria-valuemax={100}
-            >
-                <div
-                    className="h-full rounded-full bg-primary transition-[width] duration-200 ease-out"
-                    style={{ width: `${pct}%` }}
-                />
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-[10px] bg-ink">
+            <div className="title36 text-gold">Dungeon of Rhune</div>
+            <div className="frame-inset h-[8px] w-[220px]" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+                <div className="h-full bg-gold" style={{ width: `${pct}%` }} />
             </div>
-            <p className="text-sm text-white/50">Sharpening the hammer… {pct}%</p>
+            <div className="t10 text-dim">Carving rhunes… {pct}%</div>
         </div>
     );
 }

@@ -1,0 +1,45 @@
+{
+  "group_id": "2fb063ce-4f62-4958-a332-79026ce9c75a",
+  "states": [
+    {
+      "character": {
+        "id": "94545821-3ce9-4943-b30d-09bbcbe313a5",
+        "name": "Idle",
+        "prompt": "elderly herbalist woman in a moss green shawl carrying a basket of herbs and a crooked wooden staff, dark fantasy rpg townsfolk, pixel art",
+        "size": {
+          "width": 64,
+          "height": 64
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-11-08T06:03:49.989323+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "breathing_idle": {
+            "south": [
+              "Idle/animations/breathing_idle/south/frame_000.png",
+              "Idle/animations/breathing_idle/south/frame_001.png",
+              "Idle/animations/breathing_idle/south/frame_002.png",
+              "Idle/animations/breathing_idle/south/frame_003.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-11-08T06:09:08.122700"
+}

@@ -1,0 +1,55 @@
+{
+  "characters": {
+    "player": {
+      "id": "ac79e0ac-0c9e-4140-b05b-c235496f1cf5",
+      "anim:walking-8-frames": "done",
+      "anim:breathing-idle": "done"
+    },
+    "npc_smith": {
+      "id": "f599afbc-13ab-434c-b118-1438a78f310d",
+      "anim:breathing-idle": "done"
+    },
+    "npc_trader": {
+      "id": "0e16d8e6-9de4-4a4c-bcc5-845408f05ab2",
+      "anim:breathing-idle": "done"
+    },
+    "npc_herbalist": {
+      "id": "94545821-3ce9-4943-b30d-09bbcbe313a5",
+      "anim:breathing-idle": "done"
+    },
+    "npc_lore": {
+      "id": "d67ccb12-cad2-4cc3-bcda-e065aab3913c",
+      "anim:breathing-idle": "done"
+    },
+    "npc_gambler": {
+      "id": "a8617714-3288-4e48-9b84-d66aeb7fb1eb",
+      "anim:breathing-idle": "done"
+    },
+    "npc_captain": {
+      "id": "417e9483-16f2-4925-9fdb-8449fa70e745",
+      "anim:breathing-idle": "done"
+    }
+  },
+  "tilesets": {
+    "grass_dirt": {
+      "id": "8d12f59a-7851-4bb0-9b02-2bde3a0036c4",
+      "lower_base_tile_id": "8811d1ab-141f-49cf-a828-8953edf0b55d",
+      "upper_base_tile_id": "97969402-4dc6-4dcc-aff7-7efd5521759d"
+    },
+    "grass_cobble": {
+      "id": "c38d91a0-1b29-4988-9266-87e625efc83b",
+      "lower_base_tile_id": "8811d1ab-141f-49cf-a828-8953edf0b55d",
+      "upper_base_tile_id": "3cebe0c4-373d-4d7b-9b43-dcd93597c2d5"
+    },
+    "water_grass": {
+      "id": "36f3d9c3-39bd-4e21-83bd-89526dd0cc78",
+      "lower_base_tile_id": "70e4499e-2811-4632-ae6c-3837f1ad0661",
+      "upper_base_tile_id": "8811d1ab-141f-49cf-a828-8953edf0b55d"
+    },
+    "dirt_cobble": {
+      "id": "1d10aff9-b1e2-4ca4-9b00-a1f7e629e654",
+      "lower_base_tile_id": "97969402-4dc6-4dcc-aff7-7efd5521759d",
+      "upper_base_tile_id": "3cebe0c4-373d-4d7b-9b43-dcd93597c2d5"
+    }
+  }
+}

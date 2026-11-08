@@ -1,112 +1,118 @@
 # Dungeon of Rhune
 
-You're an idiot with a legendary hammer standing in a swarm of nonsense monsters that auto-die
-around you. Every floor is a fresh screen of chaos, every drop glows with how much you should
-care about it, and no two hammers are ever the same hammer.
+A pixel-art ARPG homage: Diablo II's loot, Grim Dawn's dual masteries, Last Epoch's per-skill
+trees, and Diablo's weird little things — with its own twists. No story mode; the world
+explains itself through small lore quests. This build is the **foundation + the main town,
+Thornwick**. Combat, the Wilds and the Pit come next.
 
 Built on Pixi.js v8 + React 19 + Tailwind v4 + Vite + TypeScript + the RundotGameAPI SDK.
-
-## Get Up and Running
+All art is generated with PixelLab (see `tools/art/`).
 
 ```bash
 npm install
-npm run dev            # opens the game at http://localhost:5173
+npm run dev            # http://localhost:5173
+npm run build          # type-checks, then builds dist/
 ```
 
-You should see: black cover → loading bar → main menu → Play → a free-roam hub (chest, armor
-rack, tier statue, blacksmith, multiplayer portal, dungeon entrance) → Enter Dungeon →
-dodge-and-auto-fire combat.
+## Controls
 
-```bash
-npm run build
-rundot deploy          # or: npm run deploy
+| | |
+|---|---|
+| Click / hold | walk (A* pathing); click people, objects and loot labels to use them |
+| WASD / arrows | walk directly |
+| I · C · K · Q · L | Inventory · Character · Skills · Quests · Codex |
+| Right-click item | use / equip; sell when a shop is open; move to/from stash or crucible |
+| Esc / Space | close panels (Esc with nothing open → menu) |
+| ~ (backtick) | **Loot Lab** dev tool: roll any treasure class, simulate 5,000 drops, cheats |
+
+## What's in the foundation
+
+**Loot (the heart).** D2-style item model: base types with item levels, tiered prefixes/suffixes
+gated by affix level, quality ladder (crude → normal → superior → magic → rare → unique), magic
+items drop **unidentified** (Old Varn reads them for free — or use a Scroll of Insight), rares get
+two-word names, uniques roll **variable stats** (perfect rolls are tracked). Treasure classes with
+picks and "no drop" weights. Grid ("tetris") inventory, paperdoll, shared stash, D2 cursor
+pickup/place/swap. Ground loot pops out in arcs with coloured labels; uniques get a light beam.
+
+**Fortune — "magic find of certain things".** Three classic stats plus **Targeted Find**:
+
+- *Rarity Find* — better quality on everything (D2 diminishing returns on rare/unique)
+- *Item Quantity* — fewer empty drops · *Extra Gold*
+- *Weapon / Armor / Jewelry / Curio / Rhune Find* — more of THAT kind of drop
+- *Unique Find* — boosts only the unique roll
+
+Gear can roll these ("Scribe's" = Rhune Find, "Grailseeker's" = Unique Find, ...), so players can
+build a hunting kit for exactly what they're chasing. Tune it all in the Loot Lab.
+
+**Rhunes & Rhunewords** (the namesake). 12 rhunes with weapon/armor/shield effects; socket the
+right ones *in order* into a plain item with exactly that many sockets to speak one of 9
+Rhunewords. Brannoc's **Crucible** fuses 3 identical rhunes into the next, reforges magic items,
+and can strip sockets; he also punches sockets into plain gear.
+
+**Curios** — charms that work from the backpack (small/medium/grand). Every cell they use is a
+cell you can't fill with loot.
+
+**Disciplines (Grim Dawn) + skill trees (Last Epoch).** No classes. Pick any two of four
+Disciplines (Bulwark, Emberwright, Galeborn, Hollowcaller); every pair has a title (Forgeguard,
+Ashbinder, Nightwind...). Path Points (1/level + lore quests) raise Discipline rank: passive stats
+per rank, skills unlock at rank thresholds. Specialize up to 5 skills; each has its own node tree,
+and specialized skills level up with your XP (one tree point per level, plus +skill gear). Nodes
+include cross-discipline conversions (a Bulwark slam that turns to fire, thralls that use forge
+fire) — if it makes sense, it works. Tree effects are data the combat layer will read.
+
+**Thornwick.** Six NPCs with services — Old Varn (identify, Codex), Brannoc (crucible, sockets),
+Pell (trader), Mother Ysolde (potions/scrolls), "Lucky" Odo (sealed goods = gambling), Captain
+Maren (the gate) — plus the Wishing Well (gold → loot), your Strongbox, the Sealed Stair, a
+Rhunestone Circle (future waypoint), a graveyard, a pond and **the Goose**. Eight lore quests are
+completable in town and pay out Path Points, XP, items and lore entries.
+
+**The Codex** — Holy Grail tracking: every unique (with best roll %), rhune and rhuneword you've
+found, plus unlocked lore.
+
+**Crisp pixels.** World and UI each scale by an integer number of *device* pixels (computed from
+the real DPR), the camera snaps to the device grid, and the UI renders into a fixed "UI canvas"
+with native-size pixel fonts (Jersey 10, Jacquarda Bastarda 9, Silkscreen). World: 32px tiles,
+64px characters; UI: 32px per inventory cell.
+
+## Where things live
+
+```
+src/content/            pure data — the design lives here
+  stats.ts              stat registry (tags, damage types, Targeted Find kinds, tooltip text)
+  items/                bases, affixes, uniques (+quirks), rhunes & rhunewords, rare names
+  loot/                 treasure classes + quality tuning
+  skills/               Disciplines, skills, per-skill trees, combo titles
+  lore/                 lore entries + lore quests
+  npcs.ts
+src/systems/            rules over the data (pure TS, no rendering)
+  itemGen.ts loot.ts    item creation, treasure-class resolution, quality rolls
+  itemText.ts           derived item view: names, colours, final damage/defense, prices
+  character.ts          stat sheet (gear, curios, disciplines, passives, tree nodes)
+  actions.ts            item flow: pickup, cursor, equip, socketing, identify, sell
+  economy.ts            vendors, gambling, wishing well, sockets, crucible recipes
+  skills.ts quests.ts progression.ts hero.ts inventory.ts save.ts rng.ts
+src/game/               Pixi world
+  engine/               nav (A*), tilemap (Wang autotiling), art slicing, ground loot, fx
+  world/thornwick.ts    the town map (terrain painting, props, NPCs, placed items)
+  scenes/townScene.ts   input, player, NPCs, goose, camera, interactions
+  interact.ts           what clicking things does (dialogs, panels, quest events)
+src/ui/                 React UI (panels, HUD, tooltips) inside the integer-scaled UI root
+src/view/viewport.ts    pixel-perfect frame/zoom/UI-scale math
+tools/art/              PixelLab pipeline (prompts → generation → packing)
 ```
 
-Before your first deploy, replace `public/thumbnail.jpg` with real game art — **exactly
-512×512, JPG** — and confirm `game.config.prod.json` has a real `gameId` (from `rundot init`).
+## Next up (proposed)
 
-## Core Loop
+1. **Combat** — basic attack + the 12 skills reading their tree effects; life/mana; monsters with
+   treasure classes; the Coin-Gobbler (loot goblin) already has a TC.
+2. **The Wilds** — first outdoor zone south of the gate, then the Pit's first floors below the
+   Sealed Stair (~1/4 of a D2 act for the first release).
+3. Waypoints (Rhunestone Circles), sets, more uniques/rhunewords, skill/ability icons and attack
+   animations (PixelLab can add them to the existing characters), sound.
+4. Secrets: the Goose's key, a bright-and-cheerful secret level, Omens (temporary Targeted Find).
 
-1. Spawn in the hub and walk around freely (WASD/arrows, or hold the pointer anywhere and the
-   idiot walks toward it — no drag origin, works the same from any part of the screen). Six
-   stations are scattered around the room; each is always tappable, and glows when you're near.
-2. Walk to (or tap) the **Tier Statue** to pick a difficulty (persists until changed; higher
-   tiers unlock by reaching a floor-depth threshold in the current one).
-3. Walk to (or tap) **Enter Dungeon** to drop into an endless arena at the selected tier.
-4. Same movement scheme as the hub. Equipped hand-slot gear auto-fires at the nearest enemy;
-   Rhunes layer on top — some are plain stat bonuses, others are build-defining: on-hit status
-   procs (slow/burn/poison/shock/stun), a trail that follows your movement, an aura around you,
-   or an amplifier that doubles all damage of one element. A Rhune of Frostfall (ice trail that
-   slows) and a Rhune of Absolute Zero (ice damage x2) turn "walk near things" into a build.
-5. Clear a floor's kill quota → loot drops (glow color = rarity) → floor counter increments →
-   next arena, slightly harder.
-6. Die, or tap **Exit**, to return to the hub. Reaching a tier's floor threshold unlocks the
-   next tier at the statue.
-7. Back in the hub: the **Chest** is where you equip/unequip/salvage loot. The **Armor Rack**
-   is a read-only "check me out" card — equipped gear, stats, and milestones, no actions. The
-   **Blacksmith** spends salvage currency to reroll an item's affix values or craft a fresh item
-   of a chosen kind. The **Multiplayer Portal** is visible but disabled for v1.
+## RUN.game
 
-## World & Camera
-
-Both the hub and dungeon are fixed 1920×1080 worlds (`src/game/world.ts`) — bigger than the
-on-screen viewport on purpose. `src/game/camera.ts` pans a follow-camera around inside those
-bounds (clamped to the edges, smoothed), reusing `stage.ts`'s existing device-fit scale
-unchanged, so bigger screens still render bigger with no extra work. `src/game/input.ts` is the
-shared movement input: WASD/arrow keys, plus "hold anywhere, walk toward the pointer" for
-mouse/touch — deliberately not a drag-origin joystick, since that read as stiff/inconsistent
-on desktop.
-
-## Where Things Live
-
-```
-src/main.tsx                    // boot sequence — loads the save, grants a starter kit, mounts React
-src/state/store.ts               // UI-facing store: phase, location (hub/dungeon), panel, save, run HUD
-src/game/world.ts                 // fixed WORLD_WIDTH/HEIGHT the camera pans around inside
-src/game/camera.ts                // clamped follow-camera + worldToScreen, layered on stage.ts's scale
-src/game/input.ts                 // shared WASD + hold-anywhere-to-move pointer tracking
-src/game/data/                   // static tables: rarity, base types, affixes, tiers, enemies, rhunes (effect defs)
-src/game/systems/rhuneRuntime.ts     // rarity-scaled Rhune proc/aura/trail/elementAmp resolution + UI descriptions
-src/game/systems/procAffixRuntime.ts // rarity-scaled item proc-affix resolution + UI descriptions
-src/game/systems/                    // item rolling, stat aggregation, save/load, tier-unlock progress, blacksmith
-src/game/scenes/hubScene.ts      // free-roam hub: player avatar, 6 stations, proximity glow
-src/game/scenes/dungeonScene.ts  // the arena: movement, auto-fire, enemies, loot, floor pacing
-src/game/dungeonController.ts    // bridges dungeon scene events -> store + persistence
-src/game/GameCanvas.tsx          // React <-> Pixi boundary; swaps hub/dungeon scenes by location
-src/ui/panels/                   // Loadout (equip/salvage), Armor Rack (read-only), Blacksmith, Tier Statue, Portal, Death
-game.config.prod.json            // generated by `rundot init` — do not edit manually
-```
-
-## First-Playable Scope (v1)
-
-- 4 starting tiers (The Whimper / The Ruckus / The Mayhem / The Oblivion), floor-depth gated.
-- Solo endless floors, joystick/mouse dodge, auto-fire gear (melee AoE, ranged projectiles,
-  multi-shot/pierce/splash on ranged, elemental damage that can be independently amplified per
-  element).
-- 9 hand base types (Hammer, Dagger, Axe, Frostbrand, Wand, Bow, Staff, Orb, Shield) + 3-4 base
-  types per armor slot + 4 jewelry types.
-- 30 StatBlock attributes (`src/game/data/types.ts`) — damage/defense basics plus revive chance,
-  luck, salvage bonus, floor-clear heal, knockback, regen, splash radius, and more.
-- Gear affixes aren't just flat stats anymore: every item can also roll a proc affix — "X% chance
-  on [hit/crit/kill/move/being hit/floor clear] to [throw N daggers, explode, heal, boost an
-  element, ...]" (`src/game/data/affixes.ts`'s `PROC_AFFIXES`, resolved by
-  `systems/procAffixRuntime.ts`). 21 of them today, mixed into every slot's pool.
-- 24 Rhune effects across 6 kinds (stat bonus, on-hit status proc, on-kill trigger, movement
-  trail, elemental amplifier, aura), 1 shared pool, 3 sockets — see `src/game/data/rhunes.ts`.
-  Rhune procs and item proc affixes are two independent systems that both hook the same combat
-  trigger points, so they stack.
-- 5-tier rarity with glow color + affix-count gating; comedic static-word-bank item names
-  (45 prefixes x 45 suffixes = 90 words).
-- Salvage-for-currency inventory sink, plus a Blacksmith to spend it on affix rerolls or crafting.
-- Cloud-saved inventory, equipped gear, tier-unlock state, and per-tier floor record via
-  `RundotGameAPI.appStorage`. Best-floor leaderboard per tier via `RundotGameAPI.leaderboard`
-  (mode `tier-N`) and floor-depth/best-floor stats via `RundotGameAPI.stats` — both best-effort
-  and safe to run without a configured leaderboard/stats backend.
-
-Cut for later (see the build brief): real-time co-op through the portal, hub pets/NPCs,
-AI-generated names/art, expanded base-type roster, per-tier stat dashboards.
-
-## RUN.game Tips
-
-- Use `RundotGameAPI.log()` for debug messages so they show up inside the RUN.game host.
-- Need storage, ads, haptics, or CDN helpers? The [RundotGameAPI docs](https://series-1.gitbook.io/rundot-docs) walk through every API with examples.
+- Before deploying, run `rundot init` (this is a **landscape** game; `game.config.prod.json` still
+  says portrait — re-init with `--orientation Landscape`).
+- `public/thumbnail.jpg` is a real 512×512 town shot.

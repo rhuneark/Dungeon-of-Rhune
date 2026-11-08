@@ -1,7 +1,7 @@
 {
     "name": "dungeon-of-rhune",
     "version": "1.0.0",
-    "description": "You're an idiot with a legendary hammer standing in a swarm of nonsense monsters that auto-die around you.",
+    "description": "A pixel-art ARPG homage: D2 loot, Grim Dawn dual masteries, Last Epoch skill trees, rhunes, and a goose.",
     "private": true,
     "type": "module",
     "scripts": {
@@ -29,6 +29,9 @@
         "protobufjs": true
     },
     "dependencies": {
+        "@fontsource/jacquarda-bastarda-9": "^5.3.0",
+        "@fontsource/jersey-10": "^5.3.0",
+        "@fontsource/silkscreen": "^5.3.0",
         "@series-inc/rundot-game-sdk": "^5.23.0",
         "pixi.js": "^8.18.1",
         "react": "19.2.4",

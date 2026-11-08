@@ -1,82 +1,98 @@
 /**
- * Design-resolution stage: scene code works in fixed DESIGN UNITS, and this
- * module maps them to real pixels — so anything sized at 1/4 of the design
- * height takes up 1/4 of the screen height on EVERY device.
+ * Pixel-perfect world stage + camera.
  *
- * How it works (height-fit — the landscape counterpart of the portrait
- * width-fit pattern; see #app-frame in styles/app.css, which is locked to
- * exactly 16:9, so in practice this ratio never varies):
- *   - The stage root container is scaled by screenHeight / DESIGN_HEIGHT.
- *   - Vertical space is therefore always exactly DESIGN_HEIGHT units tall.
- *   - Horizontal space is reported by designWidth() — at the frame's fixed
- *     16:9, that's always DESIGN_HEIGHT * 16/9 units, but read it live
- *     rather than hardcoding the ratio in case the frame ratio ever changes.
+ * `root` holds the world, positioned in WORLD PIXELS (1 art pixel = 1 unit).
+ * It is scaled by zoom/dpr so one world pixel is exactly `zoom` device
+ * pixels, and the camera offset is snapped to whole device pixels — so any
+ * sprite at an integer world position lands exactly on the device grid.
  */
 import { Container, type Application } from 'pixi.js';
+import type { ViewMetrics } from '../view/viewport.ts';
 
 /** The scene contract: every createXxxScene(app, stage) returns one of these. */
 export interface Scene {
     destroy(): void;
 }
 
-/**
- * ADAPT: the game's design height, in units — matches WORLD_HEIGHT (see
- * world.ts) exactly, so 1 design unit = 1 world unit and the 1920x1080 hub/
- * dungeon world fills the 16:9 frame edge-to-edge with NO camera zoom (a
- * smaller value here was the earlier "massively enlarged" bug: it made
- * every world unit map to far more screen pixels than intended).
- */
-export const DESIGN_HEIGHT = 1080;
-
-/** What createStage returns — the surface scenes build against. */
 export interface Stage {
-    /** Add all scene content here (NOT app.stage), positioned in design units. */
     root: Container;
-    /** Constant: the design-space height (= DESIGN_HEIGHT). */
-    height: number;
-    /** Current screen width in design units — re-read after resizes. */
-    designWidth(): number;
-    /** Current design-unit → pixel factor (rarely needed directly). */
-    scale(): number;
-    /** Subscribe to resizes (re-anchor left/right/center content). Returns unsubscribe. */
+    zoom(): number;
+    /** Visible world size in world px. */
+    viewW(): number;
+    viewH(): number;
+    setBounds(w: number, h: number): void;
+    /** Center the camera on a world point (clamped to bounds). */
+    lookAt(x: number, y: number): void;
+    /** Camera top-left in world px. */
+    camLeft(): number;
+    camTop(): number;
+    /** CSS px inside the canvas → world px. */
+    screenToWorld(sx: number, sy: number): { x: number; y: number };
+    worldToScreen(wx: number, wy: number): { x: number; y: number };
+    applyView(view: ViewMetrics): void;
     onResize(cb: () => void): () => void;
     destroy(): void;
 }
 
-/**
- * Create the stage on a Pixi app. Add all scene content to `stage.root`
- * (NOT app.stage) and position/size it in design units.
- */
-export function createStage(app: Application): Stage {
+export function createStage(app: Application, initial: ViewMetrics): Stage {
     const root = new Container();
     app.stage.addChild(root);
-
+    let view = initial;
+    let boundsW = 0;
+    let boundsH = 0;
+    let cx = 0;
+    let cy = 0;
+    let offX = 0; // device px
+    let offY = 0;
     const resizeCbs = new Set<() => void>();
-    let _designWidth = 0;
 
-    const layout = () => {
-        const s = app.screen.height / DESIGN_HEIGHT;
-        root.scale.set(s);
-        _designWidth = app.screen.width / s;
-        for (const cb of resizeCbs) cb();
+    const viewW = () => view.devW / view.zoom;
+    const viewH = () => view.devH / view.zoom;
+
+    const apply = () => {
+        const z = view.zoom;
+        root.scale.set(z / view.dpr);
+        const clampAxis = (c: number, span: number, bound: number) => (bound <= span ? bound / 2 : Math.min(Math.max(c, span / 2), bound - span / 2));
+        const x = clampAxis(cx, viewW(), boundsW);
+        const y = clampAxis(cy, viewH(), boundsH);
+        offX = Math.round((x - viewW() / 2) * z);
+        offY = Math.round((y - viewH() / 2) * z);
+        root.position.set(-offX / view.dpr, -offY / view.dpr);
     };
-
-    // app.screen is in CSS pixels regardless of resolution/autoDensity, so
-    // the design mapping is unaffected by devicePixelRatio.
-    app.renderer.on('resize', layout);
-    layout();
 
     return {
         root,
-        height: DESIGN_HEIGHT,
-        designWidth: () => _designWidth,
-        scale: () => root.scale.x,
+        zoom: () => view.zoom,
+        viewW,
+        viewH,
+        setBounds(w, h) {
+            boundsW = w;
+            boundsH = h;
+            apply();
+        },
+        lookAt(x, y) {
+            cx = x;
+            cy = y;
+            apply();
+        },
+        camLeft: () => offX / view.zoom,
+        camTop: () => offY / view.zoom,
+        screenToWorld(sx, sy) {
+            return { x: (sx * view.dpr + offX) / view.zoom, y: (sy * view.dpr + offY) / view.zoom };
+        },
+        worldToScreen(wx, wy) {
+            return { x: (wx * view.zoom - offX) / view.dpr, y: (wy * view.zoom - offY) / view.dpr };
+        },
+        applyView(v) {
+            view = v;
+            apply();
+            for (const cb of resizeCbs) cb();
+        },
         onResize(cb) {
             resizeCbs.add(cb);
             return () => resizeCbs.delete(cb);
         },
         destroy() {
-            app.renderer.off('resize', layout);
             resizeCbs.clear();
             root.destroy({ children: true });
         },

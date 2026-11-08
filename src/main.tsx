@@ -1,13 +1,20 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import RundotGameAPI from '@series-inc/rundot-game-sdk/api';
+import '@fontsource/jersey-10';
+import '@fontsource/jacquarda-bastarda-9';
+import '@fontsource/silkscreen';
 import App from './ui/App.tsx';
 import { store } from './state/store.ts';
+import { session } from './state/session.ts';
 import { initSdk, registerLifecycles, sdkReady } from './sdk/runSdk.ts';
 import { warmAssets } from './assets/preload.ts';
-import { loadGame, saveGame } from './game/systems/save.ts';
-import { ensureStarterKit } from './game/systems/starterKit.ts';
-import { refreshBounties } from './game/systems/quests.ts';
+import { loadGame } from './systems/save.ts';
+import { simulateDrops } from './systems/loot.ts';
+import { registerStatNameResolvers } from './content/stats.ts';
+import { getDiscipline, getSkill } from './content/skills/disciplines.ts';
+import { QUIRKS } from './content/items/uniques.ts';
+import { computeViewMetrics, sameMetrics } from './view/viewport.ts';
 import './styles/app.css';
 
 /**
@@ -16,65 +23,70 @@ import './styles/app.css';
  * marked points.
  */
 async function boot() {
+    // 0. Wire content cross-references (stat text for "+1 to Cinder Bolt" etc.)
+    //    and keep the pixel-perfect view metrics current.
+    registerStatNameResolvers({
+        skill: (id) => getSkill(id)?.name,
+        discipline: (id) => getDiscipline(id)?.name,
+        quirk: (id) => QUIRKS[id],
+    });
+    const onResize = () => {
+        const next = computeViewMetrics();
+        if (!sameMetrics(next, store.get().view)) store.patch({ view: next });
+    };
+    window.addEventListener('resize', onResize);
+    window.visualViewport?.addEventListener('resize', onResize);
+    // DPR changes (moving the window between monitors) don't always fire resize.
+    const watchDpr = () => matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`).addEventListener('change', () => (onResize(), watchDpr()), { once: true });
+    watchDpr();
+
+    // Dev-only handle for poking at state from the console / automated tests.
+    if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__rhune = { session, store, simulateDrops };
+
     // 1. SDK first. Nothing may call RundotGameAPI before this resolves.
-    //    Resolves even if init fails (local dev outside the RUN host).
     await initSdk();
 
-    // 2. Load persisted progress (inventory, equipped gear, tier unlocks,
-    //    currency) before first render. A brand-new save gets a starter
-    //    hammer + boots so floor 1 isn't unwinnable with empty hands.
-    const loaded = await loadGame();
-    const withStarterKit = ensureStarterKit(loaded);
-    const withBounties = refreshBounties(withStarterKit);
-    store.patch({ save: withBounties });
-    if (withBounties !== loaded) void saveGame(withBounties);
+    // 2. Load persisted progress (hero, shared stash, codex) before first render.
+    session.load(await loadGame());
 
-    // 3. Mount React. `phase` starts at 'loading', so this paints the
-    //    loading screen (progress bar at 0%).
+    // 3. Mount React. `phase` starts at 'loading'.
     createRoot(document.getElementById('root')!).render(
         <React.StrictMode>
             <App />
         </React.StrictMode>
     );
 
-    // 4. Lift the boot cover once the loading screen has actually painted
-    //    (double-rAF = after the next rendered frame). Asset warming continues
-    //    behind it — the player watches the progress bar, not a black screen.
+    // 4. Lift the boot cover once the loading screen has painted.
     requestAnimationFrame(() => {
         requestAnimationFrame(() => {
             const cover = document.getElementById('boot-cover');
             if (!cover) return;
             cover.classList.add('hidden');
-            setTimeout(() => cover.remove(), 400); // matches the CSS transition
+            setTimeout(() => cover.remove(), 400);
         });
     });
 
-    // 5. Warm all critical assets (see src/assets/manifest.ts). Deferred
-    //    assets keep loading in the background after this resolves.
+    // 5. Warm all art (src/assets/manifest.ts) and the pixel fonts.
     await warmAssets((p) => store.patch({ loadProgress: p }));
 
     // 6. Loading done — hand over to the menu.
     store.patch({ phase: 'menu' });
 
-    // 7. Host lifecycle hooks. Register AFTER boot so handlers never race
-    //    half-initialized state.
-    //    Rules: persist on onSleep, never rely on onQuit firing, and never
-    //    fire fresh SDK RPCs (e.g. scheduling notifications) from
-    //    onSleep/onQuit — a hard close kills the runtime before they land.
+    // 7. Host lifecycle hooks. Persist on onSleep; never rely on onQuit; no
+    //    fresh SDK RPCs beyond the save from sleep/quit.
     registerLifecycles({
         onPause: () => store.patch({ paused: true }),
         onResume: () => store.patch({ paused: false }),
         onSleep: async () => {
-            await saveGame(store.get().save);
+            await session.flush();
         },
         onQuit: async () => {
-            await saveGame(store.get().save);
+            await session.flush();
         },
     });
+    window.addEventListener('beforeunload', () => void session.flush());
 
-    // 8. Post-boot, fire-and-forget work goes here — analytics boot event,
-    //    server time refresh, notification re-arming, subscription status
-    //    refresh. None of it should block or throw into this function.
+    // 8. Fire-and-forget analytics.
     if (sdkReady()) {
         try {
             RundotGameAPI.analytics.recordCustomEvent('game_loaded');

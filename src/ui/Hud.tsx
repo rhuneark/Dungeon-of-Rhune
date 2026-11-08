@@ -1,144 +1,155 @@
 /**
- * In-game HUD: a React overlay above the Pixi canvas. Content adapts to
- * store.location — the hub shows currency/tier chrome, the dungeon shows
- * the live run readout (floor, HP, kill quota) plus the Exit button.
- *
- * Pattern to keep: the overlay itself is pointer-events-none so taps fall
- * through to the canvas; each interactive control opts back in with
- * pointer-events-auto.
+ * HUD: D2-style bottom bar — life orb, XP bar, skill hotbar, menu buttons,
+ * mana orb — plus the hover name plate, zone title and toasts.
  */
-import { useEffect } from 'react';
-import { store, useStore } from '../state/store.ts';
-import { getTier } from '../game/data/tiers.ts';
-import { requestExitToHub } from '../game/dungeonController.ts';
+import { getSkill } from '../content/skills/disciplines.ts';
+import { useSession } from '../state/session.ts';
+import { store, useStore, type LeftPanel, type Overlay } from '../state/store.ts';
+import { xpToNext } from '../systems/hero.ts';
+import { tooltip } from './kit/tooltip.ts';
+import { uiPoint } from './kit/uiPoint.ts';
+import { SkillGlyph } from './panels/SkillsOverlay.tsx';
 
-/** I = Inventory (bag), C = Build. Same toggle-or-switch behavior as tapping the HUD buttons, minus a keyboard on mobile. */
-function useHotkeys(phase: string) {
-    useEffect(() => {
-        if (phase !== 'playing') return;
-        const onKeyDown = (e: KeyboardEvent) => {
-            if (e.target instanceof HTMLElement && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
-            const panel = store.get().panel;
-            if (panel === 'death') return; // don't let a hotkey dodge the death recap
-            const key = e.key.toLowerCase();
-            if (key === 'i') {
-                e.preventDefault();
-                store.patch(panel === 'inventory' ? { panel: null } : { invTab: 'bag', panel: 'inventory' });
-            } else if (key === 'c') {
-                e.preventDefault();
-                store.patch({ panel: panel === 'build' ? null : 'build' });
-            } else if (key === 'escape' && panel !== null) {
-                store.patch({ panel: null });
-            }
-        };
-        window.addEventListener('keydown', onKeyDown);
-        return () => window.removeEventListener('keydown', onKeyDown);
-    }, [phase]);
+function Orb({ value, max, color, label }: { value: number; max: number; color: string; label: string }) {
+    const pct = max > 0 ? Math.max(0, Math.min(1, value / max)) : 0;
+    return (
+        <div
+            className="pe relative h-[44px] w-[44px] overflow-hidden rounded-full"
+            style={{ background: '#0a0806', boxShadow: '0 0 0 1px #000, 0 0 0 2px #8a6a42, 0 0 0 3px #120d09' }}
+            onPointerMove={(e) => {
+                const p = uiPoint(e.clientX, e.clientY);
+                tooltip.show({ kind: 'text', lines: [`${label}: ${Math.round(value)} / ${max}`] }, p.x, p.y);
+            }}
+            onPointerLeave={() => tooltip.hide()}
+        >
+            <div className="absolute bottom-0 left-0 right-0" style={{ height: `${pct * 100}%`, background: color }} />
+            <div className="absolute left-[9px] top-[6px] h-[8px] w-[12px] rounded-full bg-white/25" />
+        </div>
+    );
+}
+
+function MenuButton({ label, keyHint, active, onClick }: { label: string; keyHint: string; active: boolean; onClick(): void }) {
+    return (
+        <button className={`pbtn !px-[4px] ${active ? '!text-gold' : ''}`} onClick={onClick} title={`${label} (${keyHint})`}>
+            {label}
+            <span className="s8 ml-[2px] text-dim">{keyHint}</span>
+        </button>
+    );
+}
+
+export function toggleLeft(p: LeftPanel) {
+    const s = store.get();
+    store.patch({ left: s.left === p ? null : p, dialog: null });
+}
+export function toggleOverlay(o: Overlay) {
+    const s = store.get();
+    store.patch({ overlay: s.overlay === o ? null : o, dialog: null });
+}
+export function toggleInventory() {
+    const s = store.get();
+    store.patch({ right: s.right ? null : 'inventory' });
 }
 
 export default function Hud() {
-    const phase = useStore((s) => s.phase);
-    const location = useStore((s) => s.location);
-    const save = useStore((s) => s.save);
-    const run = useStore((s) => s.run);
-    const paused = useStore((s) => s.paused);
-    useHotkeys(phase);
-
-    const tier = getTier(save.selectedTier);
-
+    const s = useSession();
+    const hero = s.hero;
+    const sheet = s.sheet();
+    const left = useStore((st) => st.left);
+    const right = useStore((st) => st.right);
+    const overlay = useStore((st) => st.overlay);
+    const devTools = useStore((st) => st.devTools);
+    const xpPct = Math.min(100, (hero.xp / xpToNext(hero.level)) * 100);
+    const unspent = hero.attrPoints > 0 || hero.pathPoints > 0;
     return (
-        <div className="pointer-events-none absolute inset-0 pt-safe-top">
-            <div className="flex items-start justify-between p-4">
-                {location === 'hub' ? (
-                    <div className="pointer-events-auto rounded-xl bg-black/50 px-4 py-2 text-sm font-bold">
-                        <span style={{ color: `#${tier.color.toString(16).padStart(6, '0')}` }}>{tier.name}</span>
-                        <span className="ml-3 text-white/70">{save.currency}◆</span>
-                    </div>
-                ) : (
-                    <div className="pointer-events-auto flex flex-col gap-1 rounded-xl bg-black/50 px-4 py-2">
-                        <div className="text-lg font-bold tabular-nums">
-                            Floor {run?.floor ?? 1}
-                            {run?.isBossFloor && <span className="ml-2 text-xs font-bold uppercase tracking-wide text-red-400">Boss</span>}
-                        </div>
-                        <div className="h-2 w-36 overflow-hidden rounded-full bg-white/10">
-                            <div
-                                className="h-full rounded-full bg-red-500 transition-[width] duration-150"
-                                style={{ width: `${run ? Math.max(0, (run.hp / Math.max(1, run.maxHp)) * 100) : 100}%` }}
-                            />
-                        </div>
-                        {run?.isBossFloor && run.bossMaxHp > 0 ? (
-                            <>
-                                <div className="mt-0.5 h-2 w-36 overflow-hidden rounded-full bg-white/10">
-                                    <div
-                                        className="h-full rounded-full bg-amber-400 transition-[width] duration-150"
-                                        style={{ width: `${Math.max(0, (run.bossHp / Math.max(1, run.bossMaxHp)) * 100)}%` }}
-                                    />
-                                </div>
-                                <div className="text-[11px] text-white/50">Boss HP</div>
-                            </>
-                        ) : (
-                            <div className="text-[11px] text-white/50">
-                                Kills {run?.kills ?? 0}/{run?.killsNeeded ?? 0}
-                                {run && run.pillarCount > 0 ? ` · Pillars ${run.pillarCount}` : ''}
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                <div className="flex gap-2">
-                    <button
-                        type="button"
-                        className="pointer-events-auto rounded-xl bg-black/50 px-3 py-2 text-sm font-bold transition-transform active:scale-95"
-                        onClick={() => store.patch({ invTab: 'bag', panel: 'inventory' })}
-                        title="Inventory (I)"
+        <>
+            <div className="absolute bottom-0 left-0 right-0 flex h-[48px] items-end justify-between px-[4px] pb-[2px]">
+                <Orb value={sheet.life} max={sheet.life} color="linear-gradient(#e0533f, #7a1d14)" label="Life" />
+                <div className="frame pe mx-[4px] mb-[1px] flex flex-1 flex-col gap-[2px] px-[6px] py-[3px]" style={{ maxWidth: 560 }}>
+                    <div
+                        className="frame-inset h-[4px]"
+                        onPointerMove={(e) => {
+                            const p = uiPoint(e.clientX, e.clientY);
+                            tooltip.show({ kind: 'text', lines: [`Level ${hero.level}`, `${hero.xp} / ${xpToNext(hero.level)} xp`] }, p.x, p.y);
+                        }}
+                        onPointerLeave={() => tooltip.hide()}
                     >
-                        Bag
-                    </button>
-                    {location === 'hub' && (
-                        <button
-                            type="button"
-                            className="pointer-events-auto rounded-xl bg-black/50 px-3 py-2 text-sm font-bold transition-transform active:scale-95"
-                            onClick={() => store.patch({ panel: 'build' })}
-                            title="Build (C)"
-                        >
-                            Build
-                        </button>
-                    )}
-                    {location === 'hub' && (
-                        <button
-                            type="button"
-                            className="pointer-events-auto rounded-xl bg-black/50 px-3 py-2 text-sm font-bold transition-transform active:scale-95"
-                            onClick={() => store.patch({ panel: 'menu' })}
-                            title="Character"
-                        >
-                            Character
-                        </button>
-                    )}
-                    {location === 'dungeon' && (
-                        <button
-                            type="button"
-                            className="pointer-events-auto rounded-xl bg-black/50 px-4 py-2 text-sm font-bold transition-transform active:scale-95"
-                            onClick={requestExitToHub}
-                        >
-                            Exit
-                        </button>
-                    )}
-                    {location === 'hub' && (
-                        <button
-                            type="button"
-                            className="pointer-events-auto rounded-xl bg-black/50 px-4 py-2 text-sm font-bold transition-transform active:scale-95"
-                            onClick={() => store.patch({ phase: 'menu' })}
-                        >
-                            Menu
-                        </button>
-                    )}
+                        <div className="h-full bg-gold" style={{ width: `${xpPct}%` }} />
+                    </div>
+                    <div className="flex items-center gap-[3px]">
+                        {hero.hotbar.map((id, i) => {
+                            const sk = id ? getSkill(id) : null;
+                            return (
+                                <div
+                                    key={i}
+                                    className="frame-inset relative flex h-[30px] w-[30px] items-center justify-center"
+                                    onPointerMove={(e) => {
+                                        const p = uiPoint(e.clientX, e.clientY);
+                                        tooltip.show({ kind: 'text', title: sk?.name ?? `Slot ${i + 1}`, lines: sk ? [sk.description, '(Combat arrives with the Wilds.)'] : ['Bind skills in the Skills window (K).'] }, p.x, p.y);
+                                    }}
+                                    onPointerLeave={() => tooltip.hide()}
+                                >
+                                    {sk && <SkillGlyph skill={sk} size={28} />}
+                                    <span className="s8 absolute bottom-0 right-[1px] text-dim">{i + 1}</span>
+                                </div>
+                            );
+                        })}
+                        <span className="t10 ml-[4px] text-gold">{hero.gold.toLocaleString()}g</span>
+                        <span className="ml-auto flex gap-[2px]">
+                            <MenuButton label="Char" keyHint="C" active={left === 'character'} onClick={() => toggleLeft('character')} />
+                            <MenuButton label="Inv" keyHint="I" active={right === 'inventory'} onClick={toggleInventory} />
+                            <MenuButton label={unspent ? 'Skills!' : 'Skills'} keyHint="K" active={overlay === 'skills'} onClick={() => toggleOverlay('skills')} />
+                            <MenuButton label="Quests" keyHint="Q" active={left === 'quests'} onClick={() => toggleLeft('quests')} />
+                            <MenuButton label="Codex" keyHint="L" active={left === 'codex'} onClick={() => toggleLeft('codex')} />
+                            {devTools && <MenuButton label="Lab" keyHint="~" active={left === 'lab'} onClick={() => toggleLeft('lab')} />}
+                        </span>
+                    </div>
                 </div>
+                <Orb value={sheet.mana} max={sheet.mana} color="linear-gradient(#5b7cff, #1b2a7a)" label="Mana" />
             </div>
-            {paused && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/60">
-                    <p className="text-2xl font-bold">Paused</p>
+            <ZoneTitle />
+            <HoverPlate />
+            <Toasts />
+        </>
+    );
+}
+
+function ZoneTitle() {
+    return (
+        <div className="absolute right-[8px] top-[6px] text-right">
+            <div className="title18 text-gold" style={{ textShadow: '1px 1px 0 #000' }}>
+                Thornwick
+            </div>
+            <div className="s8 text-dim" style={{ textShadow: '1px 1px 0 #000' }}>
+                TOWN · SAFE
+            </div>
+        </div>
+    );
+}
+
+function HoverPlate() {
+    const h = useStore((s) => s.hoverName);
+    const left = useStore((s) => s.left);
+    const overlay = useStore((s) => s.overlay);
+    if (!h || overlay) return null;
+    return (
+        <div className="frame pointer-events-none absolute top-[6px] px-[8px] py-[2px] text-center" style={{ left: '50%', transform: 'translateX(-50%)', marginLeft: left ? 90 : 0 }}>
+            <div className="t10" style={{ color: h.color }}>
+                {h.text}
+            </div>
+            {h.sub && <div className="s8 text-dim">{h.sub.toUpperCase()}</div>}
+        </div>
+    );
+}
+
+function Toasts() {
+    const toasts = useStore((s) => s.toasts);
+    return (
+        <div className="pointer-events-none absolute left-1/2 top-[40px] flex -translate-x-1/2 flex-col items-center gap-[2px]">
+            {toasts.map((t) => (
+                <div key={t.id} className="t10 px-[6px] py-[1px]" style={{ color: t.color ?? '#e8dcc0', background: 'rgba(0,0,0,0.6)' }}>
+                    {t.text}
                 </div>
-            )}
+            ))}
         </div>
     );
 }

@@ -1,21 +1,88 @@
-import { store } from '../state/store.ts';
+import { useState } from 'react';
+import { comboTitle } from '../content/skills/disciplines.ts';
+import { session } from '../state/session.ts';
+import { store, useStore } from '../state/store.ts';
+import { newHero } from '../systems/hero.ts';
+import { startAutoQuests } from '../systems/quests.ts';
+import { defaultSave } from '../systems/hero.ts';
+import { wipeSave } from '../systems/save.ts';
 
 export default function MainMenu() {
+    useStore((s) => s.rev);
+    const hero = session.save.hero;
+    const [name, setName] = useState('');
+    const [confirm, setConfirm] = useState(false);
+    const [creating, setCreating] = useState(!hero);
+
+    const start = () => {
+        session.save.hero = newHero(name || 'Wanderer');
+        startAutoQuests(session.save.hero);
+        const h = session.save.hero;
+        h.life = 1;
+        session.commit();
+        store.patch({ phase: 'playing', left: null, right: null, overlay: null, dialog: null });
+        setTimeout(() => store.toast('Welcome to Thornwick. Talk to Old Varn (the tower, north-east of the square).', '#d9b26a'), 600);
+    };
+    const play = () => store.patch({ phase: 'playing', left: null, right: null, overlay: null, dialog: null });
+    const wipe = async () => {
+        await wipeSave();
+        session.load(defaultSave());
+        setConfirm(false);
+        setCreating(true);
+    };
+
     return (
-        <div className="flex h-full flex-col items-center justify-center gap-3 px-10">
-            <h1 className="text-center text-4xl font-bold tracking-wide text-primary">
-                DUNGEON <span className="text-white">OF</span> RHUNE
-            </h1>
-            <p className="mb-8 max-w-xs text-center text-sm text-white/50">
-                You're an idiot with a legendary hammer. Everything else is a problem that solves itself.
-            </p>
-            <button
-                type="button"
-                className="rounded-2xl bg-primary px-12 py-4 text-xl font-bold text-black shadow-lg transition-transform active:scale-95"
-                onClick={() => store.patch({ phase: 'playing', location: 'hub' })}
-            >
-                Play
-            </button>
+        <div className="pe absolute inset-0 flex flex-col items-center justify-center gap-[8px]" style={{ background: 'radial-gradient(ellipse at center, #241a12 0%, #0d0b09 70%)' }}>
+            <div className="title36 text-gold" style={{ textShadow: '2px 2px 0 #000' }}>
+                Dungeon of Rhune
+            </div>
+            <div className="t10 mb-[10px] text-dim">Thornwick waits above the Sealed Stair.</div>
+            {!creating && hero ? (
+                <div className="frame flex w-[240px] flex-col items-center gap-[6px] p-[10px]">
+                    <div className="t20 text-parch">{hero.name}</div>
+                    <div className="t10 text-gold">
+                        Level {hero.level} {comboTitle(hero.disciplines[0], hero.disciplines[1])}
+                    </div>
+                    <button className="pbtn w-full !py-[4px]" onClick={play}>
+                        Continue
+                    </button>
+                    <button className="pbtn w-full" onClick={() => setCreating(true)}>
+                        New hero (replaces this one)
+                    </button>
+                    {!confirm ? (
+                        <button className="pbtn w-full" onClick={() => setConfirm(true)}>
+                            Delete save
+                        </button>
+                    ) : (
+                        <button className="pbtn w-full !text-bad" onClick={wipe}>
+                            Really delete everything?
+                        </button>
+                    )}
+                </div>
+            ) : (
+                <div className="frame flex w-[240px] flex-col items-center gap-[6px] p-[10px]">
+                    <div className="t10 text-dim">Name your wanderer</div>
+                    <input
+                        autoFocus
+                        maxLength={16}
+                        className="t20 frame-inset w-full px-[4px] text-center text-parch outline-none"
+                        value={name}
+                        placeholder="Wanderer"
+                        onChange={(e) => setName(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && start()}
+                    />
+                    <button className="pbtn w-full !py-[4px]" onClick={start}>
+                        Enter Thornwick
+                    </button>
+                    {hero && (
+                        <button className="pbtn w-full" onClick={() => setCreating(false)}>
+                            Back
+                        </button>
+                    )}
+                    <div className="t10 text-center text-dim">No classes. Choose two Disciplines as you go; everything that makes sense, works.</div>
+                </div>
+            )}
+            <div className="s8 absolute bottom-[8px] text-faint">CLICK TO MOVE · I C K Q L · ~ LOOT LAB · ESC</div>
         </div>
     );
 }

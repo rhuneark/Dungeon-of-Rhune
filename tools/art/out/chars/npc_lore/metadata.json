@@ -1,0 +1,45 @@
+{
+  "group_id": "6e37d1ab-3d64-4dc3-82d1-ac91378cb992",
+  "states": [
+    {
+      "character": {
+        "id": "d67ccb12-cad2-4cc3-bcda-e065aab3913c",
+        "name": "Idle",
+        "prompt": "ancient frail scholar with a long white beard and tattered indigo robes, holding a glowing lantern and a thick old book, dark fantasy rpg townsfolk, pixel art",
+        "size": {
+          "width": 64,
+          "height": 64
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-11-08T06:03:49.953069+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "breathing_idle": {
+            "south": [
+              "Idle/animations/breathing_idle/south/frame_000.png",
+              "Idle/animations/breathing_idle/south/frame_001.png",
+              "Idle/animations/breathing_idle/south/frame_002.png",
+              "Idle/animations/breathing_idle/south/frame_003.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-11-08T06:08:25.121457"
+}

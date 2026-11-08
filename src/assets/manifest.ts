@@ -1,53 +1,33 @@
 /**
- * Asset manifest — the single place that lists what gets loaded and when.
- * Files live in public/ (URLs are relative to the page, so 'images/x.png'
- * means public/images/x.png; works in dev and in the deployed subdirectory).
+ * Asset manifest — built from the generated art metadata (tools/art/pack.py
+ * writes src/assets/art.generated.ts). Files live in public/art/; URLs are
+ * relative so they work in dev and in the deployed subdirectory.
  *
- * Two tiers (the pattern production RUN games use):
- *   - 'critical'  — awaited during the loading screen. Everything the first
- *                   interactive screen needs: menu art, UI chrome, the sprites
- *                   visible in the first seconds of play.
- *   - 'deferred'  — fire-and-forget background load after boot. Sub-screen
- *                   art, late-game content, anything the player can't see yet.
- *
- * Keep 'critical' small: every asset here delays first interaction.
+ *   - 'critical' — awaited during the loading screen (everything the town
+ *                  needs: ~1MB of crisp pixel art).
+ *   - 'deferred' — background load after boot (nothing yet).
  */
 import type { AssetsManifest, UnresolvedAsset } from 'pixi.js';
+import { ART } from './art.generated.ts';
 
-/**
- * A narrowing of Pixi's AssetsManifest: Pixi also allows `assets` to be a
- * record, but this template keeps it an array so the tier filters below can
- * check `assets.length`. Still assignable to AssetsManifest (Assets.init).
- */
 export interface Manifest extends AssetsManifest {
     bundles: { name: string; assets: UnresolvedAsset[] }[];
 }
 
+const entries = (kind: keyof typeof ART): UnresolvedAsset[] =>
+    Object.keys(ART[kind]).map((name) => ({ alias: `${kind}/${name}`, src: `art/${kind}/${name}.png` }));
+
 export const MANIFEST: Manifest = {
     bundles: [
-        {
-            name: 'critical',
-            assets: [
-                // ADAPT: replace with the game's real first-screen assets.
-                // Reference loaded assets by alias: Assets.get('placeholder'),
-                // Sprite.from('placeholder').
-                { alias: 'placeholder', src: 'images/placeholder.png' },
-            ],
-        },
-        {
-            name: 'deferred',
-            assets: [
-                // ADAPT: sub-screen backgrounds, per-level art, shop icons...
-            ],
-        },
+        { name: 'critical', assets: [...entries('tiles'), ...entries('chars'), ...entries('props'), ...entries('icons')] },
+        { name: 'deferred', assets: [] },
     ],
 };
 
-// Empty bundles are skipped so an unused tier never errors.
-export const CRITICAL_BUNDLES: string[] = MANIFEST.bundles
-    .filter((b) => b.name !== 'deferred' && b.assets.length > 0)
-    .map((b) => b.name);
+export const CRITICAL_BUNDLES: string[] = MANIFEST.bundles.filter((b) => b.name !== 'deferred' && b.assets.length > 0).map((b) => b.name);
+export const DEFERRED_BUNDLES: string[] = MANIFEST.bundles.filter((b) => b.name === 'deferred' && b.assets.length > 0).map((b) => b.name);
 
-export const DEFERRED_BUNDLES: string[] = MANIFEST.bundles
-    .filter((b) => b.name === 'deferred' && b.assets.length > 0)
-    .map((b) => b.name);
+/** URL of an item icon for <img> tags in the React UI. */
+export function iconUrl(name: string): string {
+    return `art/icons/${name}.png`;
+}

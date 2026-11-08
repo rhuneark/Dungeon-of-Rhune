@@ -1,33 +1,41 @@
 /**
- * Screen router. One phase visible at a time; the 'playing' phase stacks the
- * React HUD + panel overlays above the Pixi canvas.
- *
- * #app-frame (styled in styles/app.css) is the device frame: a fixed 16:9
- * box, centered in the viewport, letterboxed on any other aspect ratio.
- * Everything — canvas and DOM UI — lives inside it, so they always align.
+ * Screen router + pixel-perfect frame. #app-frame is positioned from the
+ * device-aligned view metrics; the UI renders into a fixed-size "UI canvas"
+ * (uiW x uiH UI px) scaled by an integer number of device pixels, so pixel
+ * fonts and art stay crisp at every resolution.
  */
+import { useEffect, type ReactNode } from 'react';
 import { useStore } from '../state/store.ts';
 import LoadingScreen from './LoadingScreen.tsx';
 import MainMenu from './MainMenu.tsx';
-import Hud from './Hud.tsx';
-import Panels from './Panels.tsx';
-import Toasts from './Toasts.tsx';
 import GameCanvas from '../game/GameCanvas.tsx';
+import PlayingUi from './PlayingUi.tsx';
+
+function UiRoot({ children }: { children: ReactNode }) {
+    const v = useStore((s) => s.view);
+    return (
+        <div className="ui-root" style={{ width: v.uiW, height: v.uiH, transform: `scale(${v.ui / v.dpr})` }}>
+            {children}
+        </div>
+    );
+}
 
 export default function App() {
     const phase = useStore((s) => s.phase);
+    const v = useStore((s) => s.view);
+    useEffect(() => {
+        const block = (e: Event) => e.preventDefault();
+        window.addEventListener('contextmenu', block);
+        return () => window.removeEventListener('contextmenu', block);
+    }, []);
     return (
-        <div id="app-frame" className="bg-surface text-white">
-            {phase === 'loading' && <LoadingScreen />}
-            {phase === 'menu' && <MainMenu />}
-            {phase === 'playing' && (
-                <div className="absolute inset-0">
-                    <GameCanvas />
-                    <Hud />
-                    <Toasts />
-                    <Panels />
-                </div>
-            )}
+        <div id="app-frame" style={{ left: v.left, top: v.top, width: v.cssW, height: v.cssH }}>
+            {phase === 'playing' && <GameCanvas />}
+            <UiRoot>
+                {phase === 'loading' && <LoadingScreen />}
+                {phase === 'menu' && <MainMenu />}
+                {phase === 'playing' && <PlayingUi />}
+            </UiRoot>
         </div>
     );
 }

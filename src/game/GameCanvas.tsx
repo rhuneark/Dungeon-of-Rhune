@@ -1,111 +1,89 @@
 /**
  * React ↔ Pixi boundary. React owns WHEN the game exists (mount/unmount with
- * the 'playing' phase) and WHICH sub-scene is active (hub vs dungeon, via
- * store.location). No React state flows in per-frame — game → UI
- * communication goes through the store.
- *
- * Re-keying the effect on `location` recreates the whole Pixi Application on
- * every hub<->dungeon transition — the same StrictMode-safe teardown pattern
- * the template already uses for menu<->playing, just applied one level
- * deeper. Transitions happen a few times per session, not per frame, so the
- * WebGL context churn is cheap relative to the simplicity it buys.
+ * the 'playing' phase); Pixi owns the world. View-metric changes resize the
+ * renderer in place (no recreate) so the pixel grid stays exact.
  */
 import { useEffect, useRef } from 'react';
 import type { Application } from 'pixi.js';
-import { createPixiApp } from './pixiApp.ts';
-import { createStage, type Stage } from './stage.ts';
-import { createHubScene } from './scenes/hubScene.ts';
-import { createDungeonScene } from './scenes/dungeonScene.ts';
-import type { Scene } from './stage.ts';
+import { createPixiApp, resizePixiApp } from './pixiApp.ts';
+import { createStage, type Scene, type Stage } from './stage.ts';
+import { createTownScene } from './scenes/townScene.ts';
+import { THORNWICK } from './world/thornwick.ts';
+import { onWorldInteract } from './interact.ts';
 import { store, useStore } from '../state/store.ts';
-import { aggregateStats } from './systems/inventory.ts';
-import {
-    dungeonSceneRef,
-    onCurrencyEarned,
-    onDeath,
-    onFloorCleared,
-    onPillarChosen,
-    onRunBossHpChange,
-    onRunFloorChange,
-    onRunHpChange,
-    onRunKillsChange,
-} from './dungeonController.ts';
-
-function mountSceneFor(location: 'hub' | 'dungeon', app: Application, stage: Stage): Scene {
-    if (location === 'hub') {
-        return createHubScene(app, stage, {
-            onOpenChest: () => store.patch({ invTab: 'chest', panel: 'inventory' }),
-            onOpenPillars: () => store.patch({ panel: 'build' }),
-            onOpenPortal: () => store.patch({ panel: 'portal' }),
-            onOpenBlacksmith: () => store.patch({ panel: 'blacksmith' }),
-            onOpenMerchant: () => store.patch({ panel: 'merchant' }),
-            onOpenQuestBoard: () => store.patch({ panel: 'quests' }),
-            onEnterDungeon: () => store.patch({ panel: 'tierSelect' }),
-        });
-    }
-
-    const { save } = store.get();
-    const { stats, weapons, rhunes, procAffixes, skillTree } = aggregateStats(save);
-    const dungeon = createDungeonScene(app, stage, {
-        tier: save.selectedTier,
-        stats,
-        weapons,
-        rhunes,
-        procAffixes,
-        skillTree,
-        onHpChange: onRunHpChange,
-        onFloorChange: onRunFloorChange,
-        onKillsChange: onRunKillsChange,
-        onBossHpChange: onRunBossHpChange,
-        onFloorCleared,
-        onDeath,
-        onCurrencyEarned,
-        onPillarChosen,
-    });
-    dungeonSceneRef.current = dungeon;
-    return dungeon;
-}
+import { dropCursor, pickUp } from '../systems/actions.ts';
+import { session } from '../state/session.ts';
 
 export default function GameCanvas() {
     const hostRef = useRef<HTMLDivElement | null>(null);
     const appRef = useRef<Application | null>(null);
+    const stageRef = useRef<Stage | null>(null);
     const paused = useStore((s) => s.paused);
-    const location = useStore((s) => s.location);
+    const view = useStore((s) => s.view);
 
     useEffect(() => {
         let disposed = false;
         let scene: Scene | null = null;
-        let stage: Stage | null = null;
         (async () => {
-            const app = await createPixiApp(hostRef.current!);
+            const app = await createPixiApp(hostRef.current!, store.get().view);
             if (disposed) {
                 app.destroy({ removeView: true }, { children: true });
                 return;
             }
             appRef.current = app;
-            stage = createStage(app);
-            scene = mountSceneFor(location, app, stage);
+            const stage = createStage(app, store.get().view);
+            stageRef.current = stage;
+            scene = createTownScene(app, stage, THORNWICK, {
+                onInteract: onWorldInteract,
+                onPickup: (entry) => {
+                    if (entry.drop.kind === 'gold') {
+                        session.hero.gold += entry.drop.amount;
+                        session.commit();
+                        return true;
+                    }
+                    return pickUp(entry.drop.item);
+                },
+                onDropCursor: () => {
+                    if (!session.hero.cursor) return false;
+                    dropCursor();
+                    return true;
+                },
+            });
             if (store.get().paused) app.ticker.stop();
         })();
         return () => {
             disposed = true;
-            dungeonSceneRef.current = null;
-            try { scene?.destroy(); } catch { /* scene already torn down */ }
-            try { stage?.destroy(); } catch { /* stage already torn down */ }
+            try {
+                scene?.destroy();
+            } catch {
+                /* already torn down */
+            }
+            try {
+                stageRef.current?.destroy();
+            } catch {
+                /* already torn down */
+            }
+            stageRef.current = null;
             if (appRef.current) {
                 appRef.current.destroy({ removeView: true }, { children: true });
                 appRef.current = null;
             }
         };
-    }, [location]);
+    }, []);
 
-    // Host lifecycle pause/resume → freeze/unfreeze the whole ticker.
+    useEffect(() => {
+        const app = appRef.current;
+        if (!app) return;
+        resizePixiApp(app, view);
+        stageRef.current?.applyView(view);
+    }, [view]);
+
     useEffect(() => {
         const app = appRef.current;
         if (!app) return;
         if (paused) app.ticker.stop();
         else app.ticker.start();
-    }, [paused, location]);
+    }, [paused]);
 
     return <div ref={hostRef} className="absolute inset-0" />;
 }

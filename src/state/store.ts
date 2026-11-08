@@ -3,116 +3,127 @@
  * modules) and React — no state-library dependency. Game code calls
  * store.patch(); React components subscribe with useStore(selector).
  *
- * Keep this store for UI-FACING state only (phase, HUD numbers, popups).
- * Per-frame simulation state stays inside the Pixi scene — patching the
- * store every frame re-renders React every frame.
+ * UI-FACING state only. The save itself is a mutable object owned by
+ * state/session.ts; mutations bump `rev`, which re-renders subscribers.
  */
 import { useSyncExternalStore } from 'react';
-import { defaultSaveData, type ItemInstance, type RhuneInstance, type SaveData } from '../game/data/types.ts';
+import { computeViewMetrics, type ViewMetrics } from '../view/viewport.ts';
 
 export type Phase = 'loading' | 'menu' | 'playing';
-export type Location = 'hub' | 'dungeon';
-/**
- * 'inventory' is the unified paperdoll + Bag/Chest storage screen (I key defaults it to
- * the 'bag' sub-tab via invTab, the Chest station defaults it to 'chest');
- * 'menu' is the Character/Stats/Gear menu (HUD button, replaces the old Armor Rack station);
- * 'tierSelect' is the dungeon-entry popup (walk to the Dungeon Entrance, replaces the old Tier Statue station);
- * 'build' is the skill tree (C key or walk to the Pillars station).
- */
-export type PanelId = 'inventory' | 'menu' | 'tierSelect' | 'portal' | 'blacksmith' | 'merchant' | 'quests' | 'build' | 'death' | null;
-export type InventoryTab = 'bag' | 'chest';
 
-export interface RunHud {
-    floor: number;
-    hp: number;
-    maxHp: number;
-    kills: number;
-    killsNeeded: number;
-    isBossFloor: boolean;
-    bossHp: number;
-    bossMaxHp: number;
-    pillarCount: number;
+/** Left-side panels (D2 layout: character/vendor/stash on the left, inventory on the right). */
+export type LeftPanel =
+    | 'character'
+    | 'stash'
+    | 'vendor'
+    | 'herbs'
+    | 'gamble'
+    | 'smith'
+    | 'codex'
+    | 'quests'
+    | 'well'
+    | 'lab'
+    | null;
+export type RightPanel = 'inventory' | null;
+/** Full-screen overlays. */
+export type Overlay = 'skills' | null;
+
+export interface Dialog {
+    /** NPC id when talking to a person (drives services + facing). */
+    npcId: string | null;
+    title: string;
+    sub?: string;
+    line: string;
+    /** Extra lines (quest offers / completions) shown under the greeting. */
+    notes: string[];
 }
 
 export interface Toast {
     id: number;
     text: string;
+    color?: string;
 }
 
-/** The UI-facing app state. */
 export interface AppState {
-    /** 'loading' → 'menu' → 'playing' */
     phase: Phase;
-    /** 0..1 progress of the critical-asset warm during 'loading' */
     loadProgress: number;
-    /** Set by the host's onPause/onResume lifecycle hooks */
     paused: boolean;
-    /** Which sub-scene GameCanvas mounts while phase === 'playing' */
-    location: Location;
-    /** Which React overlay panel is open, if any */
-    panel: PanelId;
-    /** Which sub-tab the Inventory panel opens on — set this right before patching panel:'inventory' */
-    invTab: InventoryTab;
-    /** The whole persisted save blob: inventory, equipped gear, tier progress, currency */
-    save: SaveData;
-    /** Live HUD numbers for the current dungeon run, null while in the hub */
-    run: RunHud | null;
-    /** Summary shown on the death panel */
-    deathSummary: { floor: number } | null;
+    view: ViewMetrics;
+    /** Bumped on every save mutation. */
+    rev: number;
+    left: LeftPanel;
+    right: RightPanel;
+    overlay: Overlay;
+    dialog: Dialog | null;
+    /** Which NPC's shop/service is open (vendor stock key). */
+    serviceNpc: string | null;
+    /** Cursor mode for scrolls: identify the next clicked item. */
+    cursorMode: 'identify' | null;
     toasts: Toast[];
+    /** Hovered world thing, for the top-of-screen name plate. */
+    hoverName: { text: string; color: string; sub?: string } | null;
+    /** Dev tools visible (backtick). */
+    devTools: boolean;
 }
 
 const listeners = new Set<() => void>();
-
 let toastSeq = 0;
 
 let state: AppState = {
     phase: 'loading',
     loadProgress: 0,
     paused: false,
-    location: 'hub',
-    panel: null,
-    invTab: 'bag',
-    save: defaultSaveData(),
-    run: null,
-    deathSummary: null,
+    view: computeViewMetrics(),
+    rev: 0,
+    left: null,
+    right: null,
+    overlay: null,
+    dialog: null,
+    serviceNpc: null,
+    cursorMode: null,
     toasts: [],
+    hoverName: null,
+    devTools: false,
+};
+
+const emit = () => {
+    for (const l of listeners) l();
 };
 
 export const store = {
-    /** Read the current state (from game code; in React use useStore). */
     get: (): AppState => state,
-    /** Shallow-merge a partial update and notify React subscribers. */
     patch(partial: Partial<AppState>): void {
         state = { ...state, ...partial };
-        for (const l of listeners) l();
+        emit();
     },
     subscribe(l: () => void): () => void {
         listeners.add(l);
         return () => listeners.delete(l);
     },
-    pushToast(text: string): void {
+    toast(text: string, color?: string): void {
         toastSeq += 1;
-        const toast = { id: toastSeq, text };
-        state = { ...state, toasts: [...state.toasts, toast] };
-        for (const l of listeners) l();
-        setTimeout(() => store.dismissToast(toast.id), 3200);
+        const toast = { id: toastSeq, text, color };
+        state = { ...state, toasts: [...state.toasts.slice(-5), toast] };
+        emit();
+        setTimeout(() => store.dismissToast(toast.id), 3800);
     },
     dismissToast(id: number): void {
         state = { ...state, toasts: state.toasts.filter((t) => t.id !== id) };
-        for (const l of listeners) l();
+        emit();
+    },
+    /** Close every panel (Esc). Returns true if anything was open. */
+    closeAll(): boolean {
+        const s = state;
+        const any = !!(s.left || s.right || s.overlay || s.dialog || s.cursorMode);
+        if (any) store.patch({ left: null, right: null, overlay: null, dialog: null, serviceNpc: null, cursorMode: null });
+        return any;
     },
 };
 
 /**
- * React hook. IMPORTANT: the selector must return a primitive or a stable
- * reference (e.g. s => s.phase). Returning a fresh object/array each call
- * makes React re-render forever.
+ * React hook. The selector must return a primitive or a stable reference
+ * (e.g. s => s.phase). Returning a fresh object each call loops forever.
  */
-export function useStore<T = AppState>(
-    selector: (s: AppState) => T = (s) => s as unknown as T
-): T {
+export function useStore<T = AppState>(selector: (s: AppState) => T = (s) => s as unknown as T): T {
     return useSyncExternalStore(store.subscribe, () => selector(state));
 }
-
-export type { SaveData, ItemInstance, RhuneInstance };

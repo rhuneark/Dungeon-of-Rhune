@@ -16,6 +16,25 @@ generated with PixelLab (see `tools/art/`).
 3. Press **F5**. Editor runs are debug builds, so the Loot Lab (`` ` ``) is on.
 
 To change the town, open `scenes/world/thornwick.tscn` (see *Editing Thornwick* below).
+
+### Keeping your PC copy up to date
+
+New work is pushed to the `claude/trusting-cray-6gvlg9` branch on GitHub. **Double-click
+`update.bat`** (Windows; `./update.sh` on macOS/Linux) to pull the latest into your folder, then
+switch back to Godot, which reloads changed files. Local edits (say, town changes made in the
+editor) are kept: they're stashed for the update and re-applied. To send your own edits back,
+commit and push them to the same branch (GitHub Desktop: *Commit* then *Push origin*).
+
+First time only (your folder is still on the old web version, which has no `update.bat`), in a
+terminal opened in the folder:
+
+```bash
+git fetch origin claude/trusting-cray-6gvlg9
+git checkout claude/trusting-cray-6gvlg9
+```
+
+If `checkout` complains about local changes, run `git stash` first. No Git clone yet?
+`git clone -b claude/trusting-cray-6gvlg9 https://github.com/rhuneark/Dungeon-of-Rhune.git`
 Shipping on Steam (App ID, GodotSteam, exports, SteamPipe, Cloud, achievements, Deck) is in
 [STEAM.md](STEAM.md).
 

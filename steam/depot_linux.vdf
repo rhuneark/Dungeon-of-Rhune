@@ -1,8 +1,8 @@
 "DepotBuild"
 {
 	"DepotID" "1000002"
-	// Output of `npm run dist:linux` — also what the Steam Deck runs.
-	"ContentRoot" "../release/linux-unpacked/"
+	// Godot export preset "Linux" — also what the Steam Deck runs.
+	"ContentRoot" "../builds/linux/"
 	"FileMapping"
 	{
 		"LocalPath" "*"

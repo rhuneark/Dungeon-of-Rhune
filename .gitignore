@@ -1,11 +1,11 @@
-node_modules/
-dist/
-release/
-dist-ssr/
-*.log
-.env*
+# Godot
+.godot/
+/android/
+# exports
+/builds/
+*.tmp
+# OS / editors
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
-coverage/

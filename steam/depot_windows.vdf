@@ -1,8 +1,8 @@
 "DepotBuild"
 {
 	"DepotID" "1000001"
-	// Output of `npm run dist:win` (build it on Windows for the branded .exe).
-	"ContentRoot" "../release/win-unpacked/"
+	// Godot export preset "Windows Desktop".
+	"ContentRoot" "../builds/windows/"
 	"FileMapping"
 	{
 		"LocalPath" "*"

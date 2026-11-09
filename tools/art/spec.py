@@ -3,7 +3,7 @@ Art spec for Dungeon of Rhune — every generated sprite, with its prompt.
 
 Edit a prompt, delete the matching file under tools/art/out/, and re-run
 `python3 tools/art/gen.py` to regenerate just that asset; then
-`python3 tools/art/pack.py` to rebuild public/art/.
+`python3 tools/art/pack.py` to rebuild assets/art/.
 
 Conventions
 - World: 32px tiles ("high top-down"), characters on 64px canvases

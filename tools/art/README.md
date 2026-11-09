@@ -6,7 +6,7 @@ game-ready sheets. Prompts live in one file, so changing the look of something i
 ```
 spec.py      every asset + its prompt (characters, tilesets, props, item icons, rhunes)
 gen.py       calls the API for anything missing in out/ (idempotent; delete a file to regenerate it)
-pack.py      out/ → public/art/ sheets + src/assets/art.generated.ts (frame grids, tile corners, sizes)
+pack.py      out/ → assets/art/ sheets + assets/art/art_meta.json (frame grids, tile corners, sizes)
 pixellab.py  tiny API client
 ref/         approved drafts that steer re-generation of buildings/trees (see below)
 out/         raw generations (kept so pack.py can be re-run without spending generations)
@@ -16,7 +16,7 @@ out/         raw generations (kept so pack.py can be re-run without spending gen
 ```bash
 export PIXELLAB_TOKEN=...        # not needed inside the Claude Code cloud session (proxy injects it)
 python3 tools/art/gen.py         # everything missing (or: chars | tiles | props | icons | rhunes)
-python3 tools/art/pack.py        # rebuild public/art + the generated manifest
+python3 tools/art/pack.py        # rebuild assets/art + art_meta.json (Godot re-imports on focus)
 ```
 
 Conventions: world tiles 32px ("high top-down"), characters on 64px canvases ("low top-down",

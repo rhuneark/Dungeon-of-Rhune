@@ -1,6 +1,7 @@
 extends Node
 ## Whole-town overview with footprints (red), walls (magenta) and approach
-## points (cyan) drawn over the map. Run via run.gd; args: out.png [zoom town_x town_y].
+## points (cyan) drawn over the map. Run via run.gd; args: out.png [zoom town_x town_y [clean]]
+## ("clean" skips the overlay).
 var frame := 0
 var out := "/tmp/overview.png"
 
@@ -13,6 +14,7 @@ func _ready() -> void:
 		set_meta("zoom", float(args[1]))
 		set_meta("cx", float(args[2]))
 		set_meta("cy", float(args[3]))
+	set_meta("clean", args.size() > 4 and args[4] == "clean")
 
 
 func _process(_d: float) -> void:
@@ -31,10 +33,11 @@ func _process(_d: float) -> void:
 		cam.limit_bottom = 100000
 		rt.set_process(false)
 		cam.position = Iso.vertex(16 + get_meta("cx", 30.0), 16 + get_meta("cy", 23.0))
-		var o := Overlay.new()
-		o.zone = rt.zone
-		o.nav = rt.nav
-		rt.zone.add_child(o)
+		if not get_meta("clean", false):
+			var o := Overlay.new()
+			o.zone = rt.zone
+			o.nav = rt.nav
+			rt.zone.add_child(o)
 		get_tree().root.get_node("Main/UI").visible = false
 	if frame == 90:
 		get_viewport().get_texture().get_image().save_png(out)

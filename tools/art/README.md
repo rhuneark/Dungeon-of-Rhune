@@ -31,12 +31,21 @@ corner; item icons 32px per inventory cell (a 2x3 armor is 64x96). Notes:
   terrain in the description. On the isometric diamond, NW is the top corner, NE right, SW
   left, SE bottom. `pack.py` colour-matches every set's terrains to one canonical set (so
   grass is the same green everywhere) and bleeds each tile 1px to close the 1-pixel gaps where
-  four diamonds meet.
+  four diamonds meet. The match is per tile, so a terrain looks the same in transition tiles
+  as in its solid tile; describe water as one even colour or the shoreline tiles bring darker
+  "deep" patches that ring the pond.
 - Characters export as a ZIP through `api.pixellab.ai` (the image CDN host may be blocked).
 - Buildings (`ISO_BUILDINGS`): the style prompt asks for the door on the lower-left wall, but
   the model sometimes puts it on the right; list those in `MIRROR` and `pack.py` flips them.
   `pack.py` then measures each building's base corner and footprint from its silhouette (the
-  side corners are where the outline jumps straight up) into art_meta.json. Some buildings
-  come with a thin yard slab under them; that's this model's house style.
+  bottom corner and its edges keep the isometric slope, found on the silhouette's lower convex
+  hull) into art_meta.json. Where something in front of the walls misleads it (crates, a potted
+  plant), hand-measured values go in `ISO_FIT`.
+- Ground slabs: the model likes to put things on a raised lot or a grass island. Prompts help
+  ("the walls stand directly on the ground, no lawn, no yard, no base") but don't always work,
+  so either re-roll, or list the art in `SLABS`: `pack.py` reads each column up from the bottom
+  (slab outline and side face, then the yard surface, then what stands on it) and either cuts
+  the whole slab ("remove", capped at a yard depth) or just its edge so the top sits flush
+  ("sink", e.g. the smithy's forge floor). Check the result over grass before relying on it.
 - Map objects larger than ~40k px² come back on a flat colour; `gen.py` keys it out from the
   borders (`strip_flat_background`).

@@ -33,6 +33,19 @@ ISO_BUILDINGS = {"smithy", "trader", "herbalist", "lore_tower", "tavern", "house
 # Generated with the door on the lower-right face; pack.py mirrors them so
 # every front faces lower-left (map +y). Don't add art with text in it.
 MIRROR = {"house_b", "smithy", "lore_tower", "gate"}
+# Art that came with a ground slab under it (a raised lot with a visible edge).
+# pack.py fixes it: "remove" cuts the whole slab so the thing stands on our
+# ground; "sink" cuts only the slab's edge so its top sits flush (a yard).
+SLABS = {
+    # name: ("remove", max yard depth in px) | ("sink",) | ("sink_grass", depth):
+    # sink and recolour the yard's grass to match the ground tiles
+    "trader": ("remove", 48), "notice_board": ("remove", 26),
+    "tree_oak": ("remove", 16), "signpost": ("remove", 10), "banner": ("remove", 12),
+    "lamp_post": ("sink",), "smithy": ("sink",), "pit_entrance": ("sink",),
+}
+# Footprints measured by hand where pack.py's silhouette fit is misled
+# (e.g. crates standing in front of the walls).
+ISO_FIT = {"trader": {"base": [130, 214], "block": [3, 4]}, "herbalist": {"base": [184, 242], "block": [5, 2]}}
 ISO_PROPS = {"gate", "market_stall", "cart", "crates", "fence", "wishing_well", "notice_board", "strongbox", "statue", "waypoint"}
 
 # ---------------------------------------------------------------- characters
@@ -79,7 +92,7 @@ CHARACTERS = {
 ISO_TILESETS = [
     {"name": "grass_dirt", "description": "lush dark green grass with small tufts to worn brown dirt road with small pebbles"},
     {"name": "grass_cobble", "description": "lush dark green grass with small tufts to old grey cobblestone town square pavement"},
-    {"name": "grass_water", "description": "lush dark green grass with small tufts to dark murky green-blue pond water with gentle ripples"},
+    {"name": "grass_water", "description": "lush dark green grass with small tufts to calm flat dark green-blue pond water, one even water colour with a few faint ripples, no deep spots", "boundary_amplitude": 0.1},
     {"name": "dirt_cobble", "description": "worn brown dirt road with small pebbles to old grey cobblestone town square pavement"},
 ]
 
@@ -89,7 +102,7 @@ PROPS = {
     # buildings / landmarks
     "smithy": (320, 288, "village blacksmith workshop, stone forge with glowing coals under a timber lean-to roof, anvil out front, brick chimney"),
     "trader": (288, 272, "merchant shop, timber frame house with a striped awning over the door and crates of goods out front, standing directly on flat ground, no base platform, no grass patch"),
-    "herbalist": (288, 256, "herbalist cottage with a mossy thatched roof, bundles of drying herbs hanging by the door, standing directly on flat ground, no base platform, no fence, no grass patch"),
+    "herbalist": (288, 256, "herbalist cottage with a mossy thatched roof, white plaster walls and timber beams, bundles of drying herbs hanging by the door, the walls stand directly on the ground, no lawn, no garden, no yard, no fence, no base"),
     "lore_tower": (192, 288, "tall narrow stone library tower with a pointed slate roof, a round window and a lantern by the door"),
     "gambler_wagon": (176, 144, "colorful fortune teller wagon with a purple canopy, hanging dice and coins, wooden wheels"),
     "tavern": (352, 320, "large two story timber tavern inn with a hanging wooden sign and warm lit windows"),
@@ -110,9 +123,9 @@ PROPS = {
     "bush": (48, 40, "round leafy green bush"),
     "rock_big": (48, 40, "mossy grey boulder"),
     "rocks_small": (32, 32, "cluster of small grey stones"),
-    "flowers": (32, 32, "small patch of wildflowers in grass"),
-    "grass_tuft": (32, 32, "tuft of tall wild grass"),
-    "mushrooms": (32, 32, "cluster of small red capped mushrooms"),
+    "flowers": (32, 32, "three tiny wildflowers on thin green stems, white and pink petals, isolated sprite on transparent background, no ground, no soil, no dirt, no grass patch"),
+    "grass_tuft": (32, 32, "single tuft of tall wild grass blades, isolated sprite, no ground, no soil"),
+    "mushrooms": (32, 32, "cluster of three small red capped mushrooms, isolated sprite, no ground, no soil, no grass patch"),
     # clutter
     "barrel": (32, 32, "wooden barrel with iron bands"),
     "crates": (64, 64, "stack of wooden crates"),

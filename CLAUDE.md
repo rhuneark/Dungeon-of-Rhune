@@ -83,8 +83,9 @@ Ships on **Steam** (Godot desktop exports + optional GodotSteam GDExtension) and
 - **New art** → prompt in `tools/art/spec.py`, run `gen.py` then `pack.py` (writes
   assets/art + art_meta.json). Buildings go in `ISO_BUILDINGS` (isometric, seen from the south
   corner, door on the lower-left wall; if it comes out on the right, add it to `MIRROR`);
-  small directional props in `ISO_PROPS`; round things need neither. Check new buildings with
-  tools/godot/overview.gd (footprints drawn over the map).
+  small directional props in `ISO_PROPS`; round things need neither. Nothing may sit on a raised
+  ground slab or grass island: re-roll it or list it in `SLABS` (see tools/art/README.md). Check
+  new buildings with tools/godot/overview.gd (footprints drawn over the map; `clean` for none).
 - **Loot tuning** → `scripts/content/treasure_classes.gd` (TCs + `QUALITY_TUNING`), affix tiers
   and weights in `affixes.gd`; check with the Loot Lab (`` ` ``).
 - **UI** → `scripts/ui/` (new left panel: add to `PlayingUi._make_left`). Palette: `UiKit`.

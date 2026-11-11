@@ -52,6 +52,8 @@ func _ready() -> void:
 				if best == null or n.pos.distance_to(rt.player.pos) < best.pos.distance_to(rt.player.pos):
 					best = n
 			target_npc = best.id
+			var target = rt.pick(best.pos + Vector2(0, -24))
+			print("  nearest NPC: ", best.id, " dist=", best.pos.distance_to(rt.player.pos), " picked=", target.target if target is Dictionary and target.has("target") else target)
 			_click(_screen(best.pos + Vector2(0, -24)))],
 		[520, func(): _check("clicking an NPC walks over and talks", game.ui.dialog.get("npcId", "") == target_npc, str(game.ui.dialog.get("npcId")))],
 		[525, func(): _key(KEY_I)],

@@ -5,37 +5,35 @@ Edit a prompt, delete the matching file under tools/art/out/, and re-run
 `python3 tools/art/gen.py` to regenerate just that asset; then
 `python3 tools/art/pack.py` to rebuild assets/art/.
 
-Conventions
-- World: 32px tiles ("high top-down"), characters on 64px canvases
-  ("low top-down", 8 directions). Buildings/landmarks use the FRONT style:
-  facade toward the camera, roof seen from above, no isometric diamond —
-  the classic 16-bit RPG town look that matches the tiles.
+Conventions (2.5D isometric, Diablo II style)
+- Ground: 2:1 isometric diamonds, 64x32 px, as 16-tile corner (Wang) sets from
+  /create-tiles-pro. Characters: 64px canvases, "low top-down", 8 directions.
+- Buildings and directional props (ISO_BUILDINGS / ISO_PROPS) are drawn
+  isometric, seen from the south corner: the long front wall with the door
+  faces lower-left (map +y, the town's "south"), the side wall lower-right.
+  Their base width is about (w + h) * 32 px for a w x h tile footprint;
+  pack.py measures the real footprint from the art.
+- Round things (trees, rocks, barrels, lamps...) work from any angle.
 - UI: item icons are 32px per inventory cell (a 2x3 armor is 64x96).
 """
 
 PROP_STYLE = "dark fantasy medieval frontier village, muted earthy palette, pixel art, top-down rpg map object"
 ICON_STYLE = "dark fantasy arpg inventory item icon, single object centered, crisp pixel art"
 CHAR_STYLE = "dark fantasy rpg townsfolk, pixel art"
-FRONT_STYLE = (
-    "classic 16-bit top-down RPG town building seen from the front at a three-quarter angle, facade facing the viewer, "
-    "roof seen from above, square footprint, no isometric angle, no ground platform, dark fantasy medieval village"
+ISO_STYLE = (
+    "isometric 2:1 pixel art building seen from the south corner, two walls visible: the long front wall with the "
+    "entrance on the lower left, the short side wall on the lower right, roof seen from above, no ground tile, "
+    "dark fantasy medieval frontier village, muted earthy palette"
 )
-# Composition references (tools/art/ref/<name>.png): approved smaller drafts.
-# gen.py resizes the reference to the target size (bilinear, over a flat
-# background) and passes it as init_image, so a re-generation keeps the
-# approved front-facing composition while drawing at native pixel density.
-# Buildings are 1.5x the drafts so doors fit the 64px characters.
-REF_STRENGTH = 200
-REF_STRENGTH_OVERRIDES = {"market_stall": 450}
-PROP_REFS = {
-    "smithy", "trader", "herbalist", "lore_tower", "tavern", "house_a", "house_b",
-    "gate", "market_stall", "pit_entrance", "tree_oak", "tree_pine",
-}
-# Props drawn in the FRONT style ("low top-down" view). Everything else uses PROP_STYLE ("high top-down").
-FRONT_FACING = {
-    "smithy", "trader", "herbalist", "lore_tower", "tavern", "house_a", "house_b",
-    "gate", "market_stall", "cart", "pit_entrance",
-}
+ISO_PROP_STYLE = (
+    "isometric 2:1 pixel art game prop seen from the south corner, front facing lower left, no ground tile, "
+    "dark fantasy medieval village, muted earthy palette"
+)
+ISO_BUILDINGS = {"smithy", "trader", "herbalist", "lore_tower", "tavern", "house_a", "house_b", "gambler_wagon", "pit_entrance"}
+# Generated with the door on the lower-right face; pack.py mirrors them so
+# every front faces lower-left (map +y). Don't add art with text in it.
+MIRROR = {"house_b", "smithy", "lore_tower", "gate"}
+ISO_PROPS = {"gate", "market_stall", "cart", "crates", "fence", "wishing_well", "notice_board", "strongbox", "statue", "waypoint"}
 
 # ---------------------------------------------------------------- characters
 # name -> (prompt, animations [(template_id, [directions])])
@@ -74,61 +72,37 @@ CHARACTERS = {
 
 # ------------------------------------------------------------------ tilesets
 # Built in order; "base" refs reuse another set's base tile so grass matches.
-TILESETS = [
-    {
-        "name": "grass_dirt",
-        "lower": "lush dark green grass with small tufts and tiny clover",
-        "upper": "worn brown dirt road with small pebbles",
-        "transition": "",
-        "transition_size": 0.0,
-    },
-    {
-        "name": "grass_cobble",
-        "lower": "lush dark green grass with small tufts and tiny clover",
-        "lower_base_from": ("grass_dirt", "lower"),
-        "upper": "old grey cobblestone town square pavement",
-        "transition": "",
-        "transition_size": 0.0,
-    },
-    {
-        "name": "water_grass",
-        "lower": "dark murky green-blue pond water with gentle ripples",
-        "upper": "lush dark green grass with small tufts and tiny clover",
-        "upper_base_from": ("grass_dirt", "lower"),
-        "transition": "muddy grassy bank",
-        "transition_size": 0.25,
-    },
-    {
-        "name": "dirt_cobble",
-        "lower": "worn brown dirt road with small pebbles",
-        "lower_base_from": ("grass_dirt", "upper"),
-        "upper": "old grey cobblestone town square pavement",
-        "upper_base_from": ("grass_cobble", "upper"),
-        "transition": "",
-        "transition_size": 0.0,
-    },
+# ------------------------------------------------------------------- tiles
+# Isometric 64x32 corner sets. Describe each as "<first> to <second>": tiles
+# store mask NW<<3|NE<<2|SW<<1|SE with bit 1 = the FIRST terrain. Grass comes
+# first everywhere so pack.py can colour-match every set's grass to grass_dirt.
+ISO_TILESETS = [
+    {"name": "grass_dirt", "description": "lush dark green grass with small tufts to worn brown dirt road with small pebbles"},
+    {"name": "grass_cobble", "description": "lush dark green grass with small tufts to old grey cobblestone town square pavement"},
+    {"name": "grass_water", "description": "lush dark green grass with small tufts to dark murky green-blue pond water with gentle ripples"},
+    {"name": "dirt_cobble", "description": "worn brown dirt road with small pebbles to old grey cobblestone town square pavement"},
 ]
 
 # --------------------------------------------------------------------- props
 # name -> (w, h, prompt)
 PROPS = {
     # buildings / landmarks
-    "smithy": (240, 216, "village blacksmith workshop, stone forge with glowing coals under a timber lean-to roof, anvil out front, brick chimney"),
-    "trader": (216, 192, "merchant shop, timber frame house with a striped awning over the door and crates of goods out front"),
-    "herbalist": (192, 192, "herbalist cottage with a mossy thatched roof, bundles of drying herbs hanging by the door, tiny garden"),
-    "lore_tower": (192, 264, "tall narrow stone library tower with a pointed slate roof, a round window and a lantern by the door"),
-    "gambler_wagon": (128, 96, "colorful fortune teller wagon with a purple canopy, hanging dice and coins, wooden wheels"),
-    "tavern": (288, 240, "large two story timber tavern inn with a hanging wooden sign and warm lit windows"),
-    "house_a": (192, 192, "small stone cottage with a thatched roof and a wooden door"),
-    "house_b": (168, 168, "timber frame village house with a red clay tiled roof"),
-    "pit_entrance": (240, 216, "ancient sealed stone archway set into a low rocky mound, stone stairs descending into darkness, heavy rusted iron chains across the opening, broken pillars carved with glowing blue runes on either side"),
-    "gate": (240, 192, "wooden palisade town gate with two small watchtowers and a closed barred gateway"),
-    "waypoint": (96, 96, "circle of small standing stones with glowing cyan runes around a flat carved stone platform"),
-    "wishing_well": (64, 80, "old stone wishing well with a little wooden roof and a bucket on a rope"),
-    "strongbox": (48, 48, "large iron banded wooden treasure chest, closed"),
-    "notice_board": (64, 64, "wooden village notice board with pinned parchment notes"),
-    "statue": (64, 112, "weathered stone statue of a hooded warrior holding up a lantern, on a square pedestal"),
-    "market_stall": (144, 120, "market stall with a green and white striped canopy and baskets of fruit, wooden support posts at each corner"),
+    "smithy": (320, 288, "village blacksmith workshop, stone forge with glowing coals under a timber lean-to roof, anvil out front, brick chimney"),
+    "trader": (288, 272, "merchant shop, timber frame house with a striped awning over the door and crates of goods out front, standing directly on flat ground, no base platform, no grass patch"),
+    "herbalist": (288, 256, "herbalist cottage with a mossy thatched roof, bundles of drying herbs hanging by the door, standing directly on flat ground, no base platform, no fence, no grass patch"),
+    "lore_tower": (192, 288, "tall narrow stone library tower with a pointed slate roof, a round window and a lantern by the door"),
+    "gambler_wagon": (176, 144, "colorful fortune teller wagon with a purple canopy, hanging dice and coins, wooden wheels"),
+    "tavern": (352, 320, "large two story timber tavern inn with a hanging wooden sign and warm lit windows"),
+    "house_a": (224, 208, "small stone cottage with a thatched roof and a wooden door"),
+    "house_b": (224, 208, "timber frame village house with a red clay tiled roof"),
+    "pit_entrance": (256, 224, "ancient sealed stone archway set into a low rocky mound, stone stairs descending into darkness, heavy rusted iron chains across the opening, broken pillars carved with glowing blue runes on either side"),
+    "gate": (256, 224, "wooden town gatehouse: a tall archway of two thick log posts and a crossbeam with a small roof, closed double wooden doors with iron bands"),  # generated facing lower right; mirrored
+    "waypoint": (160, 112, "ring of small standing stones with glowing cyan runes around a flat carved round stone platform on the ground"),
+    "wishing_well": (112, 128, "old stone wishing well with a little wooden roof and a bucket on a rope"),
+    "strongbox": (64, 64, "large iron banded wooden treasure chest, closed"),
+    "notice_board": (96, 112, "wooden village notice board with pinned parchment notes"),
+    "statue": (80, 128, "weathered stone statue of a hooded warrior holding up a lantern, on a square pedestal"),
+    "market_stall": (176, 160, "market stall with a green and white striped canopy and baskets of fruit, wooden support posts at each corner"),
     # nature
     "tree_oak": (144, 192, "large leafy oak tree"),
     "tree_pine": (96, 168, "tall dark green pine tree"),
@@ -141,13 +115,13 @@ PROPS = {
     "mushrooms": (32, 32, "cluster of small red capped mushrooms"),
     # clutter
     "barrel": (32, 32, "wooden barrel with iron bands"),
-    "crates": (48, 48, "stack of wooden crates"),
+    "crates": (64, 64, "stack of wooden crates"),
     "hay": (48, 40, "round hay bale"),
     "lamp_post": (32, 80, "iron street lantern on a wooden post, glowing warm light"),
-    "cart": (80, 64, "wooden hand cart loaded with sacks"),
+    "cart": (112, 96, "wooden hand cart loaded with sacks"),
     "campfire": (48, 48, "campfire with burning logs and orange flames inside a ring of grey stones"),
     "signpost": (32, 64, "wooden signpost with arrow signs"),
-    "fence": (64, 32, "short horizontal wooden picket fence segment"),
+    "fence": (96, 64, "one straight segment of wooden picket fence with three posts, running diagonally from upper left to lower right, not an enclosure"),
     "banner": (32, 80, "tall wooden pole with a tattered crimson banner"),
     "grave_a": (32, 48, "old cracked tombstone"),
     "grave_b": (32, 48, "leaning wooden grave cross"),

@@ -30,10 +30,10 @@ func _ready() -> void:
 	add_child(_bar)
 
 	_zone = UiKit.vbox(0)
-	var zt := UiKit.shadowed(UiKit.label("Thornwick", "title18", UiKit.GOLD))
+	var zt := UiKit.shadowed(UiKit.label("Thornwick", "head", UiKit.GOLD))
 	zt.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_zone.add_child(zt)
-	var zs := UiKit.shadowed(UiKit.label("TOWN · SAFE", "s8", UiKit.DIM))
+	var zs := UiKit.shadowed(UiKit.label("TOWN · SAFE", "label", UiKit.DIM))
 	zs.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_zone.add_child(zs)
 	add_child(_zone)
@@ -99,7 +99,7 @@ func _on_ui(keys: Array) -> void:
 			t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			v.add_child(t)
 			if h.get("sub", "") != "":
-				var s := UiKit.label(String(h.sub).to_upper(), "s8", UiKit.DIM)
+				var s := UiKit.label(String(h.sub).to_upper(), "label", UiKit.DIM)
 				s.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 				v.add_child(s)
 			_plate.add_child(v)
@@ -166,7 +166,7 @@ func _rebuild_bar() -> void:
 			g.size_flags_horizontal = SIZE_SHRINK_CENTER
 			g.size_flags_vertical = SIZE_SHRINK_CENTER
 			slot.add_child(g)
-		var n := UiKit.label(str(i + 1), "s8", UiKit.DIM)
+		var n := UiKit.label(str(i + 1), "label", UiKit.DIM)
 		n.size_flags_horizontal = SIZE_SHRINK_END
 		n.size_flags_vertical = SIZE_SHRINK_END
 		slot.add_child(n)
@@ -195,7 +195,7 @@ func _rebuild_bar() -> void:
 	var btns := UiKit.hbox(2)
 	for b in buttons:
 		var btn := UiKit.button(b[0], b[3], 4, b[2])
-		var hk := UiKit.label(b[1], "s8", UiKit.DIM)
+		var hk := UiKit.label(b[1], "label", UiKit.DIM)
 		btn.text = String(b[0]) + "  "
 		hk.position = Vector2(0, 4)
 		btn.add_child(hk)

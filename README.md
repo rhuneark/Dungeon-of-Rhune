@@ -101,30 +101,35 @@ visible vertically) and the UI layer scales by a whole number (UI canvas ≥ 690
 art pixel is a block of device pixels. Exception: 645–860 px tall windows (e.g. a 1366×768
 laptop) get a 1.5× UI so text stays readable. Text is rasterized at device resolution, and the
 pixel fonts are re-gridded so their pixels land on whole device pixels (`assets/fonts/README.md`).
-Options (O) lets players pick UI scale and world zoom. World: 32px tiles, 64px characters; UI:
-32px per inventory cell.
+Options (O) lets players pick UI scale and world zoom. World: 64x32 isometric tiles, 64px
+characters; UI: 32px per inventory cell. Text uses one plain pixel face (Jersey 10) in bright
+colours; the gothic face is only the logo.
 
-**Perspective.** Classic 16-bit "top-down three-quarter": ground seen from above, buildings and
-characters seen from the front.
+**Perspective: 2.5D isometric**, like Diablo II. The ground is 2:1 diamond tiles, and buildings,
+props and characters are all drawn from the same 45° corner view. The town's "south" points to
+the lower left of the screen, so every building's front door faces that way.
 
 ## Editing Thornwick
 
 `scenes/world/thornwick.tscn` is a normal Godot scene, edited in the 2D editor:
 
-- **Ground** (TileMapLayer): paint with the *Terrains* tab (grass, dirt, cobble, water; corners
-  autotile). Water is not walkable.
+- **Ground** (isometric TileMapLayer): paint with the *Terrains* tab (grass, dirt, cobble,
+  water; corners autotile). Water is not walkable.
 - **Things** (y-sorted) and **Decals** (flat, under everything): `Prop` nodes. Pick the `art`
-  (any file in `assets/art/props/`), set `block` (footprint in tiles, drawn red in the editor),
-  `action` (stash, well, quests, inspect, waypoint, statue, gate), `display_name`, and
-  `approach_dy` (where the player stands to use it, the cyan dot). The node's position is
-  where the prop meets the ground.
+  (any file in `assets/art/props/`), set `block` (footprint in cells, the red diamond in the
+  editor), `action` (stash, well, quests, inspect, waypoint, statue, gate), `display_name`, and
+  `approach_dy` (where the player stands to use it, the cyan dot). The node's position is the
+  centre of the footprint; buildings already carry a footprint measured from their art, so
+  you mostly just move them. `nudge` fine-tunes the art against its footprint.
 - **NpcSpot**: where an NPC stands (`npc_id` from `scripts/content/npcs.gd`).
 - **Items**: `PlacedItem` quest items on the ground (`key` is remembered once taken).
 - **Blockers**: invisible walls (magenta). **Spawn**: where the hero appears.
 - `critter_area` on the root: where the goose wanders.
 
-`tools/godot/build_thornwick.gd` generated the first version of this scene from the web build's
-data. Re-running it overwrites your edits, so don't, unless you mean to start over.
+`tools/godot/build_thornwick.gd` generated this scene from the town layout (with a ring of
+forest around it). Re-running it overwrites your edits, so don't, unless you mean to start over.
+To check footprints and walls at a glance, render an overview:
+`xvfb-run -a godot --path . -s tools/godot/run.gd -- res://tools/godot/overview.gd out.png`.
 
 ## Where things live
 

@@ -48,7 +48,7 @@ static func lines(item: Dictionary, ctx := "none", price := -1, extra: Array = [
 			if need > 0:
 				out.append({"text": "Required %s: %d" % [r[0], need], "color": RED if r[2] < need else UiKit.PARCH})
 	if base.category != "consumable" and base.category != "quest":
-		out.append({"text": "Item Level: %d" % int(item.ilvl), "color": Color("#7d7462"), "style": "s8"})
+		out.append({"text": "Item Level: %d" % int(item.ilvl), "color": UiKit.DIM})
 
 	if base.category == "rhune":
 		var rh := Rhunes.get_rhune(Rhunes.rhune_id_from_base(item.baseId))
@@ -73,7 +73,7 @@ static func lines(item: Dictionary, ctx := "none", price := -1, extra: Array = [
 		out.append({"text": "'%s'" % " + ".join(ids), "color": UiKit.UNIQUE})
 
 	if v.get("flavor", "") != "" and not unid:
-		out.append({"text": v.flavor, "color": Color("#a89a7c"), "gap": true})
+		out.append({"text": v.flavor, "color": Color("#c9b994"), "gap": true})
 	if item.quality == "unique" and item.get("uniqueId", "") != "" and not unid:
 		if not Game.save.get("codex", {}).has("u:%s" % item.uniqueId):
 			out.append({"text": "New to your Codex!", "color": UiKit.GOLD})

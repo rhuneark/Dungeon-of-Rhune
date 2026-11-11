@@ -38,7 +38,7 @@ func build(body: VBoxContainer) -> void:
 	var b := UiKit.bar(float(hero.xp) / need, UiKit.GOLD, 220, 4)
 	b.size_flags_horizontal = SIZE_SHRINK_CENTER
 	head.add_child(b)
-	var xp := UiKit.label("%d / %d XP" % [int(hero.xp), need], "s8", UiKit.DIM)
+	var xp := UiKit.label("%d / %d XP" % [int(hero.xp), need], "label", UiKit.DIM)
 	xp.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	head.add_child(xp)
 	body.add_child(head)
@@ -54,7 +54,7 @@ func build(body: VBoxContainer) -> void:
 	body.add_child(cols)
 
 	var pts := int(hero.attrPoints)
-	l.add_child(UiKit.label("ATTRIBUTES" + (" (%d TO SPEND)" % pts if pts > 0 else ""), "s8", UiKit.GOOD if pts > 0 else UiKit.DIM))
+	l.add_child(UiKit.label("ATTRIBUTES" + (" (%d TO SPEND)" % pts if pts > 0 else ""), "label", UiKit.GOOD if pts > 0 else UiKit.DIM))
 	for a in HeroData.ATTRS:
 		var info: Dictionary = HeroData.ATTR_INFO[a]
 		var row := UiKit.hbox(4)
@@ -71,7 +71,7 @@ func build(body: VBoxContainer) -> void:
 		l.add_child(UiKit.hline(UiKit.ROW_LINE))
 
 	l.add_child(UiKit.gap(4))
-	l.add_child(UiKit.label("DEFENSE", "s8", UiKit.DIM))
+	l.add_child(UiKit.label("DEFENSE", "label", UiKit.DIM))
 	_row(l, "Life", str(int(sh.life)), Color("#e06a5a"))
 	_row(l, "Mana", str(int(sh.mana)), UiKit.MAGIC)
 	_row(l, "Armor", str(int(sh.armor)))
@@ -84,7 +84,7 @@ func build(body: VBoxContainer) -> void:
 	_row(l, "Damage Reduced", str(int(sh.raw.get("dmgReduce", 0))))
 	_row(l, "Thorns", str(int(sh.raw.get("thorns", 0))))
 
-	r.add_child(UiKit.label("OFFENSE", "s8", UiKit.DIM))
+	r.add_child(UiKit.label("OFFENSE", "label", UiKit.DIM))
 	_row(r, "Weapon Damage", "%d-%d" % [int(sh.damage[0]), int(sh.damage[1])])
 	for t in sh.adds:
 		var rng: Array = sh.adds[t]
@@ -96,7 +96,7 @@ func build(body: VBoxContainer) -> void:
 	_row(r, "Move Speed", "+%s%%" % UiKit.fmt_num(sh.moveSpeed))
 	_row(r, "Life Regen", UiKit.fmt_num(sh.lifeRegen))
 	r.add_child(UiKit.gap(4))
-	r.add_child(UiKit.label("FORTUNE", "s8", UiKit.GOLD))
+	r.add_child(UiKit.label("FORTUNE", "label", UiKit.GOLD))
 	var f: Dictionary = sh.fortune
 	_row(r, "Rarity Find", "+%s%%" % UiKit.fmt_num(f.rarity), UiKit.GOLD, "Better quality on every item that drops (diminishing returns for rare and unique).")
 	_row(r, "Item Quantity", "+%s%%" % UiKit.fmt_num(f.quantity), UiKit.GOLD, "Fewer empty drops.")

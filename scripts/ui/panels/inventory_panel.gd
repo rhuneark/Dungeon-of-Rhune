@@ -108,5 +108,5 @@ class Paperdoll extends Control:
 				ItemIcon.draw(self, w, (rect.get_center() - sz / 2.0).floor(), false, Color(1, 1, 1, 0.3))
 			else:
 				var lab: String = r[4]
-				var tw := UiKit.F_SMALL.get_string_size(lab.to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x
-				draw_string(UiKit.F_SMALL, (rect.get_center() + Vector2(-tw / 2.0, 3)).round(), lab.to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, 8, UiKit.FAINT)
+				var tw := UiKit.F_BODY.get_string_size(lab, HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x
+				draw_string(UiKit.F_BODY, (rect.get_center() + Vector2(-tw / 2.0, 3)).round(), lab, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UiKit.FAINT)

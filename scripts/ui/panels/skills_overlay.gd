@@ -90,7 +90,7 @@ func _disciplines() -> Control:
 		var color := Color(d.color)
 		var box := UiKit.vbox(2)
 		var head := UiKit.hbox(4)
-		head.add_child(UiKit.label(d.name, "title18", color))
+		head.add_child(UiKit.label(d.name, "head", color))
 		head.add_child(UiKit.spacer())
 		head.add_child(UiKit.label("%d/%d" % [rank, int(d.maxRank)], "t10", UiKit.DIM))
 		box.add_child(head)
@@ -110,7 +110,7 @@ func _disciplines() -> Control:
 				Game.commit()))
 		row.add_child(UiKit.spacer())
 		for sk in Disciplines.skills_of(d.id):
-			row.add_child(UiKit.label(str(int(sk.unlockRank)), "s8", color if chosen and rank >= int(sk.unlockRank) else UiKit.FAINT))
+			row.add_child(UiKit.label(str(int(sk.unlockRank)), "label", color if chosen and rank >= int(sk.unlockRank) else UiKit.FAINT))
 		box.add_child(row)
 		var w := UiKit.well(box, 4)
 		w.modulate.a = 1.0 if chosen or slot_free else 0.45
@@ -187,7 +187,7 @@ func _tree(skill: Dictionary) -> Control:
 	var info := UiKit.vbox(0)
 	info.size_flags_horizontal = SIZE_EXPAND_FILL
 	var tl := UiKit.hbox(6)
-	tl.add_child(UiKit.label(skill.name, "title18", color))
+	tl.add_child(UiKit.label(skill.name, "head", color))
 	var tags: Array = skill.get("tags", [])
 	tl.add_child(UiKit.label(KIND_LABEL.get(skill.kind, skill.kind) + (" · " + ", ".join(tags) if tags.size() > 0 else ""), "t10", UiKit.DIM))
 	info.add_child(tl)
@@ -242,7 +242,7 @@ func _tree(skill: Dictionary) -> Control:
 		var sb := UiKit._sb(UiKit._rings([ring], UiKit.PANEL3 if r > 0 else UiKit.WELL), 1, [0, 0, 0, 0])
 		for stn in ["normal", "hover", "pressed", "hover_pressed"]:
 			nb.add_theme_stylebox_override(stn, sb)
-		nb.add_theme_color_override("font_color", color if r > 0 else Color("#7d7462"))
+		nb.add_theme_color_override("font_color", color if r > 0 else UiKit.DIM)
 		nb.add_theme_color_override("font_hover_color", Color.WHITE)
 		var node: Dictionary = n
 		nb.pressed.connect(func(): err(SkillRules.allocate(Game.hero(), skill, node, Game.sheet().raw)))
@@ -258,7 +258,7 @@ func _tree(skill: Dictionary) -> Control:
 				lines.append("Click: add point · Right-click: refund")
 				UiTip.text(nb, "%s (%d/%d)" % [node.name, r, int(node.maxRank)], lines, color.to_html(false)))
 		canvas.add_child(nb)
-		var nl := UiKit.label(n.name, "t10", UiKit.PARCH if r > 0 else Color("#7d7462"))
+		var nl := UiKit.label(n.name, "t10", UiKit.PARCH if r > 0 else UiKit.DIM)
 		nl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		nl.position = p + Vector2(-20, NODE)
 		nl.custom_minimum_size = Vector2(NODE + 40, 0)

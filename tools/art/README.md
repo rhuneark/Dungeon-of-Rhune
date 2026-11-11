@@ -8,7 +8,6 @@ spec.py      every asset + its prompt (characters, tilesets, props, item icons, 
 gen.py       calls the API for anything missing in out/ (idempotent; delete a file to regenerate it)
 pack.py      out/ → assets/art/ sheets + assets/art/art_meta.json (frame grids, tile corners, sizes)
 pixellab.py  tiny API client
-ref/         approved drafts that steer re-generation of buildings/trees (see below)
 out/         raw generations (kept so pack.py can be re-run without spending generations)
 .cache/      PixelLab ids (characters/tilesets) — lets gen.py add new animations to EXISTING characters
 ```
@@ -19,17 +18,25 @@ python3 tools/art/gen.py         # everything missing (or: chars | tiles | props
 python3 tools/art/pack.py        # rebuild assets/art + art_meta.json (Godot re-imports on focus)
 ```
 
-Conventions: world tiles 32px ("high top-down"), characters on 64px canvases ("low top-down",
-8 directions), item icons 32px per inventory cell (a 2x3 armor is 64x96). Notes:
+Conventions (2.5D isometric): ground is 2:1 diamonds, 64x32, as 16-tile corner sets from
+`/create-tiles-pro` (`tile_type: isometric`, `tile_feature: tileset`, `outline_mode:
+segmentation` so tiles have no edge lines); characters on 64px canvases ("low top-down",
+8 directions); buildings and directional props are isometric map objects seen from the south
+corner; item icons 32px per inventory cell (a 2x3 armor is 64x96). Notes:
 
 - Sync endpoints time out at ~30s through some proxies; everything here uses the async
-  job endpoints (map objects, characters, tilesets) and reads results as base64.
-- Tileset corner labels sometimes come back inverted relative to the prompts; `pack.py`
-  detects that from the pixels (the grass side must be the greener one).
+  job endpoints and reads results as base64 (tiles-pro's `tileset_grid_png`, map objects'
+  `image`). The `backblaze.pixellab.ai` storage host is blocked here; don't rely on it.
+- Corner sets: tile i of the 4x4 grid has mask i = NW<<3|NE<<2|SW<<1|SE, bit 1 = the first
+  terrain in the description. On the isometric diamond, NW is the top corner, NE right, SW
+  left, SE bottom. `pack.py` colour-matches every set's terrains to one canonical set (so
+  grass is the same green everywhere) and bleeds each tile 1px to close the 1-pixel gaps where
+  four diamonds meet.
 - Characters export as a ZIP through `api.pixellab.ai` (the image CDN host may be blocked).
-- Buildings: plain prompts drift into isometric corner views. Workflow that works: generate
-  small drafts in the FRONT style ("low top-down" + `FRONT_STYLE`), pick the best into `ref/`,
-  then the real size is generated with the draft (bilinear-resized) as `init_image`
-  (`REF_STRENGTH`, per-asset overrides) — same composition, native pixel density.
+- Buildings (`ISO_BUILDINGS`): the style prompt asks for the door on the lower-left wall, but
+  the model sometimes puts it on the right; list those in `MIRROR` and `pack.py` flips them.
+  `pack.py` then measures each building's base corner and footprint from its silhouette (the
+  side corners are where the outline jumps straight up) into art_meta.json. Some buildings
+  come with a thin yard slab under them; that's this model's house style.
 - Map objects larger than ~40k px² come back on a flat colour; `gen.py` keys it out from the
   borders (`strip_flat_background`).

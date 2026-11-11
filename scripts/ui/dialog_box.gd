@@ -27,10 +27,10 @@ func _rebuild() -> void:
 	add_theme_stylebox_override("panel", UiKit.frame(9))
 	var v := UiKit.vbox(3)
 	var head := UiKit.hbox(4)
-	head.add_child(UiKit.label(d.title, "title18", UiKit.GOLD))
+	head.add_child(UiKit.label(d.title, "head", UiKit.GOLD))
 	head.add_child(UiKit.spacer())
 	if d.get("sub", "") != "":
-		head.add_child(UiKit.label(String(d.sub).to_upper(), "s8", UiKit.DIM))
+		head.add_child(UiKit.label(String(d.sub).to_upper(), "label", UiKit.DIM))
 	v.add_child(head)
 	v.add_child(UiKit.para(d.line))
 	for n in d.get("notes", []):

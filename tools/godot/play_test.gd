@@ -25,6 +25,15 @@ func _ready() -> void:
 			rt = _find(get_tree().root, "ZoneRuntime")
 			_check("zone runtime exists", rt != null)
 			start_pos = rt.player.pos
+			# Everything usable must be reachable on foot from the spawn.
+			var unreachable := []
+			for h in rt.hotspots:
+				if h.range < 0:
+					continue
+				var path: Array = rt.nav.find_path(start_pos, h.approach)
+				if path.is_empty() or path.back().distance_to(h.approach) > h.range * 2.2:
+					unreachable.append(h.target.get("name", h.target.get("id", "?")))
+			_check("every NPC and usable object is reachable", unreachable.is_empty(), str(unreachable))
 			_click(_screen(start_pos + Vector2(0, -120)))],
 		[170, func(): _check("click-to-move walks north", rt.player.pos.y < start_pos.y - 80, str(rt.player.pos - start_pos))],
 		[175, func():

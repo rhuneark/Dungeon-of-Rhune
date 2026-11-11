@@ -36,7 +36,7 @@ class QuestsPanel extends UiPanel:
 			box.add_child(UiKit.hline(UiKit.ROW_LINE))
 			box.add_child(UiKit.gap(2))
 		if not done.is_empty():
-			box.add_child(UiKit.label("COMPLETED", "s8", UiKit.DIM))
+			box.add_child(UiKit.label("COMPLETED", "label", UiKit.DIM))
 			for id in done:
 				box.add_child(UiKit.label("+ %s" % QuestDefs.get_quest(id).get("title", id), "t10", UiKit.FAINT))
 		var unseen := 0

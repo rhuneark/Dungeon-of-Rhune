@@ -14,7 +14,7 @@ func _ready() -> void:
 	add_child(bg)
 	var col := UiKit.vbox(10)
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
-	var t := UiKit.label("Dungeon of Rhune", "title36", UiKit.GOLD)
+	var t := UiKit.label("Dungeon of Rhune", "logo", UiKit.GOLD)
 	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(t)
 	_bar = UiKit.bar(0.0, UiKit.GOLD, 220, 6)

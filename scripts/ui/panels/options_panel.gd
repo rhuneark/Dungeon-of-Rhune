@@ -31,7 +31,7 @@ func _fmt(n: float) -> String:
 func build(body: VBoxContainer) -> void:
 	var dev := Vector2(View.device_size)
 	if Platform.kind == "desktop":
-		body.add_child(UiKit.label("DISPLAY (F11 / ALT+ENTER)", "s8", UiKit.DIM))
+		body.add_child(UiKit.label("DISPLAY (F11 / ALT+ENTER)", "label", UiKit.DIM))
 		var row := UiKit.hbox(3)
 		var fs := Platform.is_fullscreen()
 		row.add_child(UiKit.button("Fullscreen", func(): Platform.set_fullscreen(true), 6, fs))
@@ -39,7 +39,7 @@ func build(body: VBoxContainer) -> void:
 		body.add_child(row)
 		body.add_child(UiKit.gap(4))
 
-	body.add_child(UiKit.label("UI SCALE", "s8", UiKit.DIM))
+	body.add_child(UiKit.label("UI SCALE", "label", UiKit.DIM))
 	var ui_row := HFlowContainer.new()
 	ui_row.add_theme_constant_override("h_separation", 3)
 	ui_row.add_theme_constant_override("v_separation", 3)
@@ -52,7 +52,7 @@ func build(body: VBoxContainer) -> void:
 	body.add_child(UiKit.para("Whole numbers are pixel-perfect. 1.5x is slightly soft but readable on mid-size screens. Panels are designed for at least 690x430 UI px.", "t10", UiKit.DIM))
 	body.add_child(UiKit.gap(4))
 
-	body.add_child(UiKit.label("WORLD ZOOM", "s8", UiKit.DIM))
+	body.add_child(UiKit.label("WORLD ZOOM", "label", UiKit.DIM))
 	var z_row := HFlowContainer.new()
 	z_row.add_theme_constant_override("h_separation", 3)
 	z_row.add_theme_constant_override("v_separation", 3)

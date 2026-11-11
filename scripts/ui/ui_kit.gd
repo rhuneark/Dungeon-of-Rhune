@@ -1,12 +1,11 @@
 class_name UiKit
 ## Palette, pixel fonts, pixel frames and small widget factories for the UI.
 ## Everything is in UI PIXELS; the UI CanvasLayer scales by View.ui_scale.
-## Fonts are only crisp at their native sizes: Jersey 10 at 10/20,
-## Jacquarda Bastarda 9 at 9/18/36, Silkscreen at 8.
+## Text is the plain Jersey 10 (crisp at 10 and 20); the gothic Jacquarda
+## Bastarda 9 is only for the game's logo (36).
 
 const F_BODY := preload("res://assets/fonts/jersey10.woff2")
 const F_TITLE := preload("res://assets/fonts/jacquarda9.woff2")
-const F_SMALL := preload("res://assets/fonts/silkscreen.woff2")
 
 const INK := Color("#0d0b09")
 const PANEL := Color("#17120e")
@@ -19,8 +18,8 @@ const WELL := Color("#0e0b08")
 const ROW_LINE := Color("#241b13")
 const GOLD := Color("#d9b26a")
 const PARCH := Color("#e8dcc0")
-const DIM := Color("#9a8c74")
-const FAINT := Color("#5e5444")
+const DIM := Color("#bcae92")
+const FAINT := Color("#82765f")
 const MAGIC := Color("#7896ff")
 const RARE := Color("#f3d34a")
 const UNIQUE := Color("#c9a46b")
@@ -28,11 +27,12 @@ const RHUNE := Color("#ff9b3d")
 const GOOD := Color("#6fbf5a")
 const BAD := Color("#d9534f")
 
-## style id -> [font, size]
+## style id -> [font, size]. t10 body, t20 big text, head = window titles,
+## label = captions (same face as body; colour sets them apart), logo = title screen.
 const STYLES := {
 	"t10": [F_BODY, 10], "t20": [F_BODY, 20],
-	"title9": [F_TITLE, 9], "title18": [F_TITLE, 18], "title36": [F_TITLE, 36],
-	"s8": [F_SMALL, 8],
+	"head": [F_BODY, 20], "label": [F_BODY, 10],
+	"logo": [F_TITLE, 36],
 }
 
 static var _theme: Theme

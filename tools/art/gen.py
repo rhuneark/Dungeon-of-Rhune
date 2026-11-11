@@ -65,18 +65,6 @@ def post_retry(path, body, tries=8):
 
 
 # ---------------------------------------------------------------- map objects
-REF_DIR = os.path.join(HERE, "ref")
-REF_BG = (130, 130, 133, 255)
-
-
-def _b64png(im):
-    import base64
-
-    buf = io.BytesIO()
-    im.save(buf, "PNG")
-    return base64.b64encode(buf.getvalue()).decode()
-
-
 def strip_flat_background(path, tol=22):
     """Large map objects come back on a flat colour instead of transparent.
     Flood-fill that colour from the borders (outlines stop the fill)."""
@@ -113,20 +101,13 @@ def map_object(name, w, h, prompt, out_path, view="high top-down"):
         "view": view,
         "outline": "single color outline",
         "shading": "medium shading",
-        "detail": "high detail" if name in getattr(spec, "PROP_REFS", ()) else "medium detail",
+        "detail": "high detail" if name in spec.ISO_BUILDINGS else "medium detail",
     }
-    ref = os.path.join(REF_DIR, f"{name}.png")
-    if name in getattr(spec, "PROP_REFS", ()) and os.path.exists(ref):
-        from PIL import Image
-
-        canvas = Image.new("RGBA", (w, h), REF_BG)
-        canvas.alpha_composite(Image.open(ref).convert("RGBA").resize((w, h), Image.BILINEAR))
-        body["init_image"] = {"type": "base64", "base64": _b64png(canvas)}
-        body["init_image_strength"] = getattr(spec, "REF_STRENGTH_OVERRIDES", {}).get(name, spec.REF_STRENGTH)
     d = post_retry("/map-objects", body)
     job = pl.wait_job(d["background_job_id"], label=name)
     if job["status"] != "completed":
         raise RuntimeError(f"{name} failed: {str(job)[:300]}")
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
     pl.save_b64(job["last_response"]["image"], out_path)
     strip_flat_background(out_path)
     log("ok", name)
@@ -135,10 +116,13 @@ def map_object(name, w, h, prompt, out_path, view="high top-down"):
 def gen_props():
     tasks = []
     for name, (w, h, prompt) in spec.PROPS.items():
-        if name in spec.FRONT_FACING:
-            tasks.append((name, w, h, f"{prompt}, {spec.FRONT_STYLE}", os.path.join(OUT, "props", f"{name}.png"), "low top-down"))
+        out = os.path.join(OUT, "props", f"{name}.png")
+        if name in spec.ISO_BUILDINGS:
+            tasks.append((name, w, h, f"{prompt}, {spec.ISO_STYLE}", out, "low top-down"))
+        elif name in spec.ISO_PROPS:
+            tasks.append((name, w, h, f"{prompt}, {spec.ISO_PROP_STYLE}", out, "low top-down"))
         else:
-            tasks.append((name, w, h, f"{prompt}, {spec.PROP_STYLE}", os.path.join(OUT, "props", f"{name}.png"), "high top-down"))
+            tasks.append((name, w, h, f"{prompt}, {spec.PROP_STYLE}", out, "high top-down"))
     return tasks
 
 
@@ -211,48 +195,36 @@ def character(name, prompt, anims):
 
 # ------------------------------------------------------------------- tilesets
 def tileset(ts):
+    """Isometric 64x32 corner set: saves out/tiles/<name>.png (4x4 grid, tile i
+    has corner mask i = NW<<3|NE<<2|SW<<1|SE, bit 1 = first terrain) and
+    out/tiles/<name>.json (rules, colours)."""
+    import base64
+
     name = ts["name"]
+    out_png = os.path.join(OUT, "tiles", f"{name}.png")
     out_json = os.path.join(OUT, "tiles", f"{name}.json")
-    if os.path.exists(out_json):
+    if os.path.exists(out_png) and os.path.exists(out_json):
         return
-    body = {
-        "lower_description": ts["lower"],
-        "upper_description": ts["upper"],
-        "transition_description": ts.get("transition", ""),
-        "tile_size": {"width": 32, "height": 32},
-        "transition_size": ts.get("transition_size", 0.0),
-        "view": "high top-down",
-        "shading": "medium shading",
-        "detail": "medium detail",
-    }
-    for side in ("lower", "upper"):
-        ref = ts.get(f"{side}_base_from")
-        if ref:
-            base_id = STATE["tilesets"].get(ref[0], {}).get(f"{ref[1]}_base_tile_id")
-            if base_id:
-                body[f"{side}_base_tile_id"] = base_id
-    d = post_retry("/create-tileset", body)
-    tid = d["tileset_id"]
-    STATE["tilesets"].setdefault(name, {})["id"] = tid
-    save_state()
-    if d.get("background_job_id"):
-        pl.wait_job(d["background_job_id"], label=name)
-    for _ in range(120):
-        code, res = pl.get(f"/tilesets/{tid}")
-        if code == 200 and res and res.get("tileset", {}).get("tiles"):
-            break
-        time.sleep(6)
-    else:
-        raise RuntimeError(f"tileset {name} never finished")
-    os.makedirs(os.path.dirname(out_json), exist_ok=True)
-    meta = res.get("metadata") or {}
-    ids = meta.get("terrain_ids") or {}
-    STATE["tilesets"][name]["lower_base_tile_id"] = ids.get("lower")
-    STATE["tilesets"][name]["upper_base_tile_id"] = ids.get("upper")
-    save_state()
+    d = post_retry("/create-tiles-pro", {
+        "description": ts["description"],
+        "tile_type": "isometric",
+        "tile_size": 64,
+        "tile_view_angle": 30,
+        "tile_depth_ratio": 0.0,
+        "tile_feature": "tileset",
+        "outline_mode": "segmentation",
+        "boundary_amplitude": ts.get("boundary_amplitude", 0.12),
+    })
+    job = pl.wait_job(d["background_job_id"], label=name)
+    if job["status"] != "completed":
+        raise RuntimeError(f"tileset {name} failed: {str(job)[:300]}")
+    lr = job["last_response"]
+    os.makedirs(os.path.dirname(out_png), exist_ok=True)
+    with open(out_png, "wb") as f:
+        f.write(base64.b64decode(lr["tileset_grid_png"]))
     with open(out_json, "w") as f:
-        json.dump(res, f)
-    log("tileset ok", name, "terrain_ids", ids)
+        json.dump({k: v for k, v in lr.items() if k != "tileset_grid_png"}, f, indent=1)
+    log("tileset ok", name, lr.get("tile_rules", {}).get("terrains"))
 
 
 # ------------------------------------------------------------------------ run
@@ -262,14 +234,8 @@ def main():
     with ThreadPoolExecutor(max_workers=6) as ex:
         futs = {}
         if "tiles" in which:
-            def all_tiles():
-                for ts in spec.TILESETS:
-                    try:
-                        tileset(ts)
-                    except Exception as e:  # keep going with the rest
-                        errors.append(f"tileset {ts['name']}: {e}")
-                        log("ERR tileset", ts["name"], e)
-            futs[ex.submit(all_tiles)] = "tiles"
+            for ts in spec.ISO_TILESETS:
+                futs[ex.submit(tileset, ts)] = f"tileset {ts['name']}"
         if "chars" in which:
             for name, (prompt, anims) in spec.CHARACTERS.items():
                 futs[ex.submit(character, name, prompt, anims)] = f"char {name}"

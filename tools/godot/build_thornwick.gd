@@ -1,14 +1,22 @@
 extends SceneTree
-## One-time converter: bakes the original Thornwick layout into an editable
-## scene, res://scenes/world/thornwick.tscn.
+## Converter: bakes the Thornwick layout into an editable isometric scene,
+## res://scenes/world/thornwick.tscn.
 ##   godot --headless --path . -s tools/godot/build_thornwick.gd
 ##
-## After this, the .tscn is the source of truth — edit it in the Godot editor.
+## After this, the .tscn is the source of truth: edit it in the Godot editor.
 ## Re-running this script OVERWRITES those edits.
+##
+## The layout is authored on the town's own W x H cell grid (x east, y south)
+## and lands on the isometric map shifted by MARGIN cells of forest on every
+## side, so the camera never shows the void past the map's diamond edges.
+## Footprints of isometric buildings are measured from their art and centred
+## where the layout puts them.
 
 const W := 60
 const H := 46
-const TILE := 32
+const MARGIN := 16
+const MW := W + MARGIN * 2
+const MH := H + MARGIN * 2
 const OUT := "res://scenes/world/thornwick.tscn"
 
 const GRASS := 0
@@ -17,41 +25,41 @@ const DIRT := 2
 const COBBLE := 3
 ## Higher wins at shared vertices (features spread over grass).
 const PRIORITY := {GRASS: 0, WATER: 1, DIRT: 2, COBBLE: 3}
-## [tileset atlas, source id, lower terrain, upper terrain]
-const PAIRS := [
-	["grass_dirt", 0, GRASS, DIRT],
-	["grass_cobble", 1, GRASS, COBBLE],
-	["water_grass", 2, WATER, GRASS],
-]
+## [source id in terrain.tres, first terrain (mask bit 1), second terrain]
+const SETS := [[0, GRASS, DIRT], [1, GRASS, COBBLE], [2, GRASS, WATER], [3, DIRT, COBBLE]]
+## Plain tile of each terrain: [source, mask].
+const SOLID := {GRASS: [0, 15], DIRT: [0, 0], COBBLE: [1, 0], WATER: [2, 0]}
 const NPC_SHEETS := {
 	"varn": "npc_lore", "brannoc": "npc_smith", "pell": "npc_trader",
 	"ysolde": "npc_herbalist", "odo": "npc_gambler", "maren": "npc_captain",
 }
 
 var cells := PackedInt32Array()
-var meta: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://assets/art/art_meta.json"))
 var blocked := PackedByteArray()
 var rng := RandomNumberGenerator.new()
 var names := {}
 
 
-func tile_coords(tileset: String, key: String) -> Vector2i:
-	for e in meta.tiles[tileset].tiles:
-		if e.key == key:
-			return Vector2i(int(e.i) % 4, int(e.i) / 4)
-	return Vector2i(-1, -1)
-
-
 # ------------------------------------------------------------ terrain paint
-func get_t(x: int, y: int) -> int:
-	if x < 0 or y < 0 or x >= W or y >= H:
+## Raw map cells (0..MW, 0..MH).
+func get_raw(x: int, y: int) -> int:
+	if x < 0 or y < 0 or x >= MW or y >= MH:
 		return GRASS
-	return cells[y * W + x]
+	return cells[y * MW + x]
+
+
+func set_raw(x: int, y: int, t: int) -> void:
+	if x >= 0 and y >= 0 and x < MW and y < MH:
+		cells[y * MW + x] = t
+
+
+## Town cells (0..W, 0..H): the layout's own coordinates.
+func get_t(x: int, y: int) -> int:
+	return get_raw(x + MARGIN, y + MARGIN)
 
 
 func set_t(x: int, y: int, t: int) -> void:
-	if x >= 0 and y >= 0 and x < W and y < H:
-		cells[y * W + x] = t
+	set_raw(x + MARGIN, y + MARGIN, t)
 
 
 func rect(x0: int, y0: int, x1: int, y1: int, t: int) -> void:
@@ -79,12 +87,12 @@ func path(points: Array, width: float, t: int) -> void:
 
 
 func paint() -> void:
-	cells.resize(W * H)
+	cells.resize(MW * MH)
 	cells.fill(GRASS)
 	rect(22, 18, 37, 27, COBBLE)
 	rect(28, 9, 31, 17, COBBLE)
 	rect(25, 4, 34, 9, COBBLE)
-	rect(28, 28, 31, H - 1, DIRT)
+	rect(28, 28, 31, H - 1 + MARGIN, DIRT) # the south road runs on out of the gate
 	path([Vector2(21, 23), Vector2(17, 23), Vector2(17, 25)], 2, DIRT)
 	path([Vector2(38, 22), Vector2(44, 22), Vector2(45, 25)], 2, DIRT)
 	path([Vector2(28, 31), Vector2(20, 33), Vector2(19, 36)], 2, DIRT)
@@ -96,18 +104,14 @@ func paint() -> void:
 
 
 ## Vertex terrain = strongest of the 4 surrounding cells (water only if all are water).
-func vertex(vx: int, vy: int) -> int:
+func vertex_t(vx: int, vy: int) -> int:
 	var best := GRASS
 	var bp := -1
 	var all_water := true
 	for d in [Vector2i(-1, -1), Vector2i(0, -1), Vector2i(-1, 0), Vector2i(0, 0)]:
-		var x: int = vx + d.x
-		var y: int = vy + d.y
-		var t := get_t(x, y)
+		var t := get_raw(vx + d.x, vy + d.y)
 		if t != WATER:
 			all_water = false
-		if x < 0 or y < 0 or x >= W or y >= H:
-			continue
 		if PRIORITY[t] > bp:
 			bp = PRIORITY[t]
 			best = t
@@ -124,40 +128,30 @@ func uniq(a: Array) -> Array:
 	return out
 
 
-## [source id, atlas coords] for a cell's 4 corner terrains (NW NE SW SE).
+## [source id, atlas coords] for a cell's corner terrains [NW, NE, SW, SE].
 func tile_for(corners: Array) -> Array:
 	var u := uniq(corners)
 	while u.size() > 2:
+		# Three terrains in one cell: fold the weakest into the next one up.
 		u.sort_custom(func(a, b): return PRIORITY[a] < PRIORITY[b])
-		var weakest: int = u[1] if u[0] == WATER else u[0]
-		var stronger := GRASS
-		for t in u:
-			if PRIORITY[t] > PRIORITY[weakest] and t != WATER:
-				stronger = t
-				break
+		var weakest: int = u[0]
+		var stronger: int = u[1]
 		corners = corners.map(func(c): return stronger if c == weakest else c)
 		u = uniq(corners)
-	if u.size() == 2 and u.has(DIRT) and u.has(COBBLE):
-		corners = corners.map(func(c): return COBBLE if c == DIRT else c)
-		u = [COBBLE]
 	if u.size() == 2 and u.has(WATER) and not u.has(GRASS):
 		corners = corners.map(func(c): return c if c == WATER else GRASS)
 		u = uniq(corners)
 	if u.size() == 1:
-		match u[0]:
-			GRASS:
-				return [0, tile_coords("grass_dirt", "0000")]
-			DIRT:
-				return [0, tile_coords("grass_dirt", "1111")]
-			COBBLE:
-				return [1, tile_coords("grass_cobble", "1111")]
-			_:
-				return [2, tile_coords("water_grass", "0000")]
-	for p in PAIRS:
-		if u.has(p[2]) and u.has(p[3]):
-			var key := "".join(corners.map(func(c): return "1" if c == p[3] else "0"))
-			return [p[1], tile_coords(p[0], key)]
-	return [0, tile_coords("grass_dirt", "0000")]
+		var s: Array = SOLID[u[0]]
+		return [s[0], Vector2i(s[1] % 4, s[1] / 4)]
+	for s in SETS:
+		if u.has(s[1]) and u.has(s[2]):
+			var mask := 0
+			for i in 4:
+				if corners[i] == s[1]:
+					mask |= 1 << (3 - i)
+			return [s[0], Vector2i(mask % 4, mask / 4)]
+	return [0, Vector2i(3, 3)]
 
 
 # ------------------------------------------------------------------- nodes
@@ -173,33 +167,52 @@ func own(node: Node, root: Node) -> void:
 		own(c, root)
 
 
+func mark_blocked(r: Rect2i) -> void:
+	for cy in range(r.position.y, r.end.y):
+		for cx in range(r.position.x, r.end.x):
+			if cx >= 0 and cy >= 0 and cx < MW and cy < MH:
+				blocked[cy * MW + cx] = 1
+
+
+## Place a prop. (x, y) is the layout's base point in town cells; `block` (if
+## any) is the footprint the layout reserved north of it. Isometric art gets
+## a footprint measured from the art, centred on the reserved one.
 func add_prop(parent: Node, art: String, x: float, y: float, opts := {}) -> Prop:
 	var p := Prop.new()
 	p.name = unique_name(opts.get("node", art.to_pascal_case()))
 	p.art = art
-	p.position = Vector2(roundf(x * TILE), roundf(y * TILE))
-	p.block = opts.get("block", Vector2i.ZERO)
 	p.action = opts.get("action", "none")
 	p.display_name = opts.get("name", "")
 	p.mirrored = opts.get("flip", false)
+	var block: Vector2i = opts.get("block", Vector2i.ZERO)
+	var pos := Vector2(x + MARGIN, y + MARGIN)
+	if block != Vector2i.ZERO:
+		var cx := roundi(x - block.x / 2.0) + block.x / 2.0
+		var cy := ceili(y) - block.y / 2.0
+		var measured := Prop.measured_block(art)
+		if measured != Vector2i.ZERO:
+			block = Vector2i(measured.y, measured.x) if p.mirrored else measured
+		pos = Vector2(roundi(cx - block.x / 2.0) + block.x / 2.0 + MARGIN, roundi(cy - block.y / 2.0) + block.y / 2.0 + MARGIN)
+	p.position = Iso.vertex(pos.x, pos.y).round()
+	p.block = block
 	if opts.has("approach_dy"):
 		p.approach_dy = opts.approach_dy
 	parent.add_child(p)
-	if p.block != Vector2i.ZERO:
-		var fp := p.footprint()
-		for cy in range(fp.position.y, fp.end.y):
-			for cx in range(fp.position.x, fp.end.x):
-				if cx >= 0 and cy >= 0 and cx < W and cy < H:
-					blocked[cy * W + cx] = 1
+	if block != Vector2i.ZERO:
+		mark_blocked(p.footprint())
 	return p
+
+
+func town_pos(x: float, y: float) -> Vector2:
+	return Iso.vertex(x + MARGIN, y + MARGIN).round()
 
 
 func _initialize() -> void:
 	rng.seed = 1337
 	paint()
-	blocked.resize(W * H)
+	blocked.resize(MW * MH)
 	blocked.fill(0)
-	for i in W * H:
+	for i in MW * MH:
 		if cells[i] == WATER:
 			blocked[i] = 1
 
@@ -207,15 +220,15 @@ func _initialize() -> void:
 	root.name = "Thornwick"
 	root.zone_name = "Thornwick"
 	root.level = 1
-	root.critter_area = Rect2i(42, 29, 14, 12)
+	root.critter_area = Rect2i(42 + MARGIN, 29 + MARGIN, 14, 12)
 
 	var ground := TileMapLayer.new()
 	ground.name = "Ground"
 	ground.tile_set = load("res://assets/tiles/terrain.tres")
 	root.add_child(ground)
-	for y in H:
-		for x in W:
-			var t := tile_for([vertex(x, y), vertex(x + 1, y), vertex(x, y + 1), vertex(x + 1, y + 1)])
+	for y in MH:
+		for x in MW:
+			var t := tile_for([vertex_t(x, y), vertex_t(x + 1, y), vertex_t(x, y + 1), vertex_t(x + 1, y + 1)])
 			ground.set_cell(Vector2i(x, y), t[0], t[1])
 
 	var decals := Node2D.new()
@@ -232,7 +245,7 @@ func _initialize() -> void:
 	blockers.name = "Blockers"
 	root.add_child(blockers)
 
-	# ---- landmarks & buildings
+	# ---- landmarks & buildings (fronts face map +y: the lower left)
 	add_prop(things, "pit_entrance", 29.5, 9.5, {"node": "SealedStair", "block": Vector2i(5, 2), "action": "inspect", "name": "The Sealed Stair"})
 	add_prop(things, "tavern", 17.5, 16, {"node": "Tavern", "block": Vector2i(7, 3), "name": "The Crooked Lantern (closed)"})
 	add_prop(things, "lore_tower", 41, 16, {"node": "VarnsTower", "block": Vector2i(3, 2), "name": "Varn's Tower"})
@@ -242,17 +255,16 @@ func _initialize() -> void:
 	add_prop(things, "gambler_wagon", 41.5, 33, {"node": "OdosWagon", "block": Vector2i(3, 2), "name": "Odo's Wagon"})
 	add_prop(things, "house_a", 6.5, 32, {"node": "Cottage", "block": Vector2i(4, 2), "name": "Cottage"})
 	add_prop(things, "house_b", 52, 14, {"node": "Cottage", "block": Vector2i(4, 2), "name": "Cottage"})
-	add_prop(things, "house_a", 7.5, 42, {"node": "Cottage", "block": Vector2i(4, 2), "name": "Cottage", "flip": true})
-	add_prop(things, "market_stall", 24, 30.5, {"node": "MarketStall", "block": Vector2i(4, 1), "name": "Market Stall"})
+	add_prop(things, "house_b", 7.5, 42, {"node": "Cottage", "block": Vector2i(4, 2), "name": "Cottage"})
+	add_prop(things, "market_stall", 24, 30.5, {"node": "MarketStall", "block": Vector2i(2, 2), "name": "Market Stall"})
 	add_prop(things, "gate", 29.5, H, {"node": "SouthGate", "block": Vector2i(6, 1), "action": "gate", "name": "South Gate", "approach_dy": -2.2})
 
 	# ---- the square
-	add_prop(things, "wishing_well", 30, 23.5, {"node": "WishingWell", "block": Vector2i(2, 1), "action": "well", "name": "Wishing Well"})
-	add_prop(things, "notice_board", 34.5, 19.5, {"node": "NoticeBoard", "block": Vector2i(2, 1), "action": "quests", "name": "Notice Board"})
+	add_prop(things, "wishing_well", 30, 23.5, {"node": "WishingWell", "block": Vector2i(1, 1), "action": "well", "name": "Wishing Well"})
+	add_prop(things, "notice_board", 34.5, 19.5, {"node": "NoticeBoard", "block": Vector2i(1, 1), "action": "quests", "name": "Notice Board"})
 	add_prop(things, "statue", 24.5, 20.5, {"node": "Statue", "block": Vector2i(1, 1), "action": "statue", "name": "Statue of Aldra Thornwick"})
 	add_prop(things, "strongbox", 26.5, 26.5, {"node": "Strongbox", "block": Vector2i(1, 1), "action": "stash", "name": "Your Strongbox"})
-	var wp := add_prop(decals, "waypoint", 35, 27.5, {"node": "RhunestoneCircle", "action": "waypoint", "name": "Rhunestone Circle"})
-	wp.approach_dy = -1.4
+	add_prop(decals, "waypoint", 35, 27.5, {"node": "RhunestoneCircle", "action": "waypoint", "name": "Rhunestone Circle", "approach_dy": 0.3})
 
 	# ---- clutter
 	for p in [Vector2(27.5, 14), Vector2(32.5, 14), Vector2(21.5, 21.5), Vector2(38.5, 21.5), Vector2(27, 29.5), Vector2(33, 32), Vector2(33, 38)]:
@@ -275,37 +287,51 @@ func _initialize() -> void:
 	add_prop(things, "campfire", 37, 40.5, {"node": "Campfire", "block": Vector2i(1, 1), "name": "Campfire"})
 	add_prop(things, "signpost", 33, 29.5, {"node": "Signpost", "block": Vector2i(1, 1), "name": "Signpost: \"Wilds - south.  Pit - north.  Goose: everywhere.\""})
 
-	# ---- forest edge: decorative trees + invisible walls around the map
-	var tree_at := func(x: float, y: float) -> void:
+	# ---- the town edge: a ring of trees + invisible walls, then forest
+	var tree_at := func(x: float, y: float, node: String) -> void:
 		var art := "tree_pine" if rng.randf() < 0.5 else "tree_oak"
-		var p := add_prop(things, art, x + rng.randi_range(-6, 6) / 32.0, y + rng.randi_range(-4, 4) / 32.0, {"node": "EdgeTree"})
+		var p := add_prop(things, art, x + rng.randi_range(-6, 6) / 32.0, y + rng.randi_range(-4, 4) / 32.0, {"node": node})
 		p.mirrored = rng.randf() < 0.5
 	var x := 0.0
 	while x <= W:
-		tree_at.call(x, 1.6)
+		tree_at.call(x, 1.6, "EdgeTree")
 		if x < 25 or x > 35:
-			tree_at.call(x + 0.8, H + 0.2)
+			tree_at.call(x + 0.8, H + 0.2, "EdgeTree")
 		x += 1.6
 	var y := 3.0
 	while y <= H:
-		tree_at.call(0.9, y)
-		tree_at.call(W - 0.9, y)
+		tree_at.call(0.9, y, "EdgeTree")
+		tree_at.call(W - 0.9, y, "EdgeTree")
 		y += 1.7
-	for b in [[0, 0, W, 2], [0, 0, 2, H], [W - 2, 0, 2, H], [0, H - 2, W, 2]]:
+	# Forest beyond the walls (never walkable), thinning out with distance.
+	var fy := -MARGIN + 0.5
+	while fy < H + MARGIN:
+		var fx := -MARGIN + 0.5 + rng.randf() * 1.2
+		while fx < W + MARGIN:
+			var outside := fx < -0.5 or fy < -0.5 or fx > W + 0.5 or fy > H + 1.5
+			var on_road := fy > H and fx > 26.5 and fx < 33.5
+			if outside and not on_road and rng.randf() < 0.55:
+				tree_at.call(fx, fy, "Forest")
+			fx += 2.1 + rng.randf() * 0.8
+		fy += 1.9 + rng.randf() * 0.6
+	var walls := [
+		[0, 0, W, 2], [0, 0, 2, H], [W - 2, 0, 2, H], [0, H - 2, W, 2],
+		[-MARGIN, -MARGIN, W + MARGIN * 2, MARGIN], [-MARGIN, 0, MARGIN, H],
+		[W, 0, MARGIN, H], [-MARGIN, H, W + MARGIN * 2, MARGIN],
+	]
+	for b in walls:
 		var bl := Blocker.new()
 		bl.name = unique_name("Wall")
-		bl.position = Vector2(b[0] * TILE, b[1] * TILE)
+		bl.position = Iso.vertex(b[0] + MARGIN, b[1] + MARGIN)
 		bl.size = Vector2i(b[2], b[3])
 		blockers.add_child(bl)
-		for cy in range(b[1], b[1] + b[3]):
-			for cx in range(b[0], b[0] + b[2]):
-				blocked[cy * W + cx] = 1
+		mark_blocked(bl.cells())
 
 	# ---- scattered decor on open grass (flat, under everything)
 	var decor := ["flowers", "grass_tuft", "mushrooms", "rocks_small", "grass_tuft", "flowers"]
 	for cy in range(2, H - 2):
 		for cx in range(2, W - 2):
-			if get_t(cx, cy) != GRASS or blocked[cy * W + cx] == 1 or rng.randf() >= 0.07:
+			if get_t(cx, cy) != GRASS or blocked[(cy + MARGIN) * MW + cx + MARGIN] == 1 or rng.randf() >= 0.07:
 				continue
 			var near_road := false
 			for dy in [-1, 0, 1]:
@@ -314,7 +340,7 @@ func _initialize() -> void:
 						near_road = true
 			if near_road:
 				continue
-			add_prop(decals, decor[rng.randi_range(0, decor.size() - 1)], cx + 0.5 + rng.randi_range(-8, 8) / 32.0, cy + 0.875 + rng.randi_range(-6, 4) / 32.0, {"node": "Decor"})
+			add_prop(decals, decor[rng.randi_range(0, decor.size() - 1)], cx + 0.5 + rng.randi_range(-8, 8) / 32.0, cy + 0.6 + rng.randi_range(-6, 6) / 32.0, {"node": "Decor"})
 
 	# ---- NPCs and placed items
 	for n in [["varn", 41, 18], ["brannoc", 18, 25.6], ["pell", 45.5, 26], ["ysolde", 19.5, 36.5], ["odo", 38.5, 34.5], ["maren", 34.8, 39.6]]:
@@ -322,7 +348,7 @@ func _initialize() -> void:
 		s.name = String(n[0]).capitalize()
 		s.npc_id = n[0]
 		s.sheet = NPC_SHEETS[n[0]]
-		s.position = Vector2(roundf(n[1] * TILE), roundf(n[2] * TILE))
+		s.position = town_pos(n[1], n[2])
 		things.add_child(s)
 	for it in [["page_graveyard", 10.7, 11.5], ["page_tavern", 22.8, 16.6], ["page_pond", 55.5, 34.5]]:
 		var pi := PlacedItem.new()
@@ -330,12 +356,12 @@ func _initialize() -> void:
 		pi.key = it[0]
 		pi.base_id = "lore_page"
 		pi.icon = "page"
-		pi.position = Vector2(roundf(it[1] * TILE), roundf(it[2] * TILE))
+		pi.position = town_pos(it[1], it[2])
 		items.add_child(pi)
 
 	var spawn := Marker2D.new()
 	spawn.name = "Spawn"
-	spawn.position = Vector2(30 * TILE, 36 * TILE)
+	spawn.position = town_pos(30, 36)
 	root.add_child(spawn)
 
 	for c in root.get_children():
@@ -346,8 +372,16 @@ func _initialize() -> void:
 	if err == OK:
 		err = ResourceSaver.save(ps, OUT)
 	print("thornwick.tscn: ", error_string(err), " nodes=", _count(root))
+	_report(root)
 	root.free()
 	quit()
+
+
+## Footprints chosen from the art, for a quick sanity check.
+func _report(root: Node) -> void:
+	for p in root.get_node("Things").get_children():
+		if p is Prop and Prop.measured_block(p.art) != Vector2i.ZERO:
+			print("  %-14s block=%s footprint=%s" % [p.art, p.block, p.footprint()])
 
 
 func _count(n: Node) -> int:

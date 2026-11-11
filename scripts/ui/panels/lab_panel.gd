@@ -129,7 +129,7 @@ func build(body: VBoxContainer) -> void:
 		body.add_child(UiKit.well(box, 4))
 
 	body.add_child(UiKit.gap(4))
-	body.add_child(UiKit.label("CHEATS", "s8", UiKit.DIM))
+	body.add_child(UiKit.label("CHEATS", "label", UiKit.DIM))
 	var ch := UiKit.hbox(3)
 	ch.add_child(UiKit.button("+5,000 gold", func():
 		Game.hero().gold = int(Game.hero().gold) + 5000

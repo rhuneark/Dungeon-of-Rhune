@@ -133,7 +133,7 @@ class SmithPanel extends UiPanel:
 		var pb := UiKit.button("Punch sockets (%dg)" % Economy.socket_cost(punchable) if punchable != null else "Punch sockets", func(): if punchable != null: Economy.punch_sockets(punchable))
 		pb.disabled = punchable == null
 		side_box.add_child(pb)
-		side_box.add_child(UiKit.label("RECIPES", "s8", UiKit.DIM))
+		side_box.add_child(UiKit.label("RECIPES", "label", UiKit.DIM))
 		for r in Economy.recipes():
 			var on: bool = not recipe.is_empty() and recipe.id == r.id
 			side_box.add_child(UiKit.para("%s: %s" % [r.name, r.text], "t10", UiKit.GOOD if on else UiKit.PARCH))

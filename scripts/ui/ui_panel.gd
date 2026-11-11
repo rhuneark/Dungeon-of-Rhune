@@ -69,7 +69,7 @@ func _rebuild() -> void:
 	var header := Control.new()
 	header.custom_minimum_size = Vector2(0, 20)
 	header.mouse_filter = MOUSE_FILTER_IGNORE
-	var t := UiKit.label(title, "title18", UiKit.GOLD)
+	var t := UiKit.label(title, "head", UiKit.GOLD)
 	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	t.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	header.add_child(t)

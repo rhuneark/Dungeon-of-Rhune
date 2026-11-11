@@ -1,0 +1,110 @@
+{
+ "seed": 0,
+ "type": "done",
+ "colors": {
+  "lower": "#2B4D5C",
+  "upper": "#4F7C42"
+ },
+ "tile_id": "f79e79e4-d8f5-43e6-bcf9-0b50f4a8038f",
+ "progress": 0.3,
+ "tile_name": "lush dark green grass with small tufts to dark mur",
+ "tile_type": "isometric",
+ "tile_rules": {
+  "arity": 4,
+  "tiles": {
+   "tile_0": {
+    "mask": 0
+   },
+   "tile_1": {
+    "mask": 1
+   },
+   "tile_2": {
+    "mask": 2
+   },
+   "tile_3": {
+    "mask": 3
+   },
+   "tile_4": {
+    "mask": 4
+   },
+   "tile_5": {
+    "mask": 5
+   },
+   "tile_6": {
+    "mask": 6
+   },
+   "tile_7": {
+    "mask": 7
+   },
+   "tile_8": {
+    "mask": 8
+   },
+   "tile_9": {
+    "mask": 9
+   },
+   "tile_10": {
+    "mask": 10
+   },
+   "tile_11": {
+    "mask": 11
+   },
+   "tile_12": {
+    "mask": 12
+   },
+   "tile_13": {
+    "mask": 13
+   },
+   "tile_14": {
+    "mask": 14
+   },
+   "tile_15": {
+    "mask": 15
+   }
+  },
+  "terrains": [
+   "lush dark green grass with small tufts",
+   "dark murky green-blue pond water with gentle ripples"
+  ],
+  "elevation": 0,
+  "rule_type": "corner",
+  "step_slope": 0.0,
+  "boundary_seed": 0,
+  "boundary_amplitude": 0.12
+ },
+ "tileset_15": [
+  [
+   0,
+   1,
+   2,
+   3
+  ],
+  [
+   4,
+   5,
+   6,
+   7
+  ],
+  [
+   8,
+   9,
+   10,
+   11
+  ],
+  [
+   12,
+   13,
+   14,
+   15
+  ]
+ ],
+ "billing_usage": {
+  "usd": 0.0,
+  "type": "generations",
+  "generations": 10
+ },
+ "generation_id": "b507b0fa-157d-4252-ab06-5ad1559ade57",
+ "billing_charged": true,
+ "tile_description": "lush dark green grass with small tufts to dark murky green-blue pond water with gentle ripples",
+ "saved_to_database": true,
+ "generation_started_at": "2026-11-11T04:46:38.689948+00:00"
+}

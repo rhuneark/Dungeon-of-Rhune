@@ -21,30 +21,39 @@ Ships on **Steam** (Godot desktop exports + optional GodotSteam GDExtension) and
   rules (static funcs). Port of the old TS with the SAME dictionary keys (camelCase:
   `baseId`, `uniqueValues`...) so saves are unchanged. `Rng` is mulberry32, bit-identical to the
   TS build.
+- **2.5D isometric** (Diablo II style): ground is 2:1 diamonds, 64x32, TileMapLayer with
+  TILE_SHAPE_ISOMETRIC + DIAMOND_DOWN. **scripts/world/iso.gd** (`Iso`) is the single source of
+  the cell/vertex <-> pixel math; never hand-roll it. Map +x runs down-right, +y down-left; the
+  town's "south" is +y, so building fronts (doors) face the lower left.
 - **scenes/world/thornwick.tscn**: the town, edited in the editor (Ground TileMapLayer with
-  terrains, Decals, Things y-sorted, Items, Blockers, Spawn). Node types in **scripts/world/**:
-  `Prop` (art/block/action/approach_dy, anchored at the visible base), `NpcSpot`,
-  `PlacedItem`, `Blocker`, `Zone` (root: zone_name, level, critter_area).
+  terrains, Decals, Things y-sorted, Items, Blockers, Spawn), ringed by MARGIN cells of blocked
+  forest so the camera never shows the void past the diamond edges. Node types in
+  **scripts/world/**: `Prop` (position = footprint centre = y-sort line; isometric art puts its
+  base corner on the footprint's bottom corner, round art sits on the position; `block` w x h
+  cells, measured from the art for buildings), `NpcSpot`, `PlacedItem`, `Blocker` (iso cells),
+  `Zone` (root: zone_name, level, critter_area in map cells).
 - **scripts/world/zone_runtime.gd**: brings a Zone to life (nav from terrain + footprints +
-  blockers, player, NPCs, goose, ground loot, hover/click, camera). `interact.gd`: what using
-  things does (dialogs, panels, quest events).
+  blockers, player, NPCs, goose, ground loot, hover/click, camera). `zone_nav.gd`: A* on the iso
+  cells. `interact.gd`: what using things does (dialogs, panels, quest events).
 - **scripts/ui/**: all UI built in code. `ui_kit.gd` (palette, fonts, 9-slice pixel frames,
   widget factories), `ui_panel.gd` (base window: rebuilds its body on `Game.changed`, deferred),
   `playing_ui.gd` (panel slots + hotkeys), `hud.gd`, `main_menu.gd`, `grid_view.gd`,
   `item_icon.gd`, `ui_tip.gd` + `item_tooltip.gd`, `panels/`.
-- **assets/**: `art/` (packed by tools/art/pack.py + art_meta.json), `fonts/` (re-gridded pixel
-  fonts, see its README), `tiles/terrain.tres` (built by tools/godot/build_tileset.gd), icon.
+- **assets/**: `art/` (packed by tools/art/pack.py + art_meta.json: props carry `iso`, and
+  buildings a measured `base` corner + `block`), `fonts/` (see its README), `tiles/terrain.tres`
+  (isometric, built by tools/godot/build_tileset.gd from 4 corner sets), icon.
 - **tests/test_systems.tscn**: rules tests. **tools/godot/**: builders + test drivers.
 - **export_presets.cfg**: Windows Desktop, Linux, macOS, Web → `builds/` (ignored).
   **steam/**: SteamPipe templates. **STEAM.md**: the release guide.
 
 ## Key Patterns
 
-- **Crisp pixels**: world in WORLD PIXELS (32px tiles, 64px characters), UI in UI PIXELS (32px
-  per inventory cell); both scale by whole device-pixel factors (UI may be 1.5x on mid-size
-  windows). Keep positions integer, never scale art by non-integers. Fonts only at: Jersey 10
-  at 10/20, Jacquarda Bastarda 9 at 18/36, Silkscreen at 8 (`UiKit.STYLES`). UI layouts must
-  fit ~800×450 UI px (min 690×430). No ✓ ★ → glyphs in the fonts; use ASCII.
+- **Crisp pixels**: world in WORLD PIXELS (64x32 iso tiles, 64px characters), UI in UI PIXELS
+  (32px per inventory cell); both scale by whole device-pixel factors (UI may be 1.5x on mid-size
+  windows). Keep positions integer, never scale art by non-integers. Text is the plain Jersey 10
+  at 10 (body/captions) and 20 (titles); the gothic Jacquarda is for the logo only (36)
+  (`UiKit.STYLES`). Keep text bright on dark panels (PARCH/DIM). UI layouts must fit ~800×450
+  UI px (min 690×430). No ✓ ★ → glyphs in the fonts; use ASCII.
 - **Textures**: get them through `Art` (cached). A texture first loaded inside `_draw()` renders
   white, which is why main.gd warms them all at boot.
 - **Game → UI**: `Game.commit()` emits `changed` (panels rebuild); `Game.set_ui({...})` emits
@@ -69,11 +78,13 @@ Ships on **Steam** (Godot desktop exports + optional GodotSteam GDExtension) and
 
 ## What to Modify
 
-- **New zone** → new scene with a `Zone` root (copy thornwick.tscn's layer layout), loaded from
-  main.gd (`ZONE_SCENE`; zone switching comes with the Wilds).
+- **New zone** → new scene with a `Zone` root (copy thornwick.tscn's layer layout, iso ground
+  from terrain.tres), loaded from main.gd (`ZONE_SCENE`; zone switching comes with the Wilds).
 - **New art** → prompt in `tools/art/spec.py`, run `gen.py` then `pack.py` (writes
-  assets/art + art_meta.json). New props appear in a Prop's `art` picker. Buildings use the
-  FRONT style and are sized so doors fit the 64px characters.
+  assets/art + art_meta.json). Buildings go in `ISO_BUILDINGS` (isometric, seen from the south
+  corner, door on the lower-left wall; if it comes out on the right, add it to `MIRROR`);
+  small directional props in `ISO_PROPS`; round things need neither. Check new buildings with
+  tools/godot/overview.gd (footprints drawn over the map).
 - **Loot tuning** → `scripts/content/treasure_classes.gd` (TCs + `QUALITY_TUNING`), affix tiers
   and weights in `affixes.gd`; check with the Loot Lab (`` ` ``).
 - **UI** → `scripts/ui/` (new left panel: add to `PlayingUi._make_left`). Palette: `UiKit`.
@@ -88,7 +99,9 @@ Ships on **Steam** (Godot desktop exports + optional GodotSteam GDExtension) and
   tools/godot/smoke.gd` loads every script (`SMOKE bad=0`).
 - `godot --headless --path . res://tests/test_systems.tscn` → `RESULT 207/207`.
 - `xvfb-run -a -s "-screen 0 1600x900x24" godot --path . --audio-driver Dummy --resolution
-  1600x900 -s tools/godot/run.gd -- res://tools/godot/play_test.gd` → `PLAYTEST OK`.
+  1600x900 -s tools/godot/run.gd -- res://tools/godot/play_test.gd` → `PLAYTEST OK` (includes
+  "every NPC and usable object is reachable").
+- Footprints: `... -s tools/godot/run.gd -- res://tools/godot/overview.gd out.png [zoom x y]`.
 - Screenshots: same with `res://tools/godot/shots.gd <out_dir>` (also try 1366x768 → UI 1.5x).
 - `godot --headless --path . --export-pack "Linux" builds/pck/rhune.pck` then
   `godot --main-pack builds/pck/rhune.pck` boots to the menu (checks export filters).

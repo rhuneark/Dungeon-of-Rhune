@@ -6,12 +6,11 @@ extends Node2D
 ## object to walk over and use it, click a label to pick loot up. WASD/arrows
 ## and the gamepad stick also move.
 
-const TILE := 32
 const PLAYER_SPEED := 135.0
 const WATER := 3 # terrain index in assets/tiles/terrain.tres
 const CORNERS := [
-	TileSet.CELL_NEIGHBOR_TOP_LEFT_CORNER, TileSet.CELL_NEIGHBOR_TOP_RIGHT_CORNER,
-	TileSet.CELL_NEIGHBOR_BOTTOM_LEFT_CORNER, TileSet.CELL_NEIGHBOR_BOTTOM_RIGHT_CORNER,
+	TileSet.CELL_NEIGHBOR_TOP_CORNER, TileSet.CELL_NEIGHBOR_RIGHT_CORNER,
+	TileSet.CELL_NEIGHBOR_BOTTOM_CORNER, TileSet.CELL_NEIGHBOR_LEFT_CORNER,
 ]
 
 var zone: Zone
@@ -22,7 +21,8 @@ var labels: Node2D
 var things: Node2D
 var decals: Node2D
 var camera: Camera2D
-var map_px := Vector2.ZERO
+## World-space bounding box of the (isometric, diamond-shaped) map.
+var map_rect := Rect2()
 
 ## {target: Dictionary, rect: Rect2, approach: Vector2, range: float, node: CanvasItem, color: String}
 var hotspots: Array = []
@@ -48,7 +48,7 @@ func setup(z: Zone) -> void:
 	var ground: TileMapLayer = z.get_node("Ground")
 	var used := ground.get_used_rect()
 	nav = ZoneNav.new(used.end)
-	map_px = Vector2(used.end * TILE)
+	map_rect = Iso.map_bounds(used.end)
 
 	# Water tiles (2+ water corners) are not walkable.
 	for c in ground.get_used_cells():
@@ -95,10 +95,10 @@ func setup(z: Zone) -> void:
 	ground_items.layout_labels()
 
 	camera = Camera2D.new()
-	camera.limit_left = 0
-	camera.limit_top = 0
-	camera.limit_right = int(map_px.x)
-	camera.limit_bottom = int(map_px.y)
+	camera.limit_left = int(map_rect.position.x)
+	camera.limit_top = int(map_rect.position.y)
+	camera.limit_right = int(map_rect.end.x)
+	camera.limit_bottom = int(map_rect.end.y)
 	z.add_child(camera)
 	camera.make_current()
 	_apply_view()
@@ -169,7 +169,7 @@ func _add_npc(s: NpcSpot) -> void:
 	spr.position = s.global_position.round()
 	things.add_child(spr)
 	_shadow(spr.position + Vector2(0, -1))
-	nav.block(Rect2i(floori(spr.position.x / TILE), floori(spr.position.y / TILE - 0.3), 1, 1))
+	nav.block(Rect2i(Iso.cell_of(spr.position + Vector2(0, -4)), Vector2i.ONE))
 	npcs.append({"id": s.npc_id, "sprite": spr, "frames": frames, "t": randf() * 4.0, "pos": spr.position, "sheet": sheet, "facing": ""})
 	hotspots.append({
 		"target": {"kind": "npc", "id": s.npc_id, "name": def.name},
@@ -191,7 +191,7 @@ func _add_goose() -> void:
 	if spr.texture:
 		var bb := Prop.bbox_of(spr.texture)
 		spr.offset = Vector2(-spr.texture.get_width() / 2.0, -bb.end.y)
-	var pos := Vector2((area.position.x + area.size.x / 2.0) * TILE, area.position.y * TILE + 32)
+	var pos := Iso.vertex(area.position.x + area.size.x / 2.0, area.position.y + 1.0)
 	spr.position = pos
 	things.add_child(spr)
 	var hs := {"target": {"kind": "critter", "id": "goose"}, "rect": Rect2(), "approach": pos, "range": 34.0, "node": spr, "color": "#ffffff"}
@@ -201,7 +201,7 @@ func _add_goose() -> void:
 
 func _add_player() -> void:
 	var spawn: Node2D = zone.get_node_or_null("Spawn")
-	player.pos = spawn.global_position if spawn else map_px / 2.0
+	player.pos = spawn.global_position if spawn else map_rect.get_center()
 	player_sprite = Sprite2D.new()
 	player_sprite.name = "Player"
 	player_sprite.centered = false
@@ -444,7 +444,7 @@ func _update_goose(delta: float) -> void:
 	elif g.wait <= 0:
 		g.wait = 1.5 + randf() * 3.0
 		var a: Rect2i = g.area
-		g.target = Vector2((a.position.x + randf() * a.size.x) * TILE, (a.position.y + randf() * a.size.y) * TILE)
+		g.target = Iso.vertex(a.position.x + randf() * a.size.x, a.position.y + randf() * a.size.y)
 	var bob := roundi(absf(sin(g.t * 12.0))) if walking else 0
 	g.sprite.position = g.pos.round() - Vector2(0, bob)
 	g.hs.rect = Rect2(g.pos + Vector2(-12, -26), Vector2(24, 28))
@@ -456,9 +456,10 @@ func _scare_goose() -> void:
 	g.flee = 1.2
 	g.wait = 0.0
 	var a: Rect2i = g.area
-	var fx2: float = g.pos.x + signf(g.pos.x - player.pos.x if g.pos.x != player.pos.x else 1.0) * 90.0
-	var fy2: float = g.pos.y + signf(g.pos.y - player.pos.y if g.pos.y != player.pos.y else 1.0) * 50.0
-	g.target = Vector2(clampf(fx2, a.position.x * TILE, a.end.x * TILE), clampf(fy2, a.position.y * TILE, a.end.y * TILE))
+	# Run directly away from the player, then clamp to the area (in map space).
+	var away: Vector2 = (g.pos - player.pos).normalized() if g.pos != player.pos else Vector2.RIGHT
+	var m := Iso.to_map(g.pos + away * 100.0)
+	g.target = Iso.vertex(clampf(m.x, a.position.x, a.end.x), clampf(m.y, a.position.y, a.end.y))
 
 
 # ------------------------------------------------------------- the bridge

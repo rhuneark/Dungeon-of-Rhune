@@ -1,9 +1,8 @@
 class_name ZoneNav
 extends RefCounted
-## Walkability grid + A* (Godot's AStarGrid2D, 8-way, no corner cutting) with
-## string-pulling so click-to-move paths don't zigzag.
-
-const TILE := 32
+## Walkability grid + A* on the isometric map cells (Godot's AStarGrid2D,
+## 8-way, no corner cutting) with string-pulling so click-to-move paths go
+## straight where they can. Positions are world pixels; see Iso.
 
 var astar := AStarGrid2D.new()
 var size := Vector2i.ZERO
@@ -12,8 +11,7 @@ var size := Vector2i.ZERO
 func _init(map_size: Vector2i) -> void:
 	size = map_size
 	astar.region = Rect2i(Vector2i.ZERO, map_size)
-	astar.cell_size = Vector2(TILE, TILE)
-	astar.offset = Vector2(TILE / 2.0, TILE / 2.0)
+	astar.cell_size = Vector2(1, 1)
 	astar.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES
 	astar.default_compute_heuristic = AStarGrid2D.HEURISTIC_OCTILE
 	astar.default_estimate_heuristic = AStarGrid2D.HEURISTIC_OCTILE
@@ -36,13 +34,13 @@ func block(r: Rect2i) -> void:
 
 
 static func cell_of(p: Vector2) -> Vector2i:
-	return Vector2i(floori(p.x / TILE), floori(p.y / TILE))
+	return Iso.cell_of(p)
 
 
-## Is a world point standing room (with a small body radius)?
+## Is a world point standing room (with a small body radius, in pixels)?
 func walkable(p: Vector2, r := 7.0) -> bool:
 	for d in [Vector2(-r, -r / 2), Vector2(r, -r / 2), Vector2(-r, r / 2), Vector2(r, r / 2)]:
-		if is_blocked(cell_of(p + d)):
+		if is_blocked(Iso.cell_of(p + d)):
 			return false
 	return true
 
@@ -78,15 +76,15 @@ func nearest_open(c: Vector2i, max_r := 6) -> Vector2i:
 ## World-space path from a to b (excluding a). Empty if unreachable.
 func find_path(a: Vector2, b: Vector2) -> Array[Vector2]:
 	var out: Array[Vector2] = []
-	var goal := nearest_open(cell_of(b))
+	var goal := nearest_open(Iso.cell_of(b))
 	if goal.x < 0:
 		return out
-	var exact := goal == cell_of(b)
-	var final_pt := b if exact else Vector2(goal * TILE) + Vector2(TILE / 2.0, TILE / 2.0)
+	var exact := goal == Iso.cell_of(b)
+	var final_pt := b if exact else Iso.cell_center(goal)
 	if line_of_sight(a, final_pt):
 		out.append(final_pt)
 		return out
-	var start := nearest_open(cell_of(a), 1)
+	var start := nearest_open(Iso.cell_of(a), 1)
 	if start.x < 0:
 		return out
 	var ids := astar.get_id_path(start, goal)
@@ -94,7 +92,7 @@ func find_path(a: Vector2, b: Vector2) -> Array[Vector2]:
 		return out
 	var pts: Array[Vector2] = []
 	for i in range(1, ids.size()):
-		pts.append(Vector2(ids[i] * TILE) + Vector2(TILE / 2.0, TILE / 2.0))
+		pts.append(Iso.cell_center(ids[i]))
 	if pts.is_empty():
 		pts.append(final_pt)
 	pts[pts.size() - 1] = final_pt

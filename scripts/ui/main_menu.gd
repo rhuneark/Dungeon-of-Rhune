@@ -47,7 +47,7 @@ func _rebuild() -> void:
 	var col := UiKit.vbox(8)
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.size = size
-	var t := UiKit.label("Dungeon of Rhune", "title36", UiKit.GOLD)
+	var t := UiKit.label("Dungeon of Rhune", "logo", UiKit.GOLD)
 	t.add_theme_color_override("font_shadow_color", Color.BLACK)
 	t.add_theme_constant_override("shadow_offset_x", 2)
 	t.add_theme_constant_override("shadow_offset_y", 2)
@@ -114,7 +114,7 @@ func _rebuild() -> void:
 	col.add_child(row)
 	add_child(col)
 
-	var hint := UiKit.label("CLICK TO MOVE · I C K Q L O · %sESC" % ("` LOOT LAB · " if Platform.dev_tools else ""), "s8", UiKit.FAINT)
+	var hint := UiKit.label("CLICK TO MOVE · I C K Q L O · %sESC" % ("` LOOT LAB · " if Platform.dev_tools else ""), "label", UiKit.FAINT)
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint.size = Vector2(size.x, 10)
 	hint.position = Vector2(0, size.y - 16)

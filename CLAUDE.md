@@ -21,19 +21,25 @@ Ships on **Steam** (Godot desktop exports + optional GodotSteam GDExtension) and
   rules (static funcs). Port of the old TS with the SAME dictionary keys (camelCase:
   `baseId`, `uniqueValues`...) so saves are unchanged. `Rng` is mulberry32, bit-identical to the
   TS build.
-- **scenes/world/thornwick.tscn**: the town, edited in the editor (Ground TileMapLayer with
-  terrains, Decals, Things y-sorted, Items, Blockers, Spawn). Node types in **scripts/world/**:
+- **scenes/world/thornwick.tscn**: the town, BUILT by tools/godot/build_thornwick.gd (terrain
+  lanes, props, graveyard/chapel, forest edge; re-run it after layout changes) and editable in
+  the editor (Ground TileMapLayer with terrains, Decals, Things y-sorted, Items, Blockers, Spawn).
+  Node types in **scripts/world/**:
   `Prop` (art/block/action/approach_dy, anchored at the visible base), `NpcSpot`,
   `PlacedItem`, `Blocker`, `Zone` (root: zone_name, level, critter_area).
 - **scripts/world/zone_runtime.gd**: brings a Zone to life (nav from terrain + footprints +
   blockers, player, NPCs, goose, ground loot, hover/click, camera). `interact.gd`: what using
-  things does (dialogs, panels, quest events).
+  things does (dialogs, panels, quest events). `atmosphere.gd`: the look at runtime (dusk
+  CanvasModulate, a flickering PointLight2D per glow cluster from art_meta, unshaded glow
+  sprites, pixel-snapped fog shader, embers, vignette CanvasLayer). Loot labels and float text
+  live on an `Overlay` CanvasLayer (follows the camera) so the tint never dims them.
 - **scripts/ui/**: all UI built in code. `ui_kit.gd` (palette, fonts, 9-slice pixel frames,
   widget factories), `ui_panel.gd` (base window: rebuilds its body on `Game.changed`, deferred),
   `playing_ui.gd` (panel slots + hotkeys), `hud.gd`, `main_menu.gd`, `grid_view.gd`,
   `item_icon.gd`, `ui_tip.gd` + `item_tooltip.gd`, `panels/`.
-- **assets/**: `art/` (packed by tools/art/pack.py + art_meta.json), `fonts/` (re-gridded pixel
-  fonts, see its README), `tiles/terrain.tres` (built by tools/godot/build_tileset.gd), icon.
+- **assets/**: `art/` (packed by tools/art/pack.py + art_meta.json; `art/glow/` = each prop's
+  light-emitting pixels, `glow` clusters in art_meta), `fonts/` (re-gridded pixel fonts, see its
+  README), `tiles/terrain.tres` (built by tools/godot/build_tileset.gd), icon.
 - **tests/test_systems.tscn**: rules tests. **tools/godot/**: builders + test drivers.
 - **export_presets.cfg**: Windows Desktop, Linux, macOS, Web → `builds/` (ignored).
   **steam/**: SteamPipe templates. **STEAM.md**: the release guide.
@@ -72,9 +78,13 @@ Ships on **Steam** (Godot desktop exports + optional GodotSteam GDExtension) and
 
 - **New zone** → new scene with a `Zone` root (copy thornwick.tscn's layer layout), loaded from
   main.gd (`ZONE_SCENE`; zone switching comes with the Wilds).
-- **New art** → prompt in `tools/art/spec.py`, run `gen.py` then `pack.py` (writes
-  assets/art + art_meta.json). New props appear in a Prop's `art` picker. Buildings use the
-  FRONT style and are sized so doors fit the 64px characters.
+- **New art** → prompt in `tools/art/spec.py`, run `gen.py` (use `--only x --variants 3` and pick
+  from out/candidates/) then `pack.py` (writes assets/art + art_meta.json + glow). New props
+  appear in a Prop's `art` picker. LOOK: grim gothic high fantasy at dusk; everything in the
+  world is forced onto `spec.PALETTE` (keep it that way, it's what makes the town cohere). The
+  lamplight/fire/rune palette colours are for things that emit light: the packer turns them into
+  lights. Buildings use the FRONT style (front-facing, not isometric: square towers drift to a
+  corner view, so towers are round) and are sized so doors fit the 64px characters.
 - **Loot tuning** → `scripts/content/treasure_classes.gd` (TCs + `QUALITY_TUNING`), affix tiers
   and weights in `affixes.gd`; check with the Loot Lab (`` ` ``).
 - **UI** → `scripts/ui/` (new left panel: add to `PlayingUi._make_left`). Palette: `UiKit`.
@@ -91,6 +101,7 @@ Ships on **Steam** (Godot desktop exports + optional GodotSteam GDExtension) and
 - `xvfb-run -a -s "-screen 0 1600x900x24" godot --path . --audio-driver Dummy --resolution
   1600x900 -s tools/godot/run.gd -- res://tools/godot/play_test.gd` → `PLAYTEST OK` (includes
   "every NPC and usable object is reachable").
-- Screenshots: same with `res://tools/godot/shots.gd <out_dir>` (also try 1366x768 → UI 1.5x).
+- Screenshots: same with `res://tools/godot/shots.gd <out_dir>` (also try 1366x768 → UI 1.5x);
+  `res://tools/godot/tour.gd <out_dir>` walks the town and shoots each landmark at play zoom.
 - `godot --headless --path . --export-pack "Linux" builds/pck/rhune.pck` then
   `godot --main-pack builds/pck/rhune.pck` boots to the menu (checks export filters).

@@ -3,10 +3,15 @@ Generate every asset in spec.py through the PixelLab v2 API.
 
   python3 tools/art/gen.py            # everything missing
   python3 tools/art/gen.py props      # one category: chars|tiles|props|icons|rhunes
+  python3 tools/art/gen.py props --only tavern,smithy --variants 3
+                                      # candidates -> out/candidates/<name>_<i>.png;
+                                      # copy the best to out/props/<name>.png
 
 Idempotent: anything already in tools/art/out/ is skipped, so delete a file to
 regenerate it. Raw API state (character/tileset ids) lives in
 tools/art/.cache/state.json so animations can be added to existing characters.
+World art (props, tiles, reference-drawn characters) is forced onto
+spec.PALETTE.
 """
 import io
 import json
@@ -104,24 +109,50 @@ def strip_flat_background(path, tol=22):
     im.save(path)
 
 
-def map_object(name, w, h, prompt, out_path, view="high top-down"):
+_palette_b64 = None
+
+
+def palette_image():
+    """spec.PALETTE as a swatch PNG (PixelLab's forced-palette `color_image`)."""
+    global _palette_b64
+    if _palette_b64 is None:
+        from PIL import Image
+
+        cols, s = 8, 16
+        rows = (len(spec.PALETTE) + cols - 1) // cols
+        im = Image.new("RGBA", (cols * s, rows * s), (0, 0, 0, 0))
+        for i, hx in enumerate(spec.PALETTE):
+            c = tuple(int(hx[j:j + 2], 16) for j in (1, 3, 5)) + (255,)
+            im.paste(c, ((i % cols) * s, (i // cols) * s, (i % cols + 1) * s, (i // cols + 1) * s))
+        _palette_b64 = _b64png(im)
+    return {"type": "base64", "base64": _palette_b64}
+
+
+def guide_image(name, w, h):
+    """The composition guide in ref/, desaturated so the prompt + palette set the colours."""
+    from PIL import Image, ImageEnhance
+
+    canvas = Image.new("RGBA", (w, h), REF_BG)
+    canvas.alpha_composite(Image.open(os.path.join(REF_DIR, f"{name}.png")).convert("RGBA").resize((w, h), Image.BILINEAR))
+    return ImageEnhance.Color(canvas.convert("RGB")).enhance(0.3)
+
+
+def map_object(name, w, h, prompt, out_path, view="high top-down", icon=False):
     if os.path.exists(out_path):
         return
+    big = name in getattr(spec, "PROP_REFS", ()) or name in getattr(spec, "FRONT_FACING", ())
     body = {
         "description": prompt,
         "image_size": {"width": w, "height": h},
         "view": view,
         "outline": "single color outline",
-        "shading": "medium shading",
-        "detail": "high detail" if name in getattr(spec, "PROP_REFS", ()) else "medium detail",
+        "shading": "medium shading" if icon else "detailed shading",
+        "detail": "high detail" if big else "medium detail",
     }
-    ref = os.path.join(REF_DIR, f"{name}.png")
-    if name in getattr(spec, "PROP_REFS", ()) and os.path.exists(ref):
-        from PIL import Image
-
-        canvas = Image.new("RGBA", (w, h), REF_BG)
-        canvas.alpha_composite(Image.open(ref).convert("RGBA").resize((w, h), Image.BILINEAR))
-        body["init_image"] = {"type": "base64", "base64": _b64png(canvas)}
+    if not icon:
+        body["color_image"] = palette_image()
+    if name in getattr(spec, "PROP_REFS", ()) and os.path.exists(os.path.join(REF_DIR, f"{name}.png")):
+        body["init_image"] = {"type": "base64", "base64": _b64png(guide_image(name, w, h))}
         body["init_image_strength"] = getattr(spec, "REF_STRENGTH_OVERRIDES", {}).get(name, spec.REF_STRENGTH)
     d = post_retry("/map-objects", body)
     job = pl.wait_job(d["background_job_id"], label=name)
@@ -129,23 +160,33 @@ def map_object(name, w, h, prompt, out_path, view="high top-down"):
         raise RuntimeError(f"{name} failed: {str(job)[:300]}")
     pl.save_b64(job["last_response"]["image"], out_path)
     strip_flat_background(out_path)
-    log("ok", name)
+    log("ok", os.path.relpath(out_path, OUT))
 
 
-def gen_props():
+def prop_view(name):
+    if name in spec.FRONT_FACING:
+        return "low top-down"
+    return "low top-down" if name in getattr(spec, "LOW_VIEW", ()) else "high top-down"
+
+
+def gen_props(only=None, variants=0):
     tasks = []
     for name, (w, h, prompt) in spec.PROPS.items():
-        if name in spec.FRONT_FACING:
-            tasks.append((name, w, h, f"{prompt}, {spec.FRONT_STYLE}", os.path.join(OUT, "props", f"{name}.png"), "low top-down"))
+        if only and name not in only:
+            continue
+        full = f"{prompt}, {spec.FRONT_STYLE}" if name in spec.FRONT_FACING else f"{prompt}, {spec.PROP_STYLE}"
+        if variants:
+            for i in range(variants):
+                tasks.append((name, w, h, full, os.path.join(OUT, "candidates", f"{name}_{i}.png"), prop_view(name)))
         else:
-            tasks.append((name, w, h, f"{prompt}, {spec.PROP_STYLE}", os.path.join(OUT, "props", f"{name}.png"), "high top-down"))
+            tasks.append((name, w, h, full, os.path.join(OUT, "props", f"{name}.png"), prop_view(name)))
     return tasks
 
 
 def gen_icons():
     tasks = []
     for name, (cw, ch, prompt) in spec.ICONS.items():
-        tasks.append((name, cw * 32, ch * 32, f"{prompt}, {spec.ICON_STYLE}", os.path.join(OUT, "icons", f"{name}.png"), "side"))
+        tasks.append((name, cw * 32, ch * 32, f"{prompt}, {spec.ICON_STYLE}", os.path.join(OUT, "icons", f"{name}.png"), "side", True))
     return tasks
 
 
@@ -153,7 +194,7 @@ def gen_rhunes():
     tasks = []
     for name, color, glyph in spec.RHUNES:
         prompt = f"small flat dark stone carved with {glyph} glowing {color}, magic rune stone, {spec.ICON_STYLE}"
-        tasks.append((f"rhune_{name}", 32, 32, prompt, os.path.join(OUT, "icons", f"rhune_{name}.png"), "side"))
+        tasks.append((f"rhune_{name}", 32, 32, prompt, os.path.join(OUT, "icons", f"rhune_{name}.png"), "side", True))
     return tasks
 
 
@@ -165,14 +206,25 @@ def character(name, prompt, anims):
         return
     cs = STATE["characters"].setdefault(name, {})
     if not cs.get("id"):
-        d = post_retry("/create-character-v3", {
+        body = {
             "description": prompt,
             "image_size": {"width": 64, "height": 64},
             "view": "low top-down",
             "outline": "single color black outline",
             "detail": "medium detail",
             "name": name,
-        })
+        }
+        if name in getattr(spec, "CHAR_FROM_REF", ()):
+            # Draw the south-facing sprite on the world palette first; v3 rotates it.
+            ref = os.path.join(OUT, "chars", f"{name}_ref.png")
+            map_object(f"{name}_ref", 64, 64, prompt, ref, "low top-down")
+            with open(ref, "rb") as fh:
+                import base64
+
+                body["reference_image"] = {"type": "base64", "base64": base64.b64encode(fh.read()).decode()}
+            for k in ("outline", "detail"):
+                body.pop(k)
+        d = post_retry("/create-character-v3", body)
         cs["id"] = d["character_id"]
         save_state()
         job = pl.wait_job(d["background_job_id"], label=name)
@@ -210,6 +262,25 @@ def character(name, prompt, anims):
 
 
 # ------------------------------------------------------------------- tilesets
+def solid_tile(set_name, side):
+    """base64 PNG of a generated set's plain (all-corners-one-terrain) tile.
+    To re-roll a set but keep a terrain other sets share, move its json to
+    out/tiles/prev/ instead of deleting it: it is read from there."""
+    for path in (os.path.join(OUT, "tiles", f"{set_name}.json"), os.path.join(OUT, "tiles", "prev", f"{set_name}.json")):
+        try:
+            with open(path) as f:
+                d = json.load(f)
+            break
+        except OSError:
+            continue
+    else:
+        return None
+    for t in d["tileset"]["tiles"]:
+        if all(v == side for v in t["corners"].values()):
+            return t["image"]["base64"]
+    return None
+
+
 def tileset(ts):
     name = ts["name"]
     out_json = os.path.join(OUT, "tiles", f"{name}.json")
@@ -224,13 +295,21 @@ def tileset(ts):
         "view": "high top-down",
         "shading": "medium shading",
         "detail": "medium detail",
+        "mode": "pro",
+        "target_palette": {"colors": spec.PALETTE, "name": "Dungeon of Rhune"},
     }
+    for k in ("raggedness", "roundness", "boundary_amplitude", "boundary_seed"):
+        if k in ts:
+            body[k] = ts[k]
     for side in ("lower", "upper"):
         ref = ts.get(f"{side}_base_from")
         if ref:
             base_id = STATE["tilesets"].get(ref[0], {}).get(f"{ref[1]}_base_tile_id")
             if base_id:
                 body[f"{side}_base_tile_id"] = base_id
+            solid = solid_tile(ref[0], ref[1])
+            if solid:
+                body[f"{side}_reference_image"] = {"type": "base64", "base64": solid}
     d = post_retry("/create-tileset", body)
     tid = d["tileset_id"]
     STATE["tilesets"].setdefault(name, {})["id"] = tid
@@ -257,9 +336,19 @@ def tileset(ts):
 
 # ------------------------------------------------------------------------ run
 def main():
-    which = set(sys.argv[1:]) or {"chars", "tiles", "props", "icons", "rhunes"}
+    args = sys.argv[1:]
+    only, variants = None, 0
+    if "--only" in args:
+        i = args.index("--only")
+        only = set(args[i + 1].split(","))
+        del args[i:i + 2]
+    if "--variants" in args:
+        i = args.index("--variants")
+        variants = int(args[i + 1])
+        del args[i:i + 2]
+    which = set(args) or {"chars", "tiles", "props", "icons", "rhunes"}
     errors = []
-    with ThreadPoolExecutor(max_workers=6) as ex:
+    with ThreadPoolExecutor(max_workers=8) as ex:
         futs = {}
         if "tiles" in which:
             def all_tiles():
@@ -272,10 +361,12 @@ def main():
             futs[ex.submit(all_tiles)] = "tiles"
         if "chars" in which:
             for name, (prompt, anims) in spec.CHARACTERS.items():
+                if only and name not in only:
+                    continue
                 futs[ex.submit(character, name, prompt, anims)] = f"char {name}"
         tasks = []
         if "props" in which:
-            tasks += gen_props()
+            tasks += gen_props(only, variants)
         if "icons" in which:
             tasks += gen_icons()
         if "rhunes" in which:

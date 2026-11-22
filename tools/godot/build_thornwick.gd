@@ -32,14 +32,20 @@ var cells := PackedInt32Array()
 var meta: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://assets/art/art_meta.json"))
 var blocked := PackedByteArray()
 var rng := RandomNumberGenerator.new()
+var tile_rng := RandomNumberGenerator.new()
 var names := {}
 
 
+## Atlas coords of the tile with these corners. Plain tiles have mirrored
+## variants ("v" in art_meta); pick one at random so the ground doesn't grid.
 func tile_coords(tileset: String, key: String) -> Vector2i:
+	var found: Array[Vector2i] = []
 	for e in meta.tiles[tileset].tiles:
 		if e.key == key:
-			return Vector2i(int(e.i) % 4, int(e.i) / 4)
-	return Vector2i(-1, -1)
+			found.append(Vector2i(int(e.i) % 4, int(e.i) / 4))
+	if found.is_empty():
+		return Vector2i(-1, -1)
+	return found[tile_rng.randi_range(0, found.size() - 1)]
 
 
 # ------------------------------------------------------------ terrain paint
@@ -67,32 +73,34 @@ func ellipse(cx: float, cy: float, rx: float, ry: float, t: int) -> void:
 				set_t(x, y, t)
 
 
-func path(points: Array, width: float, t: int) -> void:
-	for i in points.size() - 1:
-		var a: Vector2 = points[i]
-		var b: Vector2 = points[i + 1]
-		var steps := maxi(1, int(maxf(absf(b.x - a.x), absf(b.y - a.y)) * 2))
-		var half := (width - 1.0) / 2.0
-		for s in steps + 1:
-			var p := a + (b - a) * (float(s) / steps)
-			rect(roundi(p.x - half), roundi(p.y - half), roundi(p.x + half), roundi(p.y + half), t)
+## A filled rectangle with its four corner cells left out (soft corners once
+## the corner tiles round them off).
+func plaza(x0: int, y0: int, x1: int, y1: int, t: int) -> void:
+	rect(x0, y0, x1, y1, t)
+	for c in [Vector2i(x0, y0), Vector2i(x1, y0), Vector2i(x0, y1), Vector2i(x1, y1)]:
+		set_t(c.x, c.y, GRASS)
 
 
 func paint() -> void:
 	cells.resize(W * H)
 	cells.fill(GRASS)
-	rect(22, 18, 37, 27, COBBLE)
-	rect(28, 9, 31, 17, COBBLE)
-	rect(25, 4, 34, 9, COBBLE)
-	rect(28, 28, 31, H - 1, DIRT)
-	path([Vector2(21, 23), Vector2(17, 23), Vector2(17, 25)], 2, DIRT)
-	path([Vector2(38, 22), Vector2(44, 22), Vector2(45, 25)], 2, DIRT)
-	path([Vector2(28, 31), Vector2(20, 33), Vector2(19, 36)], 2, DIRT)
-	path([Vector2(31, 31), Vector2(38, 33), Vector2(39, 34)], 2, DIRT)
-	path([Vector2(22, 18), Vector2(20, 17)], 2, DIRT)
-	path([Vector2(37, 18), Vector2(41, 17)], 2, DIRT)
-	path([Vector2(24, 6), Vector2(14, 6), Vector2(10, 8)], 2, DIRT)
-	ellipse(49, 35, 5.5, 4, WATER)
+	# Old flagstones: the Sealed Stair's forecourt, the causeway down, the square.
+	plaza(25, 3, 34, 10, COBBLE)
+	rect(28, 11, 31, 18, COBBLE)
+	plaza(22, 19, 37, 28, COBBLE)
+	# Mud: the south road to the gate and a lane to every door.
+	rect(28, 29, 30, H - 1, DIRT)
+	rect(12, 26, 21, 27, DIRT) # smithy
+	rect(38, 24, 48, 25, DIRT) # trading post
+	rect(16, 16, 22, 18, DIRT) # tavern
+	rect(37, 16, 41, 18, DIRT) # Varn's tower
+	rect(16, 35, 27, 36, DIRT) # herbalist
+	rect(32, 33, 41, 34, DIRT) # Odo's wagon
+	rect(13, 6, 24, 7, DIRT) # to the chapel...
+	rect(12, 6, 13, 10, DIRT)
+	rect(7, 9, 13, 10, DIRT) # ...and along the graves
+	# The marsh pond.
+	ellipse(49, 35, 5.5, 3.6, WATER)
 
 
 ## Vertex terrain = strongest of the 4 surrounding cells (water only if all are water).
@@ -196,6 +204,7 @@ func add_prop(parent: Node, art: String, x: float, y: float, opts := {}) -> Prop
 
 func _initialize() -> void:
 	rng.seed = 1337
+	tile_rng.seed = 4242
 	paint()
 	blocked.resize(W * H)
 	blocked.fill(0)
@@ -234,6 +243,7 @@ func _initialize() -> void:
 
 	# ---- landmarks & buildings
 	add_prop(things, "pit_entrance", 29.5, 9.5, {"node": "SealedStair", "block": Vector2i(5, 2), "action": "inspect", "name": "The Sealed Stair"})
+	add_prop(things, "chapel", 9.2, 8.4, {"node": "Chapel", "block": Vector2i(5, 2), "name": "Chapel of the Thorn (ruined)"})
 	add_prop(things, "tavern", 17.5, 16, {"node": "Tavern", "block": Vector2i(7, 3), "name": "The Crooked Lantern (closed)"})
 	add_prop(things, "lore_tower", 41, 16, {"node": "VarnsTower", "block": Vector2i(3, 2), "name": "Varn's Tower"})
 	add_prop(things, "smithy", 13, 25.5, {"node": "Smithy", "block": Vector2i(6, 3), "name": "Brannoc's Smithy"})
@@ -257,9 +267,20 @@ func _initialize() -> void:
 	# ---- clutter
 	for p in [Vector2(27.5, 14), Vector2(32.5, 14), Vector2(21.5, 21.5), Vector2(38.5, 21.5), Vector2(27, 29.5), Vector2(33, 32), Vector2(33, 38)]:
 		add_prop(things, "lamp_post", p.x, p.y, {"node": "Lantern", "block": Vector2i(1, 1), "name": "Street Lantern"})
-	for g in [[7, 7, "grave_a"], [9.5, 7, "grave_b"], [12, 7, "grave_a"], [7, 9.5, "grave_b"], [9.5, 9.5, "grave_a"], [12, 9.5, "grave_b"]]:
+	for p in [Vector2(26.2, 10.8), Vector2(32.8, 10.8)]:
+		add_prop(things, "brazier", p.x, p.y, {"node": "Brazier", "block": Vector2i(1, 1), "name": "Brazier"})
+	# The graveyard around the ruined chapel, walled on the south side.
+	for g in [[4.6, 9.6, "grave_b"], [4.4, 12.2, "grave_a"], [6.6, 12.8, "grave_b"], [11.2, 13.6, "grave_a"], [12.4, 12.4, "grave_b"], [14.6, 12, "grave_a"]]:
 		add_prop(things, g[2], g[0], g[1], {"node": "Grave", "block": Vector2i(1, 1), "name": "Old Grave"})
-	add_prop(things, "tree_dead", 4.5, 11, {"node": "DeadTree", "block": Vector2i(1, 1), "name": "Dead Tree"})
+	for wl in [[4.5, 14.9], [10.4, 14.9]]:
+		add_prop(things, "stone_wall", wl[0], wl[1], {"node": "GraveyardWall", "block": Vector2i(3, 1)})
+	add_prop(things, "tree_dead", 2.6, 11.2, {"node": "DeadTree", "block": Vector2i(1, 1), "name": "Dead Tree"})
+	add_prop(things, "tree_dead_b", 15.6, 9.8, {"node": "DeadTree", "block": Vector2i(1, 1), "name": "Dead Tree"})
+	add_prop(things, "tree_dead", 53.4, 31.2, {"node": "DeadTree", "block": Vector2i(1, 1), "name": "Dead Tree"})
+	for cr in [[7.4, 13.3, false], [27.4, 11.8, true], [3.4, 11.6, false], [34.6, 41.9, true]]:
+		add_prop(things, "crow", cr[0], cr[1], {"node": "Crow", "flip": cr[2]})
+	for st in [[3.6, 20.4], [56.4, 8.6], [56.2, 39.4], [21.2, 42.6], [44.6, 6.2]]:
+		add_prop(things, "standing_stone", st[0], st[1], {"node": "StandingStone", "block": Vector2i(1, 1), "name": "Standing Stone"})
 	for c in [
 		["barrel", 17.6, 22.5, Vector2i(1, 1)], ["barrel", 18.5, 22.8, Vector2i(1, 1)], ["crates", 9.2, 26.6, Vector2i(1, 1)],
 		["crates", 43.2, 25, Vector2i(1, 1)], ["barrel", 51.2, 24.8, Vector2i(1, 1)], ["cart", 51, 27.5, Vector2i(2, 1)],
@@ -267,9 +288,9 @@ func _initialize() -> void:
 		["fence", 18.8, 38, Vector2i(2, 1)], ["banner", 25.2, 41.5, Vector2i(1, 1)], ["banner", 33.8, 41.5, Vector2i(1, 1)],
 		["barrel", 36.5, 30.5, Vector2i(1, 1)], ["bush", 21, 26.5, Vector2i(1, 1)], ["bush", 38.5, 26.5, Vector2i(1, 1)],
 		["rock_big", 55, 30, Vector2i(1, 1)], ["rock_big", 44, 40, Vector2i(1, 1)],
-		["tree_oak", 36, 12, Vector2i(1, 1)], ["tree_oak", 24.5, 13, Vector2i(1, 1)], ["tree_pine", 46, 9, Vector2i(1, 1)],
-		["tree_oak", 54, 20, Vector2i(1, 1)], ["tree_pine", 6, 22, Vector2i(1, 1)], ["tree_oak", 23.5, 39.5, Vector2i(1, 1)],
-		["tree_oak", 39, 41, Vector2i(1, 1)], ["tree_pine", 52, 41, Vector2i(1, 1)],
+		["tree_oak", 36, 12, Vector2i(1, 1)], ["tree_oak", 23, 13.4, Vector2i(1, 1)], ["tree_pine", 46, 9, Vector2i(1, 1)],
+		["tree_oak_b", 54, 20, Vector2i(1, 1)], ["tree_pine_b", 6, 22, Vector2i(1, 1)], ["tree_oak", 23.5, 39.5, Vector2i(1, 1)],
+		["tree_oak_b", 39, 41, Vector2i(1, 1)], ["tree_pine", 52, 41, Vector2i(1, 1)],
 	]:
 		add_prop(things, c[0], c[1], c[2], {"block": c[3]})
 	add_prop(things, "campfire", 37, 40.5, {"node": "Campfire", "block": Vector2i(1, 1), "name": "Campfire"})
@@ -277,7 +298,10 @@ func _initialize() -> void:
 
 	# ---- forest edge: decorative trees + invisible walls around the map
 	var tree_at := func(x: float, y: float) -> void:
-		var art := "tree_pine" if rng.randf() < 0.5 else "tree_oak"
+		var roll := rng.randf()
+		var art := "tree_pine" if roll < 0.62 else "tree_oak" if roll < 0.9 else "tree_dead"
+		if rng.randf() < 0.5:
+			art += "_b"
 		var p := add_prop(things, art, x + rng.randi_range(-6, 6) / 32.0, y + rng.randi_range(-4, 4) / 32.0, {"node": "EdgeTree"})
 		p.mirrored = rng.randf() < 0.5
 	var x := 0.0
@@ -302,7 +326,7 @@ func _initialize() -> void:
 				blocked[cy * W + cx] = 1
 
 	# ---- scattered decor on open grass (flat, under everything)
-	var decor := ["flowers", "grass_tuft", "mushrooms", "rocks_small", "grass_tuft", "flowers"]
+	var decor := ["grass_tuft", "flowers", "mushrooms", "rocks_small", "grass_tuft", "grass_tuft", "bush"]
 	for cy in range(2, H - 2):
 		for cx in range(2, W - 2):
 			if get_t(cx, cy) != GRASS or blocked[cy * W + cx] == 1 or rng.randf() >= 0.07:

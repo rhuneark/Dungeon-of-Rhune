@@ -18,6 +18,7 @@ var zone: Zone
 var nav: ZoneNav
 var ground_items: GroundItems
 var fx: Fx
+var atmosphere: Atmosphere
 var labels: Node2D
 var things: Node2D
 var decals: Node2D
@@ -66,12 +67,19 @@ func setup(z: Zone) -> void:
 	ground_items.name = "GroundItems"
 	z.add_child(ground_items)
 	z.move_child(ground_items, decals.get_index() + 1)
+	# Loot labels and floating text sit on their own layer that tracks the
+	# camera, so the dusk tint and fog never dim them.
+	var overlay := CanvasLayer.new()
+	overlay.name = "Overlay"
+	overlay.layer = 2
+	overlay.follow_viewport_enabled = true
+	z.add_child(overlay)
 	fx = Fx.new()
 	fx.name = "Fx"
-	z.add_child(fx)
+	overlay.add_child(fx)
 	labels = Node2D.new()
 	labels.name = "Labels"
-	z.add_child(labels)
+	overlay.add_child(labels)
 	ground_items.label_layer = labels
 	ground_items.fx = fx
 	ground_items.nav = nav
@@ -84,6 +92,11 @@ func setup(z: Zone) -> void:
 		_add_npc(s)
 	_add_goose()
 	_add_player()
+	atmosphere = Atmosphere.new()
+	atmosphere.name = "Atmosphere"
+	z.add_child(atmosphere)
+	atmosphere.setup(z, map_px)
+	atmosphere.attach_player_light(player_sprite)
 
 	var hero := Game.hero()
 	for pi in _all(z, "PlacedItem"):

@@ -1,11 +1,11 @@
 {
-  "group_id": "e3149087-8fe0-4b86-8728-8afd2c7a362f",
+  "group_id": "444ff71f-fb20-4aa9-a487-c3f22ffe636d",
   "states": [
     {
       "character": {
-        "id": "0e16d8e6-9de4-4a4c-bcc5-845408f05ab2",
+        "id": "b01f074d-4eef-4112-add7-dac5b24e0144",
         "name": "Idle",
-        "prompt": "cheerful plump merchant with a feathered cap, colorful patched coat and a fat coin purse on his belt, dark fantasy rpg townsfolk, pixel art",
+        "prompt": "gaunt travelling peddler in a hooded dark brown wool cloak over a patched leather coat, a big pack of wares on his back, holding a small lit lantern, full body, standing, facing the viewer, grim medieval dark fantasy townsfolk, pixel art",
         "size": {
           "width": 64,
           "height": 64
@@ -13,7 +13,7 @@
         "template_id": "mannequin",
         "directions": 8,
         "view": "low top-down",
-        "created_at": "2026-11-08T06:03:49.971323+00:00"
+        "created_at": "2026-11-22T20:13:26.265149+00:00"
       },
       "folder": "Idle",
       "frames": {
@@ -41,5 +41,5 @@
     }
   ],
   "export_version": "3.1",
-  "export_date": "2026-11-08T06:08:18.123270"
+  "export_date": "2026-11-22T20:15:25.442869"
 }

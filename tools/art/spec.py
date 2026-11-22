@@ -5,6 +5,14 @@ Edit a prompt, delete the matching file under tools/art/out/, and re-run
 `python3 tools/art/gen.py` to regenerate just that asset; then
 `python3 tools/art/pack.py` to rebuild assets/art/.
 
+Look: grim gothic high fantasy at dusk — an old frontier hamlet of dark
+stone and black timber, steep slate roofs, pointed arches, gnarled trees,
+mist and candlelight. Every world asset is forced onto PALETTE (map objects
+via `color_image`, tilesets via `target_palette`) so it all reads as one
+place; the game then tints the world to dusk and lights it (scripts/world/
+atmosphere.gd). Keep the lamplight/fire/rune colours for things that glow:
+the game finds those pixels and puts real lights on them.
+
 Conventions
 - World: 32px tiles ("high top-down"), characters on 64px canvases
   ("low top-down", 8 directions). Buildings/landmarks use the FRONT style:
@@ -13,33 +21,56 @@ Conventions
 - UI: item icons are 32px per inventory cell (a 2x3 armor is 64x96).
 """
 
-PROP_STYLE = "dark fantasy medieval frontier village, muted earthy palette, pixel art, top-down rpg map object"
+# The world palette (47 colours). Ramps: cold stone/slate, dark timber, mud,
+# moss/olive, bone, crimson, night blue, LIGHT (lamplight, fire), RUNE (cold
+# glow), dusk purple, tarnished brass.
+PALETTE = [
+    "#0d0c10", "#17161c", "#22212a", "#2e2e38", "#3c3d48", "#4c4f5a", "#5f636d", "#767b83", "#92969b", "#b1b3b2",
+    "#1f1712", "#2d2119", "#3d2d21", "#4f3b2b", "#644b36", "#7c5e43", "#977654",
+    "#3a3427", "#4d4533", "#625942",
+    "#18201a", "#212c22", "#2c3a2b", "#384833", "#47573c", "#586a47", "#6e7f55", "#8a9466",
+    "#b9ab8a", "#d8ccae", "#ece3cb",
+    "#3e1a1c", "#5e2326", "#842f2e",
+    "#1f2738", "#2d3a52", "#435675",
+    "#ffd98a", "#ffad4d", "#e86a2a", "#b8361e",
+    "#6fd6ff", "#c6f4ff",
+    "#3b2a44", "#5d4569",
+    "#a4823e", "#d1ab55",
+]
+
+GOTHIC = "grim gothic high fantasy, ancient and weathered, muted desaturated colors, pixel art"
+PROP_STYLE = f"{GOTHIC}, top-down rpg map object, standing alone, no ground under it"
 ICON_STYLE = "dark fantasy arpg inventory item icon, single object centered, crisp pixel art"
-CHAR_STYLE = "dark fantasy rpg townsfolk, pixel art"
+CHAR_STYLE = "grim medieval dark fantasy townsfolk, pixel art"
 FRONT_STYLE = (
-    "classic 16-bit top-down RPG town building seen from the front at a three-quarter angle, facade facing the viewer, "
-    "roof seen from above, square footprint, no isometric angle, no ground platform, dark fantasy medieval village"
+    "classic 16-bit top-down RPG building seen from the front at a three-quarter angle, facade facing the viewer, "
+    f"roof seen from above, no isometric angle, no ground platform, {GOTHIC}"
 )
-# Composition references (tools/art/ref/<name>.png): approved smaller drafts.
-# gen.py resizes the reference to the target size (bilinear, over a flat
-# background) and passes it as init_image, so a re-generation keeps the
-# approved front-facing composition while drawing at native pixel density.
-# Buildings are 1.5x the drafts so doors fit the 64px characters.
-REF_STRENGTH = 200
-REF_STRENGTH_OVERRIDES = {"market_stall": 450}
+# Composition guides (tools/art/ref/<name>.png). gen.py desaturates the guide,
+# resizes it to the target size over a flat background and passes it as
+# init_image, so a re-generation keeps a front-facing composition (plain
+# prompts drift into isometric corner views) while the prompt and palette set
+# the look. Lower strength = more freedom.
+REF_STRENGTH = 130
+REF_STRENGTH_OVERRIDES = {"market_stall": 300}
 PROP_REFS = {
-    "smithy", "trader", "herbalist", "lore_tower", "tavern", "house_a", "house_b",
-    "gate", "market_stall", "pit_entrance", "tree_oak", "tree_pine",
+    "smithy", "trader", "herbalist", "tavern", "house_a", "house_b",
+    "gate", "market_stall", "pit_entrance",
 }
-# Props drawn in the FRONT style ("low top-down" view). Everything else uses PROP_STYLE ("high top-down").
+# Props drawn in the "low top-down" view (fronts toward the camera).
+# Everything else uses PROP_STYLE ("high top-down").
 FRONT_FACING = {
     "smithy", "trader", "herbalist", "lore_tower", "tavern", "house_a", "house_b",
-    "gate", "market_stall", "cart", "pit_entrance",
+    "gate", "market_stall", "pit_entrance", "chapel",
 }
+LOW_VIEW = {"tree_oak", "tree_oak_b", "tree_pine", "tree_pine_b", "tree_dead", "tree_dead_b", "standing_stone", "cart"}
 
 # ---------------------------------------------------------------- characters
-# name -> (prompt, animations [(template_id, [directions])])
+# name -> (prompt, animations [(template_id, [directions])]).
+# Characters in CHAR_FROM_REF are first drawn as a palette-locked south-facing
+# map object, which create-character-v3 then rotates and animates.
 ALL_DIRS = ["south", "south-east", "east", "north-east", "north", "north-west", "west", "south-west"]
+CHAR_FROM_REF = {"npc_trader", "npc_gambler"}
 
 CHARACTERS = {
     "player": (
@@ -51,7 +82,7 @@ CHARACTERS = {
         [("breathing-idle", ["south"])],
     ),
     "npc_trader": (
-        f"cheerful plump merchant with a feathered cap, colorful patched coat and a fat coin purse on his belt, {CHAR_STYLE}",
+        f"gaunt travelling peddler in a hooded dark brown wool cloak over a patched leather coat, a big pack of wares on his back, holding a small lit lantern, full body, standing, facing the viewer, {CHAR_STYLE}",
         [("breathing-idle", ["south"])],
     ),
     "npc_herbalist": (
@@ -63,7 +94,7 @@ CHARACTERS = {
         [("breathing-idle", ["south"])],
     ),
     "npc_gambler": (
-        f"sly gambler with a wide brimmed hat, an eyepatch and a long burgundy coat, flipping a gold coin, {CHAR_STYLE}",
+        f"small full body character sprite of a sly gambler standing, whole figure visible from hood to boots, long dark burgundy hooded cloak, shadowed grinning face, flipping a gold coin, facing the viewer, {CHAR_STYLE}",
         [("breathing-idle", ["south"])],
     ),
     "npc_captain": (
@@ -73,85 +104,107 @@ CHARACTERS = {
 }
 
 # ------------------------------------------------------------------ tilesets
-# Built in order; "base" refs reuse another set's base tile so grass matches.
+# Built in order (PixelLab "pro" tilesets on PALETTE); "*_base_from" reuses
+# another set's terrain so the shared ground matches between sets.
+GRASS = "dark wild moorland grass, muted olive and grey green, short wiry tufts, a few dark pebbles"
+DIRT = "smooth dark packed earth path, grey brown, soft mottled texture, a few tiny pebbles, no stripes, no ruts"
+COBBLE = "small irregular worn dark grey cobblestones, uneven old stones with dark mud in the gaps"
+WATER = "dark murky blue green marsh water with faint ripples and pale reflections"
+# Soft, slightly ragged borders (pro: raggedness 0..1, roundness 0 square..1 round).
+EDGE = {"raggedness": 0.35, "roundness": 0.9}
 TILESETS = [
-    {
-        "name": "grass_dirt",
-        "lower": "lush dark green grass with small tufts and tiny clover",
-        "upper": "worn brown dirt road with small pebbles",
-        "transition": "",
-        "transition_size": 0.0,
-    },
-    {
-        "name": "grass_cobble",
-        "lower": "lush dark green grass with small tufts and tiny clover",
-        "lower_base_from": ("grass_dirt", "lower"),
-        "upper": "old grey cobblestone town square pavement",
-        "transition": "",
-        "transition_size": 0.0,
-    },
+    # lower_base_from itself: re-rolling the set keeps the grass every other set matches.
+    {"name": "grass_dirt", "lower": GRASS, "lower_base_from": ("grass_dirt", "lower"), "upper": DIRT, **EDGE},
+    {"name": "grass_cobble", "lower": GRASS, "lower_base_from": ("grass_dirt", "lower"), "upper": COBBLE, **EDGE},
     {
         "name": "water_grass",
-        "lower": "dark murky green-blue pond water with gentle ripples",
-        "upper": "lush dark green grass with small tufts and tiny clover",
+        "lower": WATER,
+        "upper": GRASS,
         "upper_base_from": ("grass_dirt", "lower"),
-        "transition": "muddy grassy bank",
+        "transition": "dark muddy reedy bank",
         "transition_size": 0.25,
+        **EDGE,
     },
     {
         "name": "dirt_cobble",
-        "lower": "worn brown dirt road with small pebbles",
+        "lower": DIRT,
         "lower_base_from": ("grass_dirt", "upper"),
-        "upper": "old grey cobblestone town square pavement",
+        "upper": COBBLE,
         "upper_base_from": ("grass_cobble", "upper"),
-        "transition": "",
-        "transition_size": 0.0,
+        **EDGE,
     },
 ]
+# pack.py recolours tiles after generation: the model reaches for the timber
+# browns for mud, so they become the palette's grey-brown mud.
+MUD_REMAP = {"#4f3b2b": "#4d4533", "#644b36": "#625942", "#3d2d21": "#3a3427", "#7c5e43": "#625942"}
+# ...and the grass's brightest tufts go dry and olive: a moor, not a lawn.
+MOOR_REMAP = {"#586a47": "#47573c", "#6e7f55": "#625942", "#8a9466": "#6e7f55"}
+TILE_REMAP = {
+    "grass_dirt": {**MUD_REMAP, **MOOR_REMAP},
+    "grass_cobble": {**MUD_REMAP, **MOOR_REMAP},
+    "water_grass": MOOR_REMAP,
+    "dirt_cobble": MUD_REMAP,
+}
+
+# pack.py recolours these props after generation. The model draws lit windows
+# in pale parchment; on the tavern (dark timber, so parchment = windows only)
+# they become lamplight, which the game then lights.
+LIT_WINDOWS = {"#d8ccae": "#ffd98a", "#b9ab8a": "#ffad4d", "#ece3cb": "#ffd98a"}
+PROP_REMAP = {"tavern": LIT_WINDOWS}
 
 # --------------------------------------------------------------------- props
 # name -> (w, h, prompt)
+LIT = "glowing warm amber candlelit windows"
 PROPS = {
     # buildings / landmarks
-    "smithy": (240, 216, "village blacksmith workshop, stone forge with glowing coals under a timber lean-to roof, anvil out front, brick chimney"),
-    "trader": (216, 192, "merchant shop, timber frame house with a striped awning over the door and crates of goods out front"),
-    "herbalist": (192, 192, "herbalist cottage with a mossy thatched roof, bundles of drying herbs hanging by the door, tiny garden"),
-    "lore_tower": (192, 264, "tall narrow stone library tower with a pointed slate roof, a round window and a lantern by the door"),
-    "gambler_wagon": (128, 96, "colorful fortune teller wagon with a purple canopy, hanging dice and coins, wooden wheels"),
-    "tavern": (288, 240, "large two story timber tavern inn with a hanging wooden sign and warm lit windows"),
-    "house_a": (192, 192, "small stone cottage with a thatched roof and a wooden door"),
-    "house_b": (168, 168, "timber frame village house with a red clay tiled roof"),
-    "pit_entrance": (240, 216, "ancient sealed stone archway set into a low rocky mound, stone stairs descending into darkness, heavy rusted iron chains across the opening, broken pillars carved with glowing blue runes on either side"),
-    "gate": (240, 192, "wooden palisade town gate with two small watchtowers and a closed barred gateway"),
-    "waypoint": (96, 96, "circle of small standing stones with glowing cyan runes around a flat carved stone platform"),
-    "wishing_well": (64, 80, "old stone wishing well with a little wooden roof and a bucket on a rope"),
-    "strongbox": (48, 48, "large iron banded wooden treasure chest, closed"),
-    "notice_board": (64, 64, "wooden village notice board with pinned parchment notes"),
-    "statue": (64, 112, "weathered stone statue of a hooded warrior holding up a lantern, on a square pedestal"),
-    "market_stall": (144, 120, "market stall with a green and white striped canopy and baskets of fruit, wooden support posts at each corner"),
+    "smithy": (240, 216, "blacksmith forge workshop, rough dark fieldstone walls, heavy black timber beams, dark slate roof, glowing orange forge fire and hot coals in a stone hearth, iron anvil out front, tall stone chimney"),
+    "trader": (216, 192, f"old merchant trading post, dark stone ground floor and black timber upper floor, steep slate roof, faded dark crimson cloth awning over the door, crates and sacks of goods, {LIT}"),
+    "herbalist": (192, 192, "crooked witch herbalist cottage, rough stone walls, heavy dark mossy thatched roof, bundles of drying herbs and hanging bottles by the door, a small round window with warm candlelight"),
+    "lore_tower": (192, 264, "tall round gothic stone library tower, steep conical dark slate spire roof, tall pointed arch windows glowing with warm candlelight, iron lantern by the arched door, creeping ivy"),
+    "gambler_wagon": (128, 96, "covered traveller wagon with a dark plum canvas cover, hanging bone charms and dice, a small lit lantern, old wooden wheels"),
+    "tavern": (288, 240, f"large old two story tavern inn, dark grey stone ground floor and black timber framed upper floor, steep dark slate roof with chimneys, pointed gothic arched door, {LIT}, blank hanging iron sign without any text"),
+    "house_a": (192, 192, "small old stone cottage, rough grey fieldstone walls, steep dark mossy thatched roof, heavy wooden door, one small window with warm candlelight"),
+    "house_b": (168, 168, "narrow old timber framed house, black beams and grey plaster, steep dark slate roof, crooked stone chimney, one small window with warm candlelight"),
+    "chapel": (208, 240, "small ruined gothic stone chapel, tall pointed arch doorway, broken round rose window, steep dark slate roof with a small bell tower, crumbling buttresses, creeping ivy, candlelight inside the doorway"),
+    "pit_entrance": (240, 216, "ancient sealed stone archway set into a low rocky mound, worn stone stairs descending into darkness, heavy rusted iron chains across the opening, two broken pillars carved with faintly glowing pale blue runes"),
+    "gate": (240, 192, "fortified town gatehouse of dark weathered stone, two squat crenellated towers, heavy iron portcullis closed over an arched gateway, burning torches on the walls"),
+    "waypoint": (96, 96, "ring of ancient weathered standing stones carved with glowing pale blue runes around a flat cracked stone dais, seen from above"),
+    "wishing_well": (64, 80, "old moss covered stone well with a small dark slate roof, rope and wooden bucket"),
+    "strongbox": (48, 48, "heavy iron banded dark oak chest with a big iron lock, closed"),
+    "notice_board": (64, 64, "weathered dark wooden notice board under a small slate roof, pinned yellowed parchment notices"),
+    "statue": (64, 112, "weathered grey stone statue of a hooded knight holding up a lantern with a warm glowing flame, on a square mossy pedestal"),
+    "market_stall": (144, 120, "old market stall, dark weathered wooden frame, faded dark green and bone striped cloth canopy, baskets of turnips, apples and bread, wooden support posts at each corner"),
     # nature
-    "tree_oak": (144, 192, "large leafy oak tree"),
-    "tree_pine": (96, 168, "tall dark green pine tree"),
-    "tree_dead": (80, 112, "twisted dead leafless tree"),
-    "bush": (48, 40, "round leafy green bush"),
-    "rock_big": (48, 40, "mossy grey boulder"),
-    "rocks_small": (32, 32, "cluster of small grey stones"),
-    "flowers": (32, 32, "small patch of wildflowers in grass"),
-    "grass_tuft": (32, 32, "tuft of tall wild grass"),
-    "mushrooms": (32, 32, "cluster of small red capped mushrooms"),
+    "tree_oak": (144, 192, "huge ancient gnarled oak tree, thick twisted dark trunk, exposed roots, dense dark green-grey canopy"),
+    "tree_pine": (96, 168, "tall dark fir tree, dense drooping dark blue-green needles"),
+    "tree_dead": (80, 112, "twisted dead leafless black tree with clawlike branches"),
+    # second takes of the trees, so the forest edge isn't one sprite repeated
+    "tree_oak_b": (144, 192, "huge ancient gnarled oak tree, thick twisted dark trunk, exposed roots, dense dark green-grey canopy"),
+    "tree_pine_b": (96, 168, "tall dark fir tree, dense drooping dark blue-green needles"),
+    "tree_dead_b": (80, 112, "twisted dead leafless black tree with clawlike branches"),
+    "standing_stone": (32, 64, "tall weathered standing stone with moss and a faint carved spiral"),
+    "bush": (48, 40, "dark thorny bramble bush"),
+    "rock_big": (48, 40, "mossy dark grey boulder"),
+    "rocks_small": (32, 32, "cluster of small dark grey stones"),
+    "flowers": (32, 32, "small patch of pale white wild flowers among dark ferns"),
+    "grass_tuft": (32, 32, "tuft of tall dry pale moor grass"),
+    "mushrooms": (32, 32, "cluster of small pale grey toadstools"),
     # clutter
-    "barrel": (32, 32, "wooden barrel with iron bands"),
-    "crates": (48, 48, "stack of wooden crates"),
-    "hay": (48, 40, "round hay bale"),
-    "lamp_post": (32, 80, "iron street lantern on a wooden post, glowing warm light"),
-    "cart": (80, 64, "wooden hand cart loaded with sacks"),
-    "campfire": (48, 48, "campfire with burning logs and orange flames inside a ring of grey stones"),
-    "signpost": (32, 64, "wooden signpost with arrow signs"),
-    "fence": (64, 32, "short horizontal wooden picket fence segment"),
-    "banner": (32, 80, "tall wooden pole with a tattered crimson banner"),
-    "grave_a": (32, 48, "old cracked tombstone"),
-    "grave_b": (32, 48, "leaning wooden grave cross"),
-    "goose": (32, 32, "white farm goose with an orange beak, looking angry"),
+    "barrel": (32, 32, "old dark wooden barrel with rusted iron bands"),
+    "crates": (48, 48, "stack of old dark wooden crates"),
+    "hay": (48, 40, "old grey-brown hay bale"),
+    "lamp_post": (32, 80, "tall wrought iron gothic street lantern on a black iron post, glowing warm candle flame inside the glass"),
+    "brazier": (32, 48, "tall black iron brazier on three legs filled with burning coals and bright orange flames"),
+    "cart": (80, 64, "old two wheeled wooden hand cart loaded with grey sacks, seen from the side"),
+    "campfire": (48, 48, "campfire with burning logs and bright orange flames in a ring of dark stones"),
+    "signpost": (32, 64, "old weathered dark wooden signpost with crooked arrow boards"),
+    "fence": (64, 32, "short section of weathered dark wooden fence, horizontal"),
+    "stone_wall": (96, 40, "low crumbling dry stone wall segment with moss, horizontal"),
+    "banner": (32, 80, "tall dark wooden pole with a long tattered dark crimson banner bearing a pale silver thorn branch emblem"),
+    "grave_a": (32, 48, "old cracked weathered gothic tombstone with moss"),
+    "grave_b": (32, 48, "leaning weathered stone celtic cross grave marker"),
+    "crow": (32, 32, "black crow perched, seen from the side"),
+    "goose": (32, 32, "grey and white farm goose with an orange beak, looking angry"),
 }
 
 # --------------------------------------------------------------------- icons

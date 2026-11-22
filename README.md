@@ -108,6 +108,14 @@ face is only the logo.
 **Perspective.** Classic 16-bit "top-down three-quarter": ground seen from above, buildings and
 characters seen from the front.
 
+**Look.** Grim gothic high fantasy at dusk: an old frontier hamlet of dark stone and black
+timber, steep slate roofs, pointed arches, a ruined chapel over the graveyard, gnarled oaks and
+dark firs, mist and candlelight. All world art shares one 47-colour palette (`PALETTE` in
+`tools/art/spec.py`). In game, `scripts/world/atmosphere.gd` tints the world to a cold dusk and
+lights it: lit windows, lanterns, braziers, the forge and glowing runes get real flickering
+lights (found automatically from their colours), plus drifting mist, embers and a vignette. The
+UI and loot labels are never tinted.
+
 ## Editing Thornwick
 
 `scenes/world/thornwick.tscn` is a normal Godot scene, edited in the 2D editor:
@@ -124,8 +132,11 @@ characters seen from the front.
 - **Blockers**: invisible walls (magenta). **Spawn**: where the hero appears.
 - `critter_area` on the root: where the goose wanders.
 
-`tools/godot/build_thornwick.gd` generated the first version of this scene from the web build's
-data. Re-running it overwrites your edits, so don't, unless you mean to start over.
+`tools/godot/build_thornwick.gd` builds this scene (terrain lanes, buildings, the graveyard and
+chapel, clutter, the forest edge). Re-running it overwrites edits made in the editor, so either
+make layout changes in the builder and re-run it, or edit the scene and stop re-running it.
+Lights come from the art itself: a prop whose art has lamplight, fire or rune colours glows on
+its own (tune per art in `LIGHT_TUNING`, `scripts/world/atmosphere.gd`).
 
 ## Where things live
 
@@ -147,14 +158,15 @@ scripts/systems/        rules over the data (no rendering)
   skill_rules.gd quest_rules.gd progression.gd hero_data.gd grid.gd save_io.gd rng.gd
 scripts/world/          zone.gd + editor node types (prop, npc_spot, placed_item, blocker),
                         zone_runtime.gd (player, NPCs, goose, input, camera), zone_nav.gd (A*),
-                        ground_items.gd (loot labels/beams), fx.gd, interact.gd (what clicking does)
+                        ground_items.gd (loot labels/beams), fx.gd, interact.gd (what clicking does),
+                        atmosphere.gd (dusk tint, prop lights, mist, embers, vignette)
 scripts/ui/             UI built in code: ui_kit.gd (palette, fonts, frames), ui_panel.gd (base
                         window), hud.gd, playing_ui.gd (panel slots + hotkeys), main_menu.gd,
                         grid_view.gd, item_icon.gd, ui_tip.gd + item_tooltip.gd, panels/
-assets/                 art (packed sprites + art_meta.json), fonts, tiles/terrain.tres, icon
+assets/                 art (packed sprites + glow masks + art_meta.json), fonts, tiles/terrain.tres, icon
 tests/test_systems.tscn 207 rules tests (loot/item parity with the original web build)
 tools/art/              PixelLab pipeline (prompts → generation → packing into assets/art/)
-tools/godot/            tileset/scene builders and test drivers (play_test, shots)
+tools/godot/            tileset/scene builders and test drivers (play_test, shots, tour)
 ```
 
 ## Tests

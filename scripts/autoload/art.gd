@@ -43,7 +43,7 @@ func _tex(path: String) -> Texture2D:
 ## All art files, for the loading screen.
 static func art_files() -> PackedStringArray:
 	var out: PackedStringArray = []
-	for dir in ["chars", "tiles", "props", "icons"]:
+	for dir in ["chars", "tiles", "props", "glow", "icons"]:
 		var path := "res://assets/art/%s" % dir
 		for f in ResourceLoader.list_directory(path):
 			if f.ends_with(".png"):
@@ -127,6 +127,13 @@ func prop_texture(name: String) -> Texture2D:
 
 func prop_meta(name: String) -> Dictionary:
 	return meta.props.get(name, {})
+
+
+## The light-emitting pixels of a prop (null if it has none), see atmosphere.gd.
+func glow_texture(name: String) -> Texture2D:
+	if not prop_meta(name).has("glow"):
+		return null
+	return _tex("res://assets/art/glow/%s.png" % name)
 
 
 func icon_texture(name: String) -> Texture2D:

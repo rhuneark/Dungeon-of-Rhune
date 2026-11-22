@@ -1,8 +1,9 @@
 @tool
 class_name Blocker
 extends Node2D
-## An invisible wall of `size` map cells. Its position is the rect's top
-## corner (vertex), snapped to the grid; the magenta diamond shows it.
+## An invisible wall, in tiles. Position = top-left cell (snapped to the grid).
+
+const TILE := 32
 
 @export var size := Vector2i(1, 1):
 	set(v):
@@ -11,15 +12,11 @@ extends Node2D
 
 
 func cells() -> Rect2i:
-	var m := Iso.to_map(global_position)
-	return Rect2i(Vector2i(roundi(m.x), roundi(m.y)), size)
+	return Rect2i(Vector2i(roundi(global_position.x / TILE), roundi(global_position.y / TILE)), size)
 
 
 func _draw() -> void:
 	if Engine.is_editor_hint():
-		var pts := Iso.rect_corners(cells())
-		for i in pts.size():
-			pts[i] -= global_position
-		draw_colored_polygon(pts, Color(0.9, 0.2, 0.9, 0.15))
-		pts.append(pts[0])
-		draw_polyline(pts, Color(0.9, 0.2, 0.9, 0.8), 1.0)
+		var r := Rect2(Vector2.ZERO, Vector2(size * TILE))
+		draw_rect(r, Color(0.9, 0.2, 0.9, 0.15))
+		draw_rect(r, Color(0.9, 0.2, 0.9, 0.8), false, 1.0)

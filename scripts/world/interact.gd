@@ -58,13 +58,22 @@ static func npc_service(npc_id: String, service: String) -> void:
 ## The descent picker: floor 1 and every 5th floor you've reached.
 static func descend_dialog(title := "The Sealed Stair", sub := "") -> void:
 	var buttons: Array = []
-	for f in Game.checkpoints():
+	var resume := Game.resume_floor()
+	if resume > 1:
+		buttons.append({"text": "Continue: Floor %d" % resume, "action": func(): Game.enter_dungeon(resume)})
+	# Floor 1 and the four deepest checkpoints (deep runs would list twenty).
+	var cps: Array = Game.checkpoints()
+	var shown: Array = [1]
+	for i in range(maxi(1, cps.size() - 4), cps.size()):
+		shown.append(cps[i])
+	for f in shown:
 		var fl: int = f
-		buttons.append({"text": "Floor %d" % fl, "action": func(): Game.enter_dungeon(fl)})
+		if fl != resume:
+			buttons.append({"text": "Floor %d" % fl, "action": func(): Game.enter_dungeon(fl)})
 	var best := int(Game.hero().get("bestFloor", 0))
 	var line := "A hundred floors down, an hourglass has stopped. Each room seals until it's empty. Where do you start?"
 	if best > 0:
-		line += " (Deepest so far: floor %d.)" % best
+		line += " (Deepest so far: floor %d. Fall, and you start again from a checkpoint.)" % best
 	_say(title, line, sub, buttons)
 
 

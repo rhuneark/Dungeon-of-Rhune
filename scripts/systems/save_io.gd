@@ -70,6 +70,7 @@ static func sanitize(raw: Dictionary) -> Dictionary:
 		if not h.get("flags") is Dictionary:
 			h.flags = {}
 		h.bestFloor = int(h.get("bestFloor", 0))
+		h.resumeFloor = int(h.get("resumeFloor", 0))
 		h.crucible = _clean_items(h.get("crucible", []))
 	else:
 		save.hero = null

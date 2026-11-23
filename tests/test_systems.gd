@@ -80,6 +80,7 @@ func _ready() -> void:
 	test_rings_and_charms()
 	test_flask_and_floors()
 	test_arena()
+	test_continue_and_flow()
 	test_economy()
 	test_save()
 	test_loot()
@@ -245,7 +246,7 @@ func test_new_hero_and_sheet() -> void:
 	eq("hero: starter belt has 2 charm slots", [h.equipped.waist.baseId, h.equipped.waist.charmSlots], ["sash", 2])
 	eq("hero: empty bag", h.inventory, [])
 	eq("hero: no skills", ["pathPoints", "disciplines", "skills", "hotbar", "mana", "quests"].filter(func(k): return h.has(k)), [])
-	eq("hero: xp curve", [HeroData.xp_to_next(1), HeroData.xp_to_next(10)], [300, 6928])
+	eq("hero: xp curve", [HeroData.xp_to_next(1), HeroData.xp_to_next(10)], [240, 3732])
 	var s := CharacterSheet.compute_sheet(h)
 	eq("sheet: life", s.life, 74)
 	check("sheet: no mana", not s.has("mana"))
@@ -386,7 +387,7 @@ func test_flask_and_floors() -> void:
 	eq("monsters: floor 1 pool", Monsters.pool(1), ["skeleton", "ghoul"])
 	check("monsters: deeper floors add kinds", Monsters.pool(20).size() == 6 and not "warden" in Monsters.pool(99))
 	eq("monsters: boss floors", [Monsters.is_boss_floor(10), Monsters.is_boss_floor(11), Monsters.is_boss_floor(100)], [true, false, true])
-	eq("monsters: waves", [Monsters.waves(1), Monsters.waves(10).size(), Monsters.waves(60).size()], [[4, 6, 8], 4, 5])
+	eq("monsters: waves", [Monsters.waves(1), Monsters.waves(19).size(), Monsters.waves(20).size(), Monsters.waves(60).size()], [[4, 6, 8], 3, 4, 5])
 	check("monsters: scale up", Monsters.life_mult(100) > 50 and Monsters.damage_mult(100) > 20 and Monsters.life_mult(1) == 1.0)
 
 
@@ -412,6 +413,37 @@ func test_arena() -> void:
 		eq("arena: floor %d (%s) is connected" % [f, ArenaBuilder.SHAPES[(f - 1) % 3]], bad, [])
 		check("arena: floor %d has 4 spawn circles and a door" % f, z.get_meta("spawns").size() == 4 and z.get_meta("door") is Prop)
 		z.free()
+
+
+func test_continue_and_flow() -> void:
+	var h := _fresh_hero()
+	eq("continue: a new hero has nowhere to continue", Game.resume_floor(), 0)
+	Game.enter_dungeon(7)
+	eq("continue: leaving mid-floor restarts that floor", Game.resume_floor(), 7)
+	h.resumeFloor = 0
+	Game.set_ui({"location": "town", "floor": 0})
+	# Monsters follow the flow field from any spawn circle to the hero, around pillars.
+	var z := ArenaBuilder.build(3)
+	var nav := ZoneNav.new(Vector2i(ArenaBuilder.W, ArenaBuilder.H))
+	for b in ZoneRuntime._all(z, "Blocker"):
+		nav.block(b.cells())
+	for p in ZoneRuntime._all(z, "Prop"):
+		if p.block != Vector2i.ZERO:
+			nav.block(p.footprint())
+	var goal: Vector2 = z.get_meta("entry")
+	nav.flow_to(goal)
+	var lost: Array = []
+	for sp in z.get_meta("spawns"):
+		var at: Vector2 = sp
+		for i in 200:
+			var wp := nav.flow_step(at)
+			if wp == Vector2.INF:
+				break
+			at = wp
+		if at.distance_to(goal) > 32:
+			lost.append(sp)
+	eq("flow: every spawn circle leads to the hero", lost, [])
+	z.free()
 
 
 func test_economy() -> void:

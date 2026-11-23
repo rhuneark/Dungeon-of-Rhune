@@ -8,7 +8,9 @@ class_name HeroData
 ## HeroSave: {name, createdAt, level, xp, gold, attrs: {might, finesse, vigor, spirit},
 ##            attrPoints, equipped: {slot: item}, inventory: Array[item],
 ##            cursor: item|null, flags: {key: n}, life, crucible: Array[item],
-##            bestFloor (highest floor entered; 0 = never been down)}
+##            bestFloor (highest floor entered; 0 = never been down),
+##            resumeFloor (where "Continue" goes: the floor after the last one
+##            cleared; 0 after a death, which sends you back to a checkpoint)}
 ## Item: {uid, baseId, quality, ilvl, seed, identified, affixes: [{affixId, tier, values}],
 ##        baseRoll, sockets, socketed: Array[item], (uniqueId, uniqueValues,
 ##        rareName: [first, second], rhunewordId, charmSlots, charms: Array[item], x, y)}
@@ -49,7 +51,7 @@ static func default_save() -> Dictionary:
 
 ## XP to go from `level` to `level + 1`.
 static func xp_to_next(level: int) -> int:
-	return floori(120.0 * pow(level, 1.75) + 180.0)
+	return floori(90.0 * pow(level, 1.6) + 150.0)
 
 
 static func new_hero(name: String) -> Dictionary:
@@ -70,6 +72,7 @@ static func new_hero(name: String) -> Dictionary:
 		"life": 1,
 		"crucible": [],
 		"bestFloor": 0,
+		"resumeFloor": 0,
 	}
 	# Starter kit: plain, honest gear.
 	hero.equipped.weapon = ItemGen.create_item("short_sword", {"ilvl": 1, "quality": "normal", "rng": rng})

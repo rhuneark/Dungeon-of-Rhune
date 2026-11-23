@@ -23,8 +23,9 @@ Ships on **Steam** (Godot desktop exports + optional GodotSteam GDExtension) and
   `platform.gd` (Steam via `Engine.get_singleton("Steam")`, fullscreen, quit, achievements,
   `dev_tools`), `art.gd` (art_meta.json, character frames, tile coords, cached textures),
   `game.gd` (the session: `save`, `commit()`, `flush()`, `sheet()`, `ui` + `set_ui()`, toasts,
-  the flask (`drink_flask`, `flask_fraction`), travel (`enter_dungeon`, `next_floor`,
-  `return_to_town`, `checkpoints`), world bridge signals `drops_requested` / `float_text_requested`).
+  the flask (`drink_flask`, `flask_fraction`, on the game `clock`), travel (`enter_dungeon`,
+  `next_floor`, `return_to_town`, `resume_floor` = Continue (floor after the last clear; 0 after a
+  death), `checkpoints`), world bridge signals `drops_requested` / `float_text_requested`).
 - **scripts/content/**: pure data (static funcs + static var caches). **scripts/systems/**:
   rules (static funcs). Port of the old TS with the SAME dictionary keys (camelCase:
   `baseId`, `uniqueValues`...) so saves are unchanged. `Rng` is mulberry32, bit-identical to the
@@ -37,8 +38,12 @@ Ships on **Steam** (Godot desktop exports + optional GodotSteam GDExtension) and
   `Zone` (root: zone_name, level, ambient, fog_density, hero_light).
 - **scripts/world/arena_builder.gd** builds a dungeon floor as a Zone at runtime (room shape,
   "dungeon" cliff tiles: floor 0 / rock 1 / wall face 2, torches, pillars, spawn circles, door);
-  **arena.gd** runs it (waves, Mob AI, projectiles, every hit both ways, XP/drops, death, the
-  chest, the exit). Monster numbers and floor scaling: scripts/content/monsters.gd.
+  **arena.gd** runs it (waves, Mob AI (straight at the hero when clear, else the nav flow field
+  `ZoneNav.flow_to/flow_step`), projectiles (collide on the same feet line the shooters' thin
+  line-of-sight checks), every hit both ways, XP/drops, death, the chest, the exit). Monster
+  numbers and floor scaling: scripts/content/monsters.gd (tuned with campaign_test.gd).
+  `ground_items.gd`: loot is never drawn as the item: name label + unshaded floor ring + beam
+  sized by tier (`TIERS`), spark flight, landing burst, light for rare+.
 - **scripts/world/zone_runtime.gd**: brings a Zone to life (nav from terrain + footprints +
   blockers, player, NPCs, ground loot, hover/click, camera, the hero's attacks: walk into range,
   swing timed by attack speed, `Arena.player_attack` at 55% of the swing). `interact.gd`: what
@@ -114,7 +119,7 @@ Ships on **Steam** (Godot desktop exports + optional GodotSteam GDExtension) and
 
 - `godot --headless --path . --import` clean (no SCRIPT ERROR); `godot --headless --path . -s
   tools/godot/smoke.gd` loads every script (`SMOKE bad=0`).
-- `godot --headless --path . res://tests/test_systems.tscn` → `RESULT 218/218`.
+- `godot --headless --path . res://tests/test_systems.tscn` → `RESULT 221/221`.
 - `xvfb-run -a -s "-screen 0 1600x900x24" godot --path . --audio-driver Dummy --resolution
   1600x900 -s tools/godot/run.gd -- res://tools/godot/play_test.gd` → `PLAYTEST OK` (includes
   "every NPC and usable object is reachable").
@@ -122,5 +127,9 @@ Ships on **Steam** (Godot desktop exports + optional GodotSteam GDExtension) and
   `res://tools/godot/tour.gd <out_dir>` walks the town and shoots each landmark at play zoom.
 - Dungeon: same with `res://tools/godot/dungeon_test.gd [out_dir] [floor]` → a bot clears two
   floors, opens the chests and takes the stair → `DUNGEON OK`.
+- Balance: `godot --headless --path . --fixed-fps 60 --audio-driver Dummy -s tools/godot/run.gd --
+  res://tools/godot/campaign_test.gd 15` → a gear-managing bot plays floors 1-15 (one line per
+  floor) → `CAMPAIGN OK` (expect level ~15, 0-2 deaths, 20-35 game minutes; it's random, so run
+  a few after touching monsters.gd, XP or loot).
 - `godot --headless --path . --export-pack "Linux" builds/pck/rhune.pck` then
   `godot --main-pack builds/pck/rhune.pck` boots to the menu (checks export filters).

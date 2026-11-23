@@ -293,7 +293,7 @@ func _on_pointer_down(shift := false) -> void:
 
 
 func _set_hover(h) -> void:
-	if h == _hovered:
+	if is_same(h, _hovered):
 		return
 	if _hovered != null and not _is_entry(_hovered) and is_instance_valid(_hovered if _is_mob(_hovered) else _hovered.node):
 		if _is_mob(_hovered):
@@ -435,7 +435,7 @@ func _combat(delta: float, speed: float, sheet: Dictionary) -> Vector2:
 			return Vector2.ZERO
 		aim = m.position
 		reach += m.radius()
-		var los: bool = sheet.attack.kind == "melee" or nav.line_of_sight(player.pos, aim)
+		var los: bool = sheet.attack.kind == "melee" or nav.line_of_sight(player.pos, aim, 2.0)
 		if player.pos.distance_to(aim) > reach or not los:
 			if player.swing >= 0.0:
 				return Vector2.ZERO

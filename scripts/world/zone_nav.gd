@@ -7,6 +7,12 @@ const TILE := 32
 
 var astar := AStarGrid2D.new()
 var size := Vector2i.ZERO
+## Flow field: steps from every cell to the goal cell (-1 = can't get there).
+var _flow := PackedInt32Array()
+var _flow_goal := Vector2i(-9999, -9999)
+
+const _DIRS := [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1),
+	Vector2i(1, 1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(-1, -1)]
 
 
 func _init(map_size: Vector2i) -> void:
@@ -47,10 +53,11 @@ func walkable(p: Vector2, r := 7.0) -> bool:
 	return true
 
 
-func line_of_sight(a: Vector2, b: Vector2) -> bool:
+## Can a body of half-width r travel straight from a to b? (Shots use a thin r.)
+func line_of_sight(a: Vector2, b: Vector2, r := 7.0) -> bool:
 	var steps := ceili(a.distance_to(b) / 6.0)
 	for i in range(1, steps + 1):
-		if not walkable(a.lerp(b, float(i) / steps)):
+		if not walkable(a.lerp(b, float(i) / steps), r):
 			return false
 	return true
 
@@ -109,3 +116,63 @@ func find_path(a: Vector2, b: Vector2) -> Array[Vector2]:
 		from = pts[j]
 		i = j + 1
 	return out
+
+
+## Can you step from cell c by d (diagonals only past two open sides)?
+func _can_step(c: Vector2i, d: Vector2i) -> bool:
+	if is_blocked(c + d):
+		return false
+	if d.x != 0 and d.y != 0:
+		return not is_blocked(c + Vector2i(d.x, 0)) and not is_blocked(c + Vector2i(0, d.y))
+	return true
+
+
+## Point the flow field at a world position (monsters close in on it from
+## anywhere in the room, around pillars). Cheap: rebuilt only when the goal
+## changes cell.
+func flow_to(goal_pos: Vector2) -> void:
+	var g := nearest_open(cell_of(goal_pos), 2)
+	if g == _flow_goal:
+		return
+	_flow_goal = g
+	_flow.resize(size.x * size.y)
+	_flow.fill(-1)
+	if g.x < 0:
+		return
+	_flow[g.y * size.x + g.x] = 0
+	var queue: Array[Vector2i] = [g]
+	var head := 0
+	while head < queue.size():
+		var c := queue[head]
+		head += 1
+		var dist := _flow[c.y * size.x + c.x]
+		for d in _DIRS:
+			var n: Vector2i = c + d
+			if not inside(n) or _flow[n.y * size.x + n.x] >= 0 or not _can_step(c, d):
+				continue
+			_flow[n.y * size.x + n.x] = dist + 1
+			queue.append(n)
+
+
+## The next cell centre downhill from p towards the flow goal, or Vector2.INF.
+func flow_step(p: Vector2) -> Vector2:
+	if _flow.is_empty():
+		return Vector2.INF
+	var c := cell_of(p)
+	var here := _flow[c.y * size.x + c.x] if inside(c) else -1
+	var best := Vector2i(-1, -1)
+	var best_d := here if here >= 0 else 1 << 30
+	for d in _DIRS:
+		var n: Vector2i = c + d
+		if not inside(n):
+			continue
+		var nd := _flow[n.y * size.x + n.x]
+		if nd < 0 or nd >= best_d:
+			continue
+		if here >= 0 and not _can_step(c, d):
+			continue
+		best_d = nd
+		best = n
+	if best.x < 0:
+		return Vector2.INF
+	return Vector2(best * TILE) + Vector2(TILE / 2.0, TILE / 2.0)

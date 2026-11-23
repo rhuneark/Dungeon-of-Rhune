@@ -35,7 +35,10 @@ func _ready() -> void:
 		[410, func(): _shot("10_smith")],
 		[415, func(): _ui({"left": "gamble"})],
 		[435, func(): _shot("11_gamble")],
-		[440, func(): _ui({"left": "", "right": ""}); _interact().descend_dialog("Captain Maren", "Warden of the Stair")],
+		[440, func():
+			game.hero().bestFloor = 12
+			game.hero().resumeFloor = 8
+			_ui({"left": "", "right": ""}); _interact().descend_dialog("Captain Maren", "Warden of the Stair")],
 		[460, func(): _shot("12_descend")],
 		[465, func(): _ui({"left": "", "right": "inventory"})],
 		[480, func(): _hover(Vector2(1030, 525))],
@@ -48,7 +51,10 @@ func _ready() -> void:
 		[700, func(): _shot("16_warden_floor")],
 		[705, func(): game.enter_dungeon(7)],
 		[880, func(): _shot("17_floor_7")],
-		[885, func(): get_tree().quit()],
+		[885, func(): game.hero().life = 99999; game.spawn_drops(_tier_drops(), "player")],
+		[898, func(): _shot("18_loot_flight")],
+		[945, func(): _shot("19_loot_landed")],
+		[950, func(): get_tree().quit()],
 	]
 
 
@@ -87,6 +93,18 @@ func _drops() -> Array:
 	for i in 6:
 		d.append_array(Loot.roll_treasure("elite", {"ilvl": 20, "fortune": {"rarity": 400, "quantity": 100, "gold": 0, "seek": {"rhune": 200}}}))
 	d.append({"kind": "item", "item": ItemGen.create_item("short_sword", {"ilvl": 20, "quality": "unique"})})
+	return d
+
+
+## One drop of every glow tier, junk to unique.
+func _tier_drops() -> Array:
+	var d: Array = [{"kind": "gold", "amount": 212}]
+	for q in ["crude", "normal", "magic", "rare", "unique"]:
+		d.append({"kind": "item", "item": ItemGen.create_item("short_sword" if q != "magic" else "ring", {"ilvl": 12, "quality": q})})
+	var sock := ItemGen.create_item("breastplate", {"ilvl": 12, "quality": "normal"})
+	sock.sockets = 2
+	d.append({"kind": "item", "item": sock})
+	d.append({"kind": "item", "item": ItemGen.create_item("rhune_ember", {"ilvl": 12})})
 	return d
 
 

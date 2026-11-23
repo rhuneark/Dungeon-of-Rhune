@@ -93,6 +93,7 @@ func _process(delta: float) -> void:
 	if not dead_hero:
 		_run_waves(delta)
 	var ppos: Vector2 = rt.player.pos
+	rt.nav.flow_to(ppos)
 	for i in range(mobs.size() - 1, -1, -1):
 		var m: Mob = mobs[i]
 		if not is_instance_valid(m):
@@ -337,6 +338,7 @@ func _hero_died() -> void:
 	var hero := Game.hero()
 	hero.life = 0
 	Game.save.stats.deaths = int(Game.save.stats.get("deaths", 0)) + 1
+	hero.resumeFloor = 0
 	var cps := Game.checkpoints()
 	var line := "The Stair takes you. Somewhere above, the night starts over, and Thornwick drags you home."
 	line += " You keep everything you carry. Next descent: floor %d or any checkpoint." % int(cps.back())
@@ -352,6 +354,9 @@ func _cleared() -> void:
 	state = "cleared"
 	_title()
 	Game.toast("Floor %d cleared!" % floor, "#6fbf5a")
+	# Town trips from here on keep your place: "Continue" takes you one deeper.
+	Game.hero().resumeFloor = mini(100, floor + 1)
+	Game.commit()
 	var center: Vector2 = zone.get_meta("center")
 	chest = Prop.new()
 	chest.art = "dungeon_chest"
@@ -433,7 +438,10 @@ func _move_shots(delta: float) -> void:
 		var s: Dictionary = shots[i]
 		s.pos += s.vel * delta
 		s.life -= delta
-		var done: bool = s.life <= 0 or not rt.nav.walkable(s.pos + Vector2(0, 16), 1.0)
+		# Shots fly 20px up; they stop where the ground under them is wall. That
+		# ground line is the same feet-to-feet line the shooters' line-of-sight
+		# checks, so a shot that was clear to take is never eaten by a pillar.
+		var done: bool = s.life <= 0 or rt.nav.is_blocked(ZoneNav.cell_of(s.pos + Vector2(0, 20)))
 		if not done and s.owner == "player":
 			for m in mobs:
 				if m.dead or m.state == "spawn":
@@ -633,11 +641,12 @@ class Mob extends Node2D:
 				return
 			want = to / dist
 		else:
-			var sees := nav.line_of_sight(position, ppos)
+			var sees := nav.line_of_sight(position, ppos, 2.0)
 			if dist > float(def.range) * 0.95 or not sees:
 				want = to / maxf(dist, 0.01)
-			elif dist < float(def.get("keep", 120.0)) * 0.6:
-				want = -to / maxf(dist, 0.01)
+			elif dist < float(def.get("keep", 120.0)) * 0.4:
+				# Step back only when crowded, and slowly: a melee hero can catch them.
+				want = -to / maxf(dist, 0.01) * 0.6
 			elif cd <= 0:
 				state = "windup"
 				st = 0.0
@@ -646,6 +655,12 @@ class Mob extends Node2D:
 				return
 		if want == Vector2.ZERO:
 			return
+		# Closing in: straight at the hero when the way is clear, otherwise
+		# follow the room's flow field around pillars and corners.
+		if want.dot(to) > 0 and not nav.line_of_sight(position, ppos):
+			var wp := nav.flow_step(position)
+			if wp != Vector2.INF:
+				want = (wp - position).normalized()
 		var step := want * speed * delta
 		for a in [0.0, 0.6, -0.6, 1.2, -1.2]:
 			var s := step.rotated(a)
@@ -654,6 +669,11 @@ class Mob extends Node2D:
 				moving = true
 				_face(s)
 				return
+		# Wedged: slide towards the next flow cell even if it means hugging a wall.
+		var wp2 := nav.flow_step(position)
+		if wp2 != Vector2.INF:
+			position += (wp2 - position).normalized() * speed * delta
+			moving = true
 
 	func _strike(ppos: Vector2) -> void:
 		if def.kind == "melee":

@@ -61,13 +61,19 @@ All keys are input actions (Project Settings → Input Map), so rebinding is a s
 ## The game
 
 **The Sealed Stair (the dungeon).** Talk to Captain Maren (or click the Stair) and pick a
-start: floor 1, or any 5th floor you've reached. Every floor is one sealed room about the size
+start: **Continue** (the floor after the last one you cleared: town trips to sell, identify and
+gear up never cost you progress), floor 1, or any 5th floor you've reached. Every floor is one sealed room about the size
 of an Infernal Hordes arena (hall, round or cross shaped). Waves pour out of four summoning
 circles; deeper down come archers, brutes, ember cultists, wraiths and champions (tougher, blue,
 better loot). Every 10th floor an **Hourglass Warden** holds the room. When the last monster
 falls, a chest rises in the middle (the real haul), the sealed door opens onto the next floor,
-and a portal home appears. Die and the town drags you home: you keep everything you carry.
-About a minute a floor early on.
+and a portal home appears. Die and the town drags you home: you keep everything you carry, but
+your next descent starts from a checkpoint. About a minute a floor early on, two or three by
+floor 15.
+
+**The climb.** Tuned with a bot that plays like a careful player (wears what drops, shops,
+spends points): it reaches floor 15 at about level 15 in 20-35 minutes, with 0-2 deaths. Monster
+life grows about x5 by floor 15, damage about x3; new kinds join at floors 4, 7, 11 and 16.
 
 **Combat is your weapon.** Swords, axes and maces swing in an arc and hit everything in it; bows
 shoot arrows; wands and staves cast bolts with a little splash. The weapon also decides which
@@ -87,8 +93,10 @@ gated by affix level, quality ladder (crude → normal → superior → magic �
 items drop **unidentified** (Old Varn reads them for free), rares get two-word names, uniques
 roll **variable stats** (perfect rolls are tracked). Treasure classes with picks and "no drop"
 weights. Grid ("tetris") inventory, paperdoll with **four ring slots** (two each side), shared
-stash, D2 cursor pickup/place/swap. Ground loot pops out in arcs with coloured labels; uniques
-get a light beam.
+stash, D2 cursor pickup/place/swap. Loot on the ground is never drawn as the item: a drop arcs
+out as a spark, lands with a flash, and becomes its name over a glowing ring with a beam of
+light whose height and colour say how good it is (a white glint for plain items, a blue beam for
+magic, tall gold/orange beams with drifting motes and floor light for rares, rhunes and uniques).
 
 **Belts and charms.** Every belt rolls 1-8 charm slots (Sash 1-3, Belt 2-5, Heavy Belt 4-6, War
 Girdle 6-8). Charms only work slotted into your equipped belt, and take slots by size: Small 1,
@@ -183,7 +191,7 @@ scripts/ui/             UI built in code: ui_kit.gd (palette, fonts, frames), ui
 assets/                 art (packed sprites + glow masks + art_meta.json), fonts, tiles/terrain.tres, icon
 tests/test_systems.tscn rules tests (items, loot, rings, charms, flask, floors, rooms, saves)
 tools/art/              PixelLab pipeline (prompts → generation → packing into assets/art/)
-tools/godot/            builders and test drivers (play_test, dungeon_test, shots, tour)
+tools/godot/            builders and test drivers (play_test, dungeon_test, campaign_test, shots, tour)
 ```
 
 ## Tests
@@ -195,6 +203,8 @@ godot --headless --path . res://tests/test_systems.tscn # rules: prints PASS/FAI
 xvfb-run -a godot --path . --resolution 1600x900 -s tools/godot/run.gd -- res://tools/godot/play_test.gd
 # a bot clears floors 1-2 (or from any floor: add `<out_dir> <floor>`), opens the chests, takes the stair:
 xvfb-run -a godot --path . --resolution 1600x900 -s tools/godot/run.gd -- res://tools/godot/dungeon_test.gd
+# balance: a bot plays floors 1-15 with real gear management (prints a line per floor), faster than real time:
+godot --headless --path . --fixed-fps 60 --audio-driver Dummy -s tools/godot/run.gd -- res://tools/godot/campaign_test.gd 15
 ```
 
 ## Next up (proposed)

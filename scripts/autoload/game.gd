@@ -37,14 +37,19 @@ var ui := {
 	"dead": false,
 }
 
-## The flask refills in real time (ms, Time.get_ticks_msec).
-var _flask_from := 0
-var _flask_ready := 0
+## The flask refills on the game clock (seconds of play, not wall time).
+var clock := 0.0
+var _flask_from := 0.0
+var _flask_ready := 0.0
 
 var _sheet: Dictionary = {}
 var _sheet_rev := -1
 var _unlocked := {}
 var _save_timer: Timer
+
+
+func _process(delta: float) -> void:
+	clock += delta
 
 
 func _ready() -> void:
@@ -114,10 +119,9 @@ func close_all() -> bool:
 # ------------------------------------------------------------ the flask
 ## 0..1, how full the rejuvenation flask is (1 = ready).
 func flask_fraction() -> float:
-	var now := Time.get_ticks_msec()
-	if now >= _flask_ready:
+	if clock >= _flask_ready:
 		return 1.0
-	return clampf(float(now - _flask_from) / maxf(1.0, float(_flask_ready - _flask_from)), 0.0, 1.0)
+	return clampf((clock - _flask_from) / maxf(0.001, _flask_ready - _flask_from), 0.0, 1.0)
 
 
 func drink_flask() -> void:
@@ -133,22 +137,23 @@ func drink_flask() -> void:
 		return
 	var heal: int = sh.flask.heal
 	h.life = minf(float(sh.life), float(h.life) + heal)
-	var now := Time.get_ticks_msec()
-	_flask_from = now
-	_flask_ready = now + int(float(sh.flask.cooldown) * 1000.0)
+	_flask_from = clock
+	_flask_ready = clock + float(sh.flask.cooldown)
 	float_text("+%d" % heal, "#c68cff")
 
 
 func reset_flask() -> void:
-	_flask_from = 0
-	_flask_ready = 0
+	_flask_from = 0.0
+	_flask_ready = 0.0
 
 
 # ------------------------------------------------------------ where you are
-## Go down the Sealed Stair to `floor` (1, or a checkpoint).
+## Go down the Sealed Stair to `floor` (continue, 1, or a checkpoint).
+## Leaving mid-floor and coming back restarts that floor.
 func enter_dungeon(floor: int) -> void:
 	var h := hero()
 	h.bestFloor = maxi(int(h.get("bestFloor", 0)), floor)
+	h.resumeFloor = floor
 	commit()
 	set_ui({"location": "dungeon", "floor": floor, "dead": false, "dialog": {}, "left": "", "service_npc": ""})
 
@@ -167,6 +172,11 @@ func return_to_town() -> void:
 	commit()
 	flush()
 	set_ui({"location": "town", "floor": 0, "dead": false, "dialog": {}, "left": "", "service_npc": ""})
+
+
+## Where "Continue" takes you (0 = nowhere: start from a checkpoint).
+func resume_floor() -> int:
+	return int(hero().get("resumeFloor", 0)) if has_hero() else 0
 
 
 ## Floors you may start a descent from: 1 and every 5th floor you've reached.

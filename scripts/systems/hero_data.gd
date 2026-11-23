@@ -2,26 +2,24 @@ class_name HeroData
 ## The persisted save: one hero (multi-slot later), a shared stash, and
 ## account-wide records (the Codex). Plain JSON; item instances inside.
 ##
-## SaveData: {version: 1, hero: HeroSave | null, stash: Array[item],
+## SaveData: {version: 2, hero: HeroSave | null, stash: Array[item],
 ##            codex: {"u:<id>"|"w:<id>"|"r:<id>": {at, best}},
-##            stats: {gambles, wishes, identified, uniquesFound, rhunesFound}}
+##            stats: {gambles, identified, uniquesFound, rhunesFound, kills, deaths, chests}}
 ## HeroSave: {name, createdAt, level, xp, gold, attrs: {might, finesse, vigor, spirit},
-##            attrPoints, pathPoints, disciplines: [id|null, id|null], ranks: {id: n},
-##            skills: {id: {xp, level, specialized, nodes: {nodeId: rank}}},
-##            hotbar: [id|null x5], equipped: {slot: item}, inventory: Array[item],
-##            cursor: item|null, quests: {id: {state: "active"|"done", progress: {objId: n}}},
-##            lore: Array[String], flags: {key: n}, life, mana, taken: Array[String],
-##            crucible: Array[item]}
+##            attrPoints, equipped: {slot: item}, inventory: Array[item],
+##            cursor: item|null, flags: {key: n}, life, crucible: Array[item],
+##            bestFloor (highest floor entered; 0 = never been down)}
 ## Item: {uid, baseId, quality, ilvl, seed, identified, affixes: [{affixId, tier, values}],
-##        baseRoll, sockets, socketed: Array[item], (qty, uniqueId, uniqueValues,
-##        rareName: [first, second], rhunewordId, x, y)}
+##        baseRoll, sockets, socketed: Array[item], (uniqueId, uniqueValues,
+##        rareName: [first, second], rhunewordId, charmSlots, charms: Array[item], x, y)}
 
 const ATTRS := ["might", "finesse", "vigor", "spirit"]
+## Ids are the original ones (saves and item data use them); these are the names players see.
 const ATTR_INFO := {
-	"might": {"name": "Might", "desc": "+1% physical damage, gear requirements"},
-	"finesse": {"name": "Finesse", "desc": "+1% attack speed per 5, +0.2% crit per point"},
-	"vigor": {"name": "Vigor", "desc": "+3 life per point"},
-	"spirit": {"name": "Spirit", "desc": "+2 mana per point, +1% spell damage per 2"},
+	"might": {"name": "Strength", "desc": "+1% physical damage with melee weapons. Gear requirements."},
+	"finesse": {"name": "Dexterity", "desc": "+1% attack speed per 5, +0.2% crit chance. +1% physical damage with bows."},
+	"vigor": {"name": "Stamina", "desc": "+3 life per point."},
+	"spirit": {"name": "Intelligence", "desc": "+1% elemental damage. +1% physical damage with caster weapons."},
 }
 
 const INV_W := 10
@@ -32,8 +30,7 @@ const CRUCIBLE_W := 3
 const CRUCIBLE_H := 4
 
 const ATTR_POINTS_PER_LEVEL := 5
-const PATH_POINTS_PER_LEVEL := 1
-const MAX_LEVEL := 40
+const MAX_LEVEL := 99
 
 
 static func now_ms() -> int:
@@ -42,22 +39,17 @@ static func now_ms() -> int:
 
 static func default_save() -> Dictionary:
 	return {
-		"version": 1,
+		"version": 2,
 		"hero": null,
 		"stash": [],
 		"codex": {},
-		"stats": {"gambles": 0, "wishes": 0, "identified": 0, "uniquesFound": 0, "rhunesFound": 0},
+		"stats": {"gambles": 0, "identified": 0, "uniquesFound": 0, "rhunesFound": 0, "kills": 0, "deaths": 0, "chests": 0, "wardens": 0, "conquered": 0},
 	}
 
 
 ## XP to go from `level` to `level + 1`.
 static func xp_to_next(level: int) -> int:
 	return floori(120.0 * pow(level, 1.75) + 180.0)
-
-
-## Skill XP to go from skill level n to n + 1 (specialized skills earn hero XP).
-static func skill_xp_to_next(level: int) -> int:
-	return floori(90.0 * pow(level, 1.55) + 110.0)
 
 
 static func new_hero(name: String) -> Dictionary:
@@ -71,33 +63,20 @@ static func new_hero(name: String) -> Dictionary:
 		"gold": 400,
 		"attrs": {"might": 10, "finesse": 10, "vigor": 10, "spirit": 10},
 		"attrPoints": 0,
-		# One point so the player can pick a first Discipline right away.
-		"pathPoints": 1,
-		"disciplines": [null, null],
-		"ranks": {},
-		"skills": {},
-		"hotbar": [null, null, null, null, null],
 		"equipped": {},
 		"inventory": [],
 		"cursor": null,
-		"quests": {},
-		"lore": [],
 		"flags": {},
 		"life": 1,
-		"mana": 1,
-		"taken": [],
 		"crucible": [],
+		"bestFloor": 0,
 	}
 	# Starter kit: plain, honest gear.
 	hero.equipped.weapon = ItemGen.create_item("short_sword", {"ilvl": 1, "quality": "normal", "rng": rng})
 	hero.equipped.chest = ItemGen.create_item("quilted_armor", {"ilvl": 1, "quality": "normal", "rng": rng})
 	hero.equipped.offhand = ItemGen.create_item("buckler", {"ilvl": 1, "quality": "normal", "rng": rng})
-	hero.equipped.weapon.sockets = 0
-	hero.equipped.chest.sockets = 0
-	hero.equipped.offhand.sockets = 0
-	for s in [["potion_health", 0, 0], ["potion_health", 1, 0], ["potion_mana", 2, 0], ["scroll_identify", 3, 0]]:
-		var it := ItemGen.create_item(s[0], {"ilvl": 1, "rng": rng})
-		it.x = s[1]
-		it.y = s[2]
-		hero.inventory.append(it)
+	hero.equipped.waist = ItemGen.create_item("sash", {"ilvl": 1, "quality": "normal", "rng": rng})
+	for slot in ["weapon", "chest", "offhand", "waist"]:
+		hero.equipped[slot].sockets = 0
+	hero.equipped.waist.charmSlots = 2
 	return hero

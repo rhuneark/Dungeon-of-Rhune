@@ -43,12 +43,13 @@ static func lines(item: Dictionary, ctx := "none", price := -1, extra: Array = [
 		out.append({"text": "Chance to Block: %d%%" % int(v.block)})
 	if hero != null:
 		var attrs: Dictionary = sheet.attrs
-		for r in [["Level", "reqLevel", int(hero.level)], ["Might", "reqMight", int(attrs.might)], ["Finesse", "reqFinesse", int(attrs.finesse)], ["Spirit", "reqSpirit", int(attrs.spirit)]]:
+		for r in [["Level", "reqLevel", int(hero.level)], ["Strength", "reqMight", int(attrs.might)], ["Dexterity", "reqFinesse", int(attrs.finesse)], ["Intelligence", "reqSpirit", int(attrs.spirit)]]:
 			var need := int(v.get(r[1], 0))
 			if need > 0:
 				out.append({"text": "Required %s: %d" % [r[0], need], "color": RED if r[2] < need else UiKit.PARCH})
-	if base.category != "consumable" and base.category != "quest":
-		out.append({"text": "Item Level: %d" % int(item.ilvl), "color": UiKit.DIM})
+	out.append({"text": "Item Level: %d" % int(item.ilvl), "color": UiKit.DIM})
+	if item.has("charmSlots"):
+		out.append({"text": "Charm Slots: %d (%d used)" % [int(item.charmSlots), Actions.belt_used(item)], "color": SOFT})
 
 	if base.category == "rhune":
 		var rh := Rhunes.get_rhune(Rhunes.rhune_id_from_base(item.baseId))
@@ -72,6 +73,8 @@ static func lines(item: Dictionary, ctx := "none", price := -1, extra: Array = [
 			ids.append(String(ItemBases.get_base(s.baseId).name).replace(" Rhune", ""))
 		out.append({"text": "'%s'" % " + ".join(ids), "color": UiKit.UNIQUE})
 
+	for c in item.get("charms", []):
+		out.append({"text": "Charm: " + ItemText.item_name(c), "color": Color(ItemText.item_color(c))})
 	if v.get("flavor", "") != "" and not unid:
 		out.append({"text": v.flavor, "color": Color("#c9b994"), "gap": true})
 	if item.quality == "unique" and item.get("uniqueId", "") != "" and not unid:

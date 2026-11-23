@@ -1,14 +1,13 @@
 class_name ServicePanels
-## Stash, vendors, gambling, Brannoc's crucible and the wishing well.
+## Stash, Pell's shop, Odo's gambling and Brannoc's crucible.
 
 
 static func create(id: String) -> UiPanel:
 	match id:
 		"stash": return StashPanel.new()
-		"vendor", "herbs": return VendorPanel.new()
+		"vendor": return VendorPanel.new()
 		"gamble": return GamblePanel.new()
 		"smith": return SmithPanel.new()
-		"well": return WellPanel.new()
 	return null
 
 
@@ -43,8 +42,7 @@ class VendorPanel extends UiPanel:
 		var row := UiKit.hbox(4)
 		row.add_child(UiKit.label("Click to buy · right-click your items to sell", "t10", UiKit.DIM))
 		row.add_child(UiKit.spacer())
-		if npc_id != "ysolde":
-			row.add_child(UiKit.button("Fresh stock", func(): Economy.restock(npc_id)))
+		row.add_child(UiKit.button("Fresh stock", func(): Economy.restock(npc_id)))
 		body.add_child(row)
 
 	func _rebuild() -> void:
@@ -151,18 +149,3 @@ class SmithPanel extends UiPanel:
 		for it in out:
 			Grid.auto_place(grid, it)
 		Game.commit()
-
-
-class WellPanel extends UiPanel:
-	func _init() -> void:
-		title = "The Wishing Well"
-
-	func build(body: VBoxContainer) -> void:
-		var cost: int = Economy.wish_cost()
-		body.add_child(UiKit.para("Toss in a coin and the well coughs something up — gear, rhunes, potions, coin. Your Rarity and Targeted Find apply. Sometimes it is generous. Nobody has checked the bottom.", "t10", UiKit.PARCH, HORIZONTAL_ALIGNMENT_CENTER))
-		body.add_child(UiKit.gap(4))
-		var b := UiKit.button("Make a wish (%d gold)" % cost, func(): Economy.make_wish(), 12)
-		b.disabled = int(Game.hero().gold) < cost
-		b.size_flags_horizontal = SIZE_SHRINK_CENTER
-		body.add_child(b)
-		body.add_child(ServicePanels.centered(UiKit.label("Wishes made: %d" % int(Game.save.stats.get("wishes", 0)), "t10", UiKit.DIM)))

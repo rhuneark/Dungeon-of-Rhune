@@ -31,7 +31,7 @@ func build(body: VBoxContainer) -> void:
 	var n := UiKit.label(hero.name, "t20")
 	n.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	head.add_child(n)
-	var lv := UiKit.label("Level %d %s" % [int(hero.level), Disciplines.combo_title(hero.disciplines[0], hero.disciplines[1])], "t10", UiKit.GOLD)
+	var lv := UiKit.label("Level %d · Deepest floor %d" % [int(hero.level), int(hero.get("bestFloor", 0))], "t10", UiKit.GOLD)
 	lv.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	head.add_child(lv)
 	var need := HeroData.xp_to_next(int(hero.level))
@@ -73,7 +73,6 @@ func build(body: VBoxContainer) -> void:
 	l.add_child(UiKit.gap(4))
 	l.add_child(UiKit.label("DEFENSE", "label", UiKit.DIM))
 	_row(l, "Life", str(int(sh.life)), Color("#e06a5a"))
-	_row(l, "Mana", str(int(sh.mana)), UiKit.MAGIC)
 	_row(l, "Armor", str(int(sh.armor)))
 	_row(l, "Block", "%d%%" % int(sh.block))
 	var cap: int = CharacterSheet.RES_CAP
@@ -83,8 +82,13 @@ func build(body: VBoxContainer) -> void:
 		_row(l, "%s Res" % Stats.DAMAGE_TYPE_NAMES[t], "%d%%" % mini(cap, v), c, "Uncapped: %d%% (cap %d%%)" % [v, cap])
 	_row(l, "Damage Reduced", str(int(sh.raw.get("dmgReduce", 0))))
 	_row(l, "Thorns", str(int(sh.raw.get("thorns", 0))))
+	_row(l, "Life Regen", UiKit.fmt_num(sh.lifeRegen))
+	_row(l, "Flask Heal", str(int(sh.flask.heal)), Color("#c68cff"), sh.flask.name)
+	_row(l, "Flask Recovery", "%ss" % UiKit.fmt_num(snappedf(sh.flask.cooldown, 0.1)), Color("#c68cff"))
 
 	r.add_child(UiKit.label("OFFENSE", "label", UiKit.DIM))
+	var kind_name: String = {"melee": "Melee", "ranged": "Bow", "spell": "Caster"}.get(sh.attack.kind, "Melee")
+	_row(r, "Attack", kind_name, UiKit.PARCH, "Swords, axes and maces swing; bows shoot; wands and staves cast bolts. The weapon decides which attribute adds physical damage.")
 	_row(r, "Weapon Damage", "%d-%d" % [int(sh.damage[0]), int(sh.damage[1])])
 	for t in sh.adds:
 		var rng: Array = sh.adds[t]
@@ -92,9 +96,10 @@ func build(body: VBoxContainer) -> void:
 	_row(r, "Attacks / sec", "%.2f" % float(sh.attacksPerSec))
 	_row(r, "Crit Chance", "%.1f%%" % float(sh.critChance))
 	_row(r, "Crit Damage", "+%s%%" % UiKit.fmt_num(sh.critDamage))
-	_row(r, "Cast Speed", "+%s%%" % UiKit.fmt_num(sh.castSpeed))
+	if float(sh.attack.tagPct) != 0:
+		_row(r, "Attack Bonus", "+%s%%" % UiKit.fmt_num(sh.attack.tagPct), UiKit.MAGIC, "From +% %s damage on your gear." % " / ".join(sh.attack.tags))
+	_row(r, "Life Stolen", "%s%%" % UiKit.fmt_num(sh.raw.get("lifeLeech", 0)))
 	_row(r, "Move Speed", "+%s%%" % UiKit.fmt_num(sh.moveSpeed))
-	_row(r, "Life Regen", UiKit.fmt_num(sh.lifeRegen))
 	r.add_child(UiKit.gap(4))
 	r.add_child(UiKit.label("FORTUNE", "label", UiKit.GOLD))
 	var f: Dictionary = sh.fortune

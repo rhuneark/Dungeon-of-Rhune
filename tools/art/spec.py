@@ -61,22 +61,53 @@ PROP_REFS = {
 # Everything else uses PROP_STYLE ("high top-down").
 FRONT_FACING = {
     "smithy", "trader", "herbalist", "lore_tower", "tavern", "house_a", "house_b",
-    "gate", "market_stall", "pit_entrance", "chapel",
+    "gate", "market_stall", "pit_entrance", "chapel", "door_sealed", "door_open",
 }
-LOW_VIEW = {"tree_oak", "tree_oak_b", "tree_pine", "tree_pine_b", "tree_dead", "tree_dead_b", "standing_stone", "cart"}
+LOW_VIEW = {"tree_oak", "tree_oak_b", "tree_pine", "tree_pine_b", "tree_dead", "tree_dead_b", "standing_stone", "cart",
+            "pillar", "wall_torch", "town_portal", "chains", "dungeon_chest", "dungeon_chest_open"}
 
 # ---------------------------------------------------------------- characters
 # name -> (prompt, animations [(template_id, [directions])]).
 # Characters in CHAR_FROM_REF are first drawn as a palette-locked south-facing
 # map object, which create-character-v3 then rotates and animates.
 ALL_DIRS = ["south", "south-east", "east", "north-east", "north", "north-west", "west", "south-west"]
-CHAR_FROM_REF = {"npc_trader", "npc_gambler"}
+CHAR_FROM_REF = {
+    "npc_trader", "npc_gambler",
+    "mob_skeleton", "mob_archer", "mob_ghoul", "mob_brute", "mob_cultist", "mob_wraith", "boss_warden",
+}
+# Canvas size per character (default 64).
+CHAR_SIZE = {"boss_warden": 96}
+MOB = "small full body character sprite, whole figure visible from head to feet, standing, facing the viewer, grim dark fantasy dungeon monster, pixel art"
+# Animations are (template_id, directions) or, for motions no template has,
+# (name, directions, {"action": text, "frames": n}) drawn by PixelLab's v3
+# custom animator. (The skeleton "attack" template doesn't fit humanoids.)
+
+
+def mob_anims(attack: str) -> list:
+    """Monsters: walk + attack in 8 directions, a death fall facing south."""
+    return [
+        ("walking-8-frames", ALL_DIRS),
+        ("attack", ALL_DIRS, {"action": attack, "frames": 6}),
+        ("falling-back-death", ["south"]),
+    ]
 
 CHARACTERS = {
     "player": (
         "hooded wandering adventurer in a weathered dark green cloak over leather armor, short sword at hip, small satchel, dark fantasy rpg hero",
-        [("walking-8-frames", ALL_DIRS), ("breathing-idle", ALL_DIRS)],
+        [
+            ("walking-8-frames", ALL_DIRS), ("breathing-idle", ALL_DIRS),
+            ("attack", ALL_DIRS, {"action": "swings his short sword in a quick forward slash", "frames": 6}),
+            ("falling-back-death", ["south"]),
+        ],
     ),
+    # ------------------------------------------------------------- monsters
+    "mob_skeleton": (f"undead skeleton warrior with a rusty notched sword and a cracked round shield, glowing pale eyes, {MOB}", mob_anims("slashes forward with its rusty sword")),
+    "mob_archer": (f"skeleton archer in a tattered dark hood holding a bone bow, {MOB}", mob_anims("draws the bone bow and looses an arrow")),
+    "mob_ghoul": (f"hunched grey skinned ghoul with long black claws and torn rags, {MOB}", mob_anims("lunges forward and rakes with its claws")),
+    "mob_brute": (f"hulking bloated undead brute wrapped in rusted chains carrying a huge iron cleaver, {MOB}", mob_anims("raises the huge cleaver overhead and chops down")),
+    "mob_cultist": (f"hooded crimson robed cultist holding a burning orb of fire in one hand, {MOB}", mob_anims("thrusts the burning orb forward and hurls a fire bolt")),
+    "mob_wraith": (f"floating pale blue wraith in tattered grey robes with long clawed hands and a hollow glowing face, {MOB}", mob_anims("lunges forward slashing with its long clawed hands")),
+    "boss_warden": (f"huge armored death knight boss with a great black axe and a cracked glowing hourglass set in his breastplate, {MOB}", mob_anims("swings the great axe in a heavy overhead chop")),
     "npc_smith": (
         f"stocky dwarf blacksmith with a braided red beard, leather apron, bare soot-stained arms, holding a heavy forge hammer, {CHAR_STYLE}",
         [("breathing-idle", ["south"])],
@@ -134,6 +165,18 @@ TILESETS = [
         **EDGE,
     },
 ]
+# The Sealed Stair's rooms: floor ("lower") inside, solid rock ("upper") around,
+# and transition_size 1.0 makes a "cliff" set: rock edges with a brick wall
+# face below them (two cell rows), so north walls show their face.
+DUNGEON_TILESET = {
+    "name": "dungeon",
+    "lower": "dark dungeon floor of worn grey stone flagstones with thin cracks",
+    "upper": "solid black rock, top of a dungeon wall",
+    "transition": "tall dark grey stone brick dungeon wall face",
+    "transition_size": 1.0,
+}
+TILESETS.append(DUNGEON_TILESET)
+
 # pack.py recolours tiles after generation: the model reaches for the timber
 # browns for mud, so they become the palette's grey-brown mud.
 MUD_REMAP = {"#4f3b2b": "#4d4533", "#644b36": "#625942", "#3d2d21": "#3a3427", "#7c5e43": "#625942"}
@@ -204,6 +247,20 @@ PROPS = {
     "grave_a": (32, 48, "old cracked weathered gothic tombstone with moss"),
     "grave_b": (32, 48, "leaning weathered stone celtic cross grave marker"),
     "crow": (32, 32, "black crow perched, seen from the side"),
+    # --------------------------------------------------- the Sealed Stair
+    "door_sealed": (96, 96, "massive arched stone dungeon doorway sealed by a rusted iron portcullis, carved frame with faint red runes"),
+    "door_open": (96, 96, "massive arched stone dungeon doorway standing open, worn stone steps descending into darkness, faint pale blue glow from below"),
+    "dungeon_chest": (48, 48, "ornate iron bound dark oak treasure chest with tarnished gold trim, closed"),
+    "dungeon_chest_open": (48, 48, "ornate iron bound dark oak treasure chest with tarnished gold trim, lid thrown open, glowing gold coins inside"),
+    "pillar": (48, 96, "thick ancient dark stone dungeon pillar with carved runes and a cracked base"),
+    "wall_torch": (32, 48, "iron wall sconce holding a burning torch with a bright orange flame"),
+    "bones": (32, 32, "scattered old bones and a skull lying on a stone floor"),
+    "skull_pile": (48, 32, "small heap of skulls and bones"),
+    "blood_pool": (48, 32, "dark dried blood splatter, flat on the floor"),
+    "rubble": (48, 32, "pile of broken grey stone rubble"),
+    "summon_circle": (64, 64, "summoning circle of glowing red runes carved into a dark stone floor, seen from directly above"),
+    "town_portal": (64, 80, "upright oval swirling magic portal of pale blue light"),
+    "chains": (32, 64, "rusted iron chains with shackles hanging down"),
     "goose": (32, 32, "grey and white farm goose with an orange beak, looking angry"),
 }
 

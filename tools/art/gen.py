@@ -206,9 +206,10 @@ def character(name, prompt, anims):
         return
     cs = STATE["characters"].setdefault(name, {})
     if not cs.get("id"):
+        size = getattr(spec, "CHAR_SIZE", {}).get(name, 64)
         body = {
             "description": prompt,
-            "image_size": {"width": 64, "height": 64},
+            "image_size": {"width": size, "height": size},
             "view": "low top-down",
             "outline": "single color black outline",
             "detail": "medium detail",
@@ -217,7 +218,7 @@ def character(name, prompt, anims):
         if name in getattr(spec, "CHAR_FROM_REF", ()):
             # Draw the south-facing sprite on the world palette first; v3 rotates it.
             ref = os.path.join(OUT, "chars", f"{name}_ref.png")
-            map_object(f"{name}_ref", 64, 64, prompt, ref, "low top-down")
+            map_object(f"{name}_ref", size, size, prompt, ref, "low top-down")
             with open(ref, "rb") as fh:
                 import base64
 
@@ -232,16 +233,27 @@ def character(name, prompt, anims):
             raise RuntimeError(f"{name} failed: {str(job)[:300]}")
         log("char ok", name)
     cid = cs["id"]
-    for template, dirs in anims:
+    for anim in anims:
+        template, dirs = anim[0], anim[1]
         key = f"anim:{template}"
         if cs.get(key) == "done":
             continue
-        d = post_retry("/characters/animations", {
-            "character_id": cid,
-            "template_animation_id": template,
-            "mode": "template",
-            "directions": dirs,
-        })
+        if len(anim) > 2:
+            # Custom motion (v3): one job per direction; extend the group if a
+            # previous run already made some directions.
+            body = {
+                "character_id": cid, "mode": "v3", "animation_name": template,
+                "action_description": anim[2]["action"], "frame_count": anim[2].get("frames", 6),
+                "directions": [d for d in dirs if d not in cs.get(f"{key}:dirs", [])],
+            }
+            if cs.get(f"{key}:group"):
+                body["animation_group_id"] = cs[f"{key}:group"]
+        else:
+            body = {"character_id": cid, "template_animation_id": template, "mode": "template", "directions": dirs}
+        d = post_retry("/characters/animations", body)
+        if d.get("animation_group_id"):
+            cs[f"{key}:group"] = d["animation_group_id"]
+            save_state()
         job_ids = d.get("background_job_ids") or ([d["background_job_id"]] if d.get("background_job_id") else [])
         for jid in job_ids:
             job = pl.wait_job(jid, label=f"{name}:{template}")
@@ -360,10 +372,18 @@ def main():
                         log("ERR tileset", ts["name"], e)
             futs[ex.submit(all_tiles)] = "tiles"
         if "chars" in which:
-            for name, (prompt, anims) in spec.CHARACTERS.items():
-                if only and name not in only:
-                    continue
-                futs[ex.submit(character, name, prompt, anims)] = f"char {name}"
+            # One character at a time: an 8-direction animation needs 8 of the
+            # plan's 10 concurrent job slots, so parallel characters starve.
+            def all_chars():
+                for name, (prompt, anims) in spec.CHARACTERS.items():
+                    if only and name not in only:
+                        continue
+                    try:
+                        character(name, prompt, anims)
+                    except Exception as e:  # keep going with the rest
+                        errors.append(f"char {name}: {e}")
+                        log("ERR char", name, e)
+            futs[ex.submit(all_chars)] = "chars"
         tasks = []
         if "props" in which:
             tasks += gen_props(only, variants)

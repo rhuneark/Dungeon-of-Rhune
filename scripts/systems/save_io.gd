@@ -1,15 +1,17 @@
 class_name SaveIO
-## Persistence: user://saves/rhune_save_v1.json (the OS user-data folder;
+## Persistence: user://saves/rhune_save_v2.json (the OS user-data folder;
 ## Steam Auto-Cloud syncs it). Writes are atomic (write .tmp, keep the previous
 ## file as .bak, rename); loads fall back to the .bak. A save/load failure
 ## must never brick the game.
 ##
 ## JSON turns every number into a float, so loads convert integral floats back
 ## to ints, then sanitize stale content ids (renamed bases are dropped).
+## v2 is the floor-climbing game (gear-only, no skills); v1 saves from the
+## town-only build are left alone on disk and not read.
 
 ## Overridable (tests point it elsewhere so they never touch a real save).
 static var dir := "user://saves"
-const SAVE_KEY := "rhune_save_v1"
+const SAVE_KEY := "rhune_save_v2"
 
 
 static func path() -> String:
@@ -56,6 +58,8 @@ static func sanitize(raw: Dictionary) -> Dictionary:
 				eq.erase(k)
 			else:
 				eq[k].socketed = _clean_items(eq[k].get("socketed", []))
+				if eq[k].has("charms"):
+					eq[k].charms = _clean_items(eq[k].charms)
 		h.equipped = eq
 		if h.get("cursor") != null and not _valid_item(h.cursor):
 			h.cursor = null
@@ -63,12 +67,9 @@ static func sanitize(raw: Dictionary) -> Dictionary:
 			h.cursor.socketed = _clean_items(h.cursor.get("socketed", []))
 		else:
 			h.cursor = null
-		if not h.get("taken") is Array:
-			h.taken = []
 		if not h.get("flags") is Dictionary:
 			h.flags = {}
-		if not h.get("lore") is Array:
-			h.lore = []
+		h.bestFloor = int(h.get("bestFloor", 0))
 		h.crucible = _clean_items(h.get("crucible", []))
 	else:
 		save.hero = null

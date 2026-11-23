@@ -1,6 +1,7 @@
 class_name Economy
-## Town services that cost gold: vendors, Odo's sealed goods (gambling), the
-## Wishing Well, Brannoc's socket punch and Crucible recipes.
+## Town services that cost gold: Pell's shop, Odo's sealed goods (gambling),
+## Brannoc's socket punch and Crucible recipes. (Identifying and the flask are
+## free: the town needs you to win.)
 
 const VENDOR_W := 10
 const VENDOR_H := 10
@@ -36,23 +37,13 @@ static func _roll_vendor_stock(level: int) -> Dictionary:
 	return grid
 
 
-static func _herb_stock(level: int) -> Dictionary:
-	var grid := Grid.make(VENDOR_W, 4, [])
-	var ids := ["potion_health", "potion_health", "potion_health", "potion_mana", "potion_mana", "potion_mana", "scroll_identify", "scroll_identify"]
-	if level >= 8:
-		ids.append("potion_rejuv")
-	for id in ids:
-		Grid.auto_place(grid, ItemGen.create_item(id, {"ilvl": 1}))
-	return grid
-
-
 ## The vendor's shelf (restocks on level-up or every 3 minutes).
 static func vendor_grid(npc_id: String) -> Dictionary:
 	var level: int = Game.hero().level
 	var s: Dictionary = _stocks.get(npc_id, {})
 	var now := HeroData.now_ms()
 	if s.is_empty() or s.level != level or now - s.at > RESTOCK_MS:
-		s = {"grid": _herb_stock(level) if npc_id == "ysolde" else _roll_vendor_stock(level), "level": level, "at": now}
+		s = {"grid": _roll_vendor_stock(level), "level": level, "at": now}
 		_stocks[npc_id] = s
 	return s.grid
 
@@ -81,14 +72,10 @@ static func buy(npc_id: String, uid: String) -> void:
 	if hero.gold < price:
 		Game.float_text("Not enough gold.", "#e8e4d8")
 		return
-	# Ysolde's shelves never run dry: sell a copy.
-	var infinite := npc_id == "ysolde"
-	var bought := ItemGen.create_item(item.baseId, {"ilvl": item.ilvl}) if infinite else item
-	if not Grid.auto_place(Actions.grid_of("inv"), bought):
+	if not Grid.auto_place(Actions.grid_of("inv"), item):
 		Game.float_text("I have no room.", "#e8e4d8")
 		return
-	if not infinite:
-		Grid.remove_item(grid, uid)
+	Grid.remove_item(grid, uid)
 	hero.gold -= price
 	Game.commit()
 
@@ -136,36 +123,6 @@ static func gamble(base_id: String) -> void:
 	Actions.register_find(item)
 	if item.quality == "unique":
 		Game.float_text("!!!", "#c9a46b")
-	QuestRules.emit("gamble")
-	Game.commit()
-
-
-# ------------------------------------------------------------- wishing well
-static func wish_cost() -> int:
-	return 25 + 15 * int(Game.hero().level)
-
-
-static func make_wish() -> void:
-	var hero := Game.hero()
-	var cost := wish_cost()
-	if hero.gold < cost:
-		Game.float_text("Not enough gold.", "#e8e4d8")
-		return
-	hero.gold -= cost
-	Game.save.stats.wishes += 1
-	var fortune: Dictionary = Game.sheet().fortune
-	var r := Rng.world().next_float()
-	var drops := Loot.roll_treasure("well", {"ilvl": hero.level + 1, "fortune": fortune})
-	if r < 0.03:
-		# Jackpot: the well is in a generous mood.
-		drops.append_array(Loot.roll_treasure("well", {"ilvl": hero.level + 2, "fortune": fortune}))
-		drops.append_array(Loot.roll_treasure("well", {"ilvl": hero.level + 2, "fortune": fortune}))
-		Game.toast("The well gurgles happily.", "#7ec8e3")
-	elif r < 0.05:
-		drops = [{"kind": "gold", "amount": cost * 3}]
-		Game.toast("The well burps up your coin. And some of someone else’s.", "#7ec8e3")
-	Game.spawn_drops(drops, "well")
-	QuestRules.emit("wish")
 	Game.commit()
 
 

@@ -1,5 +1,241 @@
 {
  "chars": {
+  "mob_ghoul": {
+   "anims": {
+    "attack": {
+     "east": {
+      "frames": 7,
+      "row": 12
+     },
+     "north": {
+      "frames": 7,
+      "row": 14
+     },
+     "north-east": {
+      "frames": 7,
+      "row": 13
+     },
+     "north-west": {
+      "frames": 7,
+      "row": 15
+     },
+     "south": {
+      "frames": 7,
+      "row": 10
+     },
+     "south-east": {
+      "frames": 7,
+      "row": 11
+     },
+     "south-west": {
+      "frames": 7,
+      "row": 17
+     },
+     "west": {
+      "frames": 7,
+      "row": 16
+     }
+    },
+    "falling_backward": {
+     "south": {
+      "frames": 7,
+      "row": 1
+     }
+    },
+    "walking": {
+     "east": {
+      "frames": 8,
+      "row": 4
+     },
+     "north": {
+      "frames": 8,
+      "row": 6
+     },
+     "north-east": {
+      "frames": 8,
+      "row": 5
+     },
+     "north-west": {
+      "frames": 8,
+      "row": 7
+     },
+     "south": {
+      "frames": 8,
+      "row": 2
+     },
+     "south-east": {
+      "frames": 8,
+      "row": 3
+     },
+     "south-west": {
+      "frames": 8,
+      "row": 9
+     },
+     "west": {
+      "frames": 8,
+      "row": 8
+     }
+    }
+   },
+   "bodyTop": 13,
+   "cell": [
+    84,
+    84
+   ],
+   "footY": 71,
+   "rotations": {
+    "east": [
+     2,
+     0
+    ],
+    "north": [
+     4,
+     0
+    ],
+    "north-east": [
+     3,
+     0
+    ],
+    "north-west": [
+     5,
+     0
+    ],
+    "south": [
+     0,
+     0
+    ],
+    "south-east": [
+     1,
+     0
+    ],
+    "south-west": [
+     7,
+     0
+    ],
+    "west": [
+     6,
+     0
+    ]
+   }
+  },
+  "mob_skeleton": {
+   "anims": {
+    "attack": {
+     "east": {
+      "frames": 7,
+      "row": 11
+     },
+     "north": {
+      "frames": 7,
+      "row": 13
+     },
+     "north-east": {
+      "frames": 7,
+      "row": 12
+     },
+     "north-west": {
+      "frames": 7,
+      "row": 14
+     },
+     "south": {
+      "frames": 7,
+      "row": 9
+     },
+     "south-east": {
+      "frames": 7,
+      "row": 10
+     },
+     "south-west": {
+      "frames": 7,
+      "row": 16
+     },
+     "west": {
+      "frames": 7,
+      "row": 15
+     }
+    },
+    "falling_backward": {
+     "south": {
+      "frames": 7,
+      "row": 17
+     }
+    },
+    "walking": {
+     "east": {
+      "frames": 8,
+      "row": 3
+     },
+     "north": {
+      "frames": 8,
+      "row": 5
+     },
+     "north-east": {
+      "frames": 8,
+      "row": 4
+     },
+     "north-west": {
+      "frames": 8,
+      "row": 6
+     },
+     "south": {
+      "frames": 8,
+      "row": 1
+     },
+     "south-east": {
+      "frames": 8,
+      "row": 2
+     },
+     "south-west": {
+      "frames": 8,
+      "row": 8
+     },
+     "west": {
+      "frames": 8,
+      "row": 7
+     }
+    }
+   },
+   "bodyTop": 12,
+   "cell": [
+    80,
+    80
+   ],
+   "footY": 67,
+   "rotations": {
+    "east": [
+     2,
+     0
+    ],
+    "north": [
+     4,
+     0
+    ],
+    "north-east": [
+     3,
+     0
+    ],
+    "north-west": [
+     5,
+     0
+    ],
+    "south": [
+     0,
+     0
+    ],
+    "south-east": [
+     1,
+     0
+    ],
+    "south-west": [
+     7,
+     0
+    ],
+    "west": [
+     6,
+     0
+    ]
+   }
+  },
   "npc_captain": {
    "anims": {
     "breathing_idle": {
@@ -302,6 +538,40 @@
   },
   "player": {
    "anims": {
+    "attack": {
+     "east": {
+      "frames": 7,
+      "row": 12
+     },
+     "north": {
+      "frames": 7,
+      "row": 14
+     },
+     "north-east": {
+      "frames": 7,
+      "row": 13
+     },
+     "north-west": {
+      "frames": 7,
+      "row": 15
+     },
+     "south": {
+      "frames": 7,
+      "row": 10
+     },
+     "south-east": {
+      "frames": 7,
+      "row": 11
+     },
+     "south-west": {
+      "frames": 7,
+      "row": 17
+     },
+     "west": {
+      "frames": 7,
+      "row": 16
+     }
+    },
     "breathing_idle": {
      "east": {
       "frames": 4,
@@ -336,47 +606,53 @@
       "row": 7
      }
     },
+    "falling_backward": {
+     "south": {
+      "frames": 7,
+      "row": 9
+     }
+    },
     "walking": {
      "east": {
       "frames": 8,
-      "row": 11
+      "row": 20
      },
      "north": {
       "frames": 8,
-      "row": 13
+      "row": 22
      },
      "north-east": {
       "frames": 8,
-      "row": 12
+      "row": 21
      },
      "north-west": {
       "frames": 8,
-      "row": 14
+      "row": 23
      },
      "south": {
       "frames": 8,
-      "row": 9
+      "row": 18
      },
      "south-east": {
       "frames": 8,
-      "row": 10
+      "row": 19
      },
      "south-west": {
       "frames": 8,
-      "row": 16
+      "row": 25
      },
      "west": {
       "frames": 8,
-      "row": 15
+      "row": 24
      }
     }
    },
-   "bodyTop": 1,
+   "bodyTop": 15,
    "cell": [
-    64,
-    64
+    92,
+    92
    ],
-   "footY": 63,
+   "footY": 77,
    "rotations": {
     "east": [
      2,
@@ -1056,6 +1332,26 @@
    "h": 32,
    "w": 32
   },
+  "blood_pool": {
+   "bbox": [
+    2,
+    0,
+    44,
+    32
+   ],
+   "h": 32,
+   "w": 48
+  },
+  "bones": {
+   "bbox": [
+    7,
+    9,
+    23,
+    26
+   ],
+   "h": 32,
+   "w": 32
+  },
   "brazier": {
    "bbox": [
     3,
@@ -1112,6 +1408,16 @@
    "h": 64,
    "w": 80
   },
+  "chains": {
+   "bbox": [
+    2,
+    6,
+    30,
+    57
+   ],
+   "h": 64,
+   "w": 32
+  },
   "chapel": {
    "bbox": [
     13,
@@ -1161,6 +1467,62 @@
    ],
    "h": 32,
    "w": 32
+  },
+  "door_open": {
+   "bbox": [
+    4,
+    6,
+    92,
+    93
+   ],
+   "h": 96,
+   "w": 96
+  },
+  "door_sealed": {
+   "bbox": [
+    16,
+    5,
+    79,
+    83
+   ],
+   "glow": [
+    [
+     50,
+     62,
+     56,
+     "warm"
+    ]
+   ],
+   "h": 96,
+   "w": 96
+  },
+  "dungeon_chest": {
+   "bbox": [
+    5,
+    4,
+    44,
+    44
+   ],
+   "h": 48,
+   "w": 48
+  },
+  "dungeon_chest_open": {
+   "bbox": [
+    6,
+    1,
+    45,
+    44
+   ],
+   "glow": [
+    [
+     20,
+     25,
+     53,
+     "warm"
+    ]
+   ],
+   "h": 48,
+   "w": 48
   },
   "fence": {
    "bbox": [
@@ -1398,6 +1760,16 @@
    "h": 64,
    "w": 64
   },
+  "pillar": {
+   "bbox": [
+    5,
+    1,
+    43,
+    94
+   ],
+   "h": 96,
+   "w": 48
+  },
   "pit_entrance": {
    "bbox": [
     18,
@@ -1442,6 +1814,16 @@
    "h": 32,
    "w": 32
   },
+  "rubble": {
+   "bbox": [
+    1,
+    1,
+    46,
+    31
+   ],
+   "h": 32,
+   "w": 48
+  },
   "signpost": {
    "bbox": [
     3,
@@ -1451,6 +1833,16 @@
    ],
    "h": 64,
    "w": 32
+  },
+  "skull_pile": {
+   "bbox": [
+    3,
+    2,
+    45,
+    29
+   ],
+   "h": 32,
+   "w": 48
   },
   "smithy": {
    "bbox": [
@@ -1518,6 +1910,24 @@
    "h": 48,
    "w": 48
   },
+  "summon_circle": {
+   "bbox": [
+    7,
+    9,
+    57,
+    56
+   ],
+   "glow": [
+    [
+     34,
+     33,
+     78,
+     "fire"
+    ]
+   ],
+   "h": 64,
+   "w": 64
+  },
   "tavern": {
    "bbox": [
     15,
@@ -1553,6 +1963,24 @@
    ],
    "h": 240,
    "w": 288
+  },
+  "town_portal": {
+   "bbox": [
+    7,
+    3,
+    57,
+    72
+   ],
+   "glow": [
+    [
+     31,
+     38,
+     1189,
+     "rune"
+    ]
+   ],
+   "h": 80,
+   "w": 64
   },
   "trader": {
    "bbox": [
@@ -1631,6 +2059,24 @@
    ],
    "h": 168,
    "w": 96
+  },
+  "wall_torch": {
+   "bbox": [
+    7,
+    4,
+    25,
+    44
+   ],
+   "glow": [
+    [
+     16,
+     17,
+     72,
+     "warm"
+    ]
+   ],
+   "h": 48,
+   "w": 32
   },
   "waypoint": {
    "bbox": [
@@ -1762,6 +2208,141 @@
     },
     {
      "i": 21,
+     "key": "1111",
+     "v": 1
+    }
+   ]
+  },
+  "dungeon": {
+   "size": 32,
+   "tiles": [
+    {
+     "i": 0,
+     "key": "0000"
+    },
+    {
+     "i": 1,
+     "key": "0001"
+    },
+    {
+     "i": 2,
+     "key": "0011"
+    },
+    {
+     "i": 3,
+     "key": "0010"
+    },
+    {
+     "i": 4,
+     "key": "0101"
+    },
+    {
+     "i": 5,
+     "key": "0101"
+    },
+    {
+     "i": 6,
+     "key": "1111"
+    },
+    {
+     "i": 7,
+     "key": "1010"
+    },
+    {
+     "i": 8,
+     "key": "1010"
+    },
+    {
+     "i": 9,
+     "key": "1011"
+    },
+    {
+     "i": 10,
+     "key": "0111"
+    },
+    {
+     "i": 11,
+     "key": "1112"
+    },
+    {
+     "i": 12,
+     "key": "1122"
+    },
+    {
+     "i": 13,
+     "key": "1020"
+    },
+    {
+     "i": 14,
+     "key": "1210"
+    },
+    {
+     "i": 15,
+     "key": "2200"
+    },
+    {
+     "i": 16,
+     "key": "2000"
+    },
+    {
+     "i": 17,
+     "key": "0102"
+    },
+    {
+     "i": 18,
+     "key": "1121"
+    },
+    {
+     "i": 19,
+     "key": "1021"
+    },
+    {
+     "i": 20,
+     "key": "0200"
+    },
+    {
+     "i": 21,
+     "key": "2101"
+    },
+    {
+     "i": 22,
+     "key": "2101"
+    },
+    {
+     "i": 23,
+     "key": "0112"
+    },
+    {
+     "i": 24,
+     "key": "1210"
+    },
+    {
+     "i": 25,
+     "key": "0000",
+     "v": 1
+    },
+    {
+     "i": 26,
+     "key": "0000",
+     "v": 1
+    },
+    {
+     "i": 27,
+     "key": "0000",
+     "v": 1
+    },
+    {
+     "i": 28,
+     "key": "1111",
+     "v": 1
+    },
+    {
+     "i": 29,
+     "key": "1111",
+     "v": 1
+    },
+    {
+     "i": 30,
      "key": "1111",
      "v": 1
     }

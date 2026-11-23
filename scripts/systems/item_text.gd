@@ -241,8 +241,6 @@ static func quirk_text(id: String) -> String:
 ## What a vendor charges for it.
 static func buy_price(item: Dictionary) -> int:
 	var base := ItemBases.get_base(item.baseId)
-	if base.category == "consumable":
-		return base.price * int(item.get("qty", 1))
 	if base.category == "rhune":
 		return base.price * 4
 	var v: float = base.price * QUALITY_VALUE.get(item.quality, 1.0) * (1 + item.ilvl / 25.0) \
@@ -252,9 +250,6 @@ static func buy_price(item: Dictionary) -> int:
 
 ## What a vendor pays you. Unidentified loot sells cheap: let Varn look first.
 static func sell_price(item: Dictionary) -> int:
-	var base := ItemBases.get_base(item.baseId)
-	if base.category == "quest":
-		return 0
 	@warning_ignore("integer_division")
 	var p := floorf(buy_price(item) / 5) * (1.0 if item.identified else 0.4)
 	return maxi(1, floori(p))

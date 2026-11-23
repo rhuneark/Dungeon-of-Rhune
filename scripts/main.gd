@@ -1,6 +1,8 @@
 extends Node
 ## Boot + phase router. Order: load save → loading screen warms every texture
-## (progress bar) → main menu → playing (zone scene + runtime + in-game UI).
+## (progress bar) → main menu → playing (zone + runtime + in-game UI).
+## While playing, the zone follows Game.ui.location: Thornwick, or a floor of
+## the Sealed Stair built on the fly (ArenaBuilder + the Arena that runs it).
 ## Also owns the lifecycle hooks: flush the save on focus loss and before the
 ## window closes.
 
@@ -33,7 +35,11 @@ func _ready() -> void:
 	ui_layer.add_child(ui_root)
 	View.changed.connect(_apply_view)
 	_apply_view()
-	Game.ui_changed.connect(func(keys): if "phase" in keys: _route())
+	Game.ui_changed.connect(func(keys):
+		if "phase" in keys:
+			_route()
+		elif ("location" in keys or "floor" in keys) and Game.ui.phase == "playing":
+			_enter_zone.call_deferred())
 
 	Game.boot()
 	_warm = Art.art_files()
@@ -87,12 +93,23 @@ func _route() -> void:
 
 func _enter_zone() -> void:
 	_leave_zone()
-	_zone = load(ZONE_SCENE).instantiate()
+	var floor := int(Game.ui.floor)
+	var in_dungeon: bool = Game.ui.location == "dungeon" and floor > 0
+	_zone = ArenaBuilder.build(floor) if in_dungeon else load(ZONE_SCENE).instantiate()
 	world.add_child(_zone)
 	_runtime = ZoneRuntime.new()
 	_runtime.name = "Runtime"
 	world.add_child(_runtime)
 	_runtime.setup(_zone)
+	if in_dungeon:
+		var arena := Arena.new()
+		arena.name = "Arena"
+		_zone.add_child(arena)
+		arena.setup(_zone, _runtime, floor)
+	else:
+		# Home: the townsfolk patch you up.
+		Game.hero().life = Game.sheet().life
+		Game.set_ui({"zone_title": "Thornwick", "zone_sub": "Town · Safe"})
 
 
 func _leave_zone() -> void:
@@ -102,6 +119,7 @@ func _leave_zone() -> void:
 	if _zone:
 		_zone.queue_free()
 		_zone = null
+	Game.set_ui({"hover_name": {}})
 
 
 func _notification(what: int) -> void:

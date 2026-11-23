@@ -26,6 +26,11 @@ static func dir_from_vector(v: Vector2) -> String:
 	return DIRS8[i]
 
 
+## Unit vector for a direction name (inverse of dir_from_vector).
+static func vector_from_dir(dir: String) -> Vector2:
+	return Vector2.from_angle(maxi(0, DIRS8.find(dir)) * PI / 4.0)
+
+
 ## Every texture is loaded once and kept (a texture first loaded inside a
 ## _draw() call renders blank for that frame, so the loading screen warms
 ## them all up front via warm()).
@@ -118,6 +123,10 @@ func tile_coords(tileset: String, key: String) -> Vector2i:
 		if e.key == key:
 			return Vector2i(int(e.i) % 4, int(e.i) / 4)
 	return Vector2i(-1, -1)
+
+
+func tile_texture(name: String) -> Texture2D:
+	return _tex("res://assets/art/tiles/%s.png" % name)
 
 
 # --------------------------------------------------------------- props/icons

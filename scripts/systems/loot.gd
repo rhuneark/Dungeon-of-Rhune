@@ -81,11 +81,6 @@ static func _resolve_pick(pick: Dictionary, ctx: Dictionary, bonus: Dictionary, 
 		"gold":
 			var amount := maxi(1, Rng.jround(ilvl * rng.int_range(4, 12) * pick.get("mult", 1) * (1 + fortune.get("gold", 0) / 100.0)))
 			out.append({"kind": "gold", "amount": amount})
-		"potion":
-			var id := "potion_rejuv" if ilvl >= 8 and rng.chance(0.06) else ("potion_health" if rng.chance(0.6) else "potion_mana")
-			out.append({"kind": "item", "item": ItemGen.create_item(id, {"ilvl": ilvl, "rng": rng})})
-		"scroll":
-			out.append({"kind": "item", "item": ItemGen.create_item("scroll_identify", {"ilvl": ilvl, "rng": rng})})
 		"rhune":
 			var id := _pick_rhune(ilvl, rng)
 			if id != "":
@@ -138,7 +133,7 @@ static func roll_treasure(tc_id: String, ctx: Dictionary) -> Array:
 
 
 ## Simulate N rolls and tally quality/kind (powers the Loot Lab panel).
-## Returns {tally: {key: count}, gold, n}; keys: gold, rhune, consumable, or a quality.
+## Returns {tally: {key: count}, gold, n}; keys: gold, rhune, or a quality.
 static func simulate_drops(tc_id: String, ctx: Dictionary, n: int) -> Dictionary:
 	var rng: Rng = ctx.get("rng") if ctx.get("rng") != null else Rng.new(12345)
 	var c := ctx.duplicate()
@@ -152,6 +147,6 @@ static func simulate_drops(tc_id: String, ctx: Dictionary, n: int) -> Dictionary
 				tally.gold = tally.get("gold", 0) + 1
 			else:
 				var base := ItemBases.get_base(d.item.baseId)
-				var key: String = "rhune" if base.category == "rhune" else ("consumable" if base.category == "consumable" else d.item.quality)
+				var key: String = "rhune" if base.category == "rhune" else d.item.quality
 				tally[key] = tally.get(key, 0) + 1
 	return {"tally": tally, "gold": gold, "n": n}

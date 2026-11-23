@@ -1,20 +1,18 @@
 class_name PlayingUi
 extends Control
-## In-game UI: HUD, the left/right/overlay panel slots, dialog box, cursor
-## item and tooltip, and the hotkeys (input actions in project.godot).
+## In-game UI: HUD, the left/right panel slots, dialog box, cursor
+## item and tooltip, and the hotkeys (input actions in project.godot): Q/1
+## drinks the flask, T returns to town from the Stair.
 
 const INVENTORY := preload("res://scripts/ui/panels/inventory_panel.gd")
 const CHARACTER := preload("res://scripts/ui/panels/character_panel.gd")
 const OPTIONS := preload("res://scripts/ui/panels/options_panel.gd")
 const LAB := preload("res://scripts/ui/panels/lab_panel.gd")
-const SKILLS := preload("res://scripts/ui/panels/skills_overlay.gd")
 
 var _left: UiPanel
 var _right: UiPanel
-var _overlay: UiPanel
 var _left_id := ""
 var _right_id := ""
-var _overlay_id := ""
 var _panels: Control
 
 
@@ -39,14 +37,13 @@ func _layout() -> void:
 
 
 func _on_ui(keys: Array) -> void:
-	if "left" in keys or "right" in keys or "overlay" in keys or "service_npc" in keys:
+	if "left" in keys or "right" in keys or "service_npc" in keys:
 		_sync()
 
 
 func _make_left(id: String) -> UiPanel:
 	match id:
 		"character": return CHARACTER.new()
-		"quests": return JournalPanels.QuestsPanel.new()
 		"codex": return JournalPanels.CodexPanel.new()
 		"options": return OPTIONS.new()
 		"lab": return LAB.new() if Platform.dev_tools else null
@@ -56,7 +53,7 @@ func _make_left(id: String) -> UiPanel:
 func _sync() -> void:
 	var ui := Game.ui
 	var left: String = ui.left
-	if left != _left_id or (_left != null and left in ["vendor", "herbs"]):
+	if left != _left_id or (_left != null and left == "vendor"):
 		if _left:
 			_left.queue_free()
 		_left = _make_left(left) if left != "" else null
@@ -72,13 +69,6 @@ func _sync() -> void:
 			_panels.add_child(_right)
 	elif _right:
 		_right.mark() # sell/stash hints depend on the left panel
-	if ui.overlay != _overlay_id:
-		if _overlay:
-			_overlay.queue_free()
-		_overlay = SKILLS.new() if ui.overlay == "skills" else null
-		_overlay_id = ui.overlay
-		if _overlay:
-			_panels.add_child(_overlay)
 	UiTip.clear()
 
 
@@ -89,6 +79,8 @@ func _toggle_left(p: String) -> void:
 func _unhandled_input(e: InputEvent) -> void:
 	if Game.ui.phase != "playing" or not (e is InputEventKey) or not e.pressed:
 		return
+	if Game.ui.dead:
+		return # the death dialog is the only way on
 	if e.is_action_pressed("back"):
 		UiTip.clear()
 		if not Game.close_all():
@@ -101,10 +93,11 @@ func _unhandled_input(e: InputEvent) -> void:
 		Game.set_ui({"right": "" if Game.ui.right != "" else "inventory"})
 	elif e.is_action_pressed("toggle_character"):
 		_toggle_left("character")
-	elif e.is_action_pressed("toggle_skills"):
-		Game.set_ui({"overlay": "" if Game.ui.overlay == "skills" else "skills", "dialog": {}})
-	elif e.is_action_pressed("toggle_quests"):
-		_toggle_left("quests")
+	elif e.is_action_pressed("drink_flask"):
+		Game.drink_flask()
+	elif e.is_action_pressed("town_portal"):
+		if Game.ui.location == "dungeon":
+			Game.return_to_town()
 	elif e.is_action_pressed("toggle_codex"):
 		_toggle_left("codex")
 	elif e.is_action_pressed("toggle_options"):

@@ -4,7 +4,9 @@ class_name Actions
 ## click again to place (swapping with exactly one item); drop a rhune onto
 ## an item with an open socket to set it. Works on Game.save / Game.hero().
 
-const EQUIP_SLOTS := ["weapon", "offhand", "head", "chest", "hands", "feet", "waist", "neck", "ring1", "ring2"]
+## Four ring fingers: ring1/ring2 on the left of the paperdoll, ring3/ring4 on the right.
+const EQUIP_SLOTS := ["weapon", "offhand", "head", "chest", "hands", "feet", "waist", "neck", "ring1", "ring2", "ring3", "ring4"]
+const RING_SLOTS := ["ring1", "ring2", "ring3", "ring4"]
 
 
 ## kind: "inv" | "stash" | "crucible". The grid's items Array is the save's own.
@@ -85,7 +87,6 @@ static func pick_up(item: Dictionary) -> bool:
 		Game.float_text("I have no room.", "#e8e4d8")
 		return false
 	register_find(item)
-	QuestRules.emit("pickup", item.baseId)
 	Game.commit()
 	return hero.inventory.has(item)
 
@@ -109,7 +110,6 @@ static func _socket_into(rhune: Dictionary, target: Dictionary) -> void:
 	rhune.erase("x")
 	rhune.erase("y")
 	target.socketed.append(rhune)
-	QuestRules.emit("socket")
 	var base := ItemBases.get_base(target.baseId)
 	if target.socketed.size() == target.sockets and (target.quality == "normal" or target.quality == "superior"):
 		var ids: Array = []
@@ -125,7 +125,6 @@ static func _socket_into(rhune: Dictionary, target: Dictionary) -> void:
 					kept.append(a)
 			target.affixes = kept
 			register_find(target)
-			QuestRules.emit("rhuneword")
 			Game.toast("The rhunes speak: %s!" % rw.name, ItemText.QUALITY_COLORS.unique)
 			Game.float_text(rw.name, ItemText.QUALITY_COLORS.unique)
 
@@ -137,7 +136,6 @@ static func identify(item: Dictionary) -> bool:
 	item.identified = true
 	Game.save.stats.identified += 1
 	register_find(item)
-	QuestRules.emit("identify")
 	return true
 
 
@@ -158,27 +156,12 @@ static func identify_all() -> int:
 	return n
 
 
-static func _use_scroll_on(target: Dictionary) -> void:
-	var hero := Game.hero()
-	if not target.is_empty() and not target.identified:
-		var scroll := _find_base(hero.inventory, "scroll_identify")
-		if not scroll.is_empty():
-			Grid.remove_item(grid_of("inv"), scroll.uid)
-			identify(target)
-	Game.set_ui({"cursor_mode": ""})
-	Game.commit()
-
-
 # ------------------------------------------------------------- grid clicks
 ## Click on a grid at the cell where the cursor item's top-left would land
 ## (the UI computes it), or on an item (target_uid) when the cursor is empty.
 static func click_grid(kind: String, cx: int, cy: int, target_uid := "") -> void:
 	var hero := Game.hero()
 	var grid := grid_of(kind)
-
-	if Game.ui.get("cursor_mode", "") == "identify":
-		_use_scroll_on(_find_uid(grid.items, target_uid))
-		return
 
 	if not _has_cursor(hero):
 		if target_uid == "":
@@ -212,7 +195,7 @@ static func right_click_item(kind: String, uid: String) -> void:
 		return
 	var base := ItemBases.get_base(item.baseId)
 
-	if kind == "inv" and left in ["vendor", "herbs", "gamble"]:
+	if kind == "inv" and left in ["vendor", "gamble"]:
 		sell(item)
 		return
 	if left == "stash" or left == "smith" or kind == "crucible":
@@ -224,8 +207,10 @@ static func right_click_item(kind: String, uid: String) -> void:
 			Game.toast("No room.")
 		Game.commit()
 		return
-	if kind == "inv" and base.use != "":
-		use_consumable(item)
+	if kind == "inv" and base.charmSize > 0:
+		if insert_charm(item):
+			Grid.remove_item(grid, uid)
+			Game.commit()
 		return
 	if kind == "inv" and base.slot != "":
 		Grid.remove_item(grid, uid)
@@ -242,29 +227,57 @@ static func right_click_item(kind: String, uid: String) -> void:
 		Game.commit()
 
 
-static func use_consumable(item: Dictionary) -> void:
+# ------------------------------------------------------------------ charms
+## Belt slots a charm takes (its height: small 1, large 2, grand 3).
+static func charm_size(item: Dictionary) -> int:
+	return int(ItemBases.get_base(item.baseId).charmSize)
+
+
+## Slots this belt has, and how many its charms already fill.
+static func belt_capacity(belt: Dictionary) -> int:
+	return int(belt.get("charmSlots", 0))
+
+
+static func belt_used(belt: Dictionary) -> int:
+	var used := 0
+	for c in belt.get("charms", []):
+		used += charm_size(c)
+	return used
+
+
+## Put a charm into the equipped belt. False (with a word why) if it won't go.
+static func insert_charm(charm: Dictionary) -> bool:
+	var belt: Dictionary = Game.hero().equipped.get("waist", {})
+	if belt.is_empty():
+		Game.float_text("I need a belt to hang that on.", "#e8e4d8")
+		return false
+	if belt_used(belt) + charm_size(charm) > belt_capacity(belt):
+		Game.float_text("My belt is full.", "#e8e4d8")
+		return false
+	charm.erase("x")
+	charm.erase("y")
+	if not belt.has("charms"):
+		belt.charms = []
+	belt.charms.append(charm)
+	return true
+
+
+## Click on the belt's charm strip: drop the held charm in, or take one out.
+static func click_belt_charm(index: int) -> void:
 	var hero := Game.hero()
-	var base := ItemBases.get_base(item.baseId)
-	var sheet := Game.sheet()
-	match base.use:
-		"heal":
-			hero.life = sheet.life
-			Grid.remove_item(grid_of("inv"), item.uid)
-			Game.float_text("+life", "#e05050")
-		"mana":
-			hero.mana = sheet.mana
-			Grid.remove_item(grid_of("inv"), item.uid)
-			Game.float_text("+mana", "#5a7cff")
-		"rejuv":
-			hero.life = sheet.life
-			hero.mana = sheet.mana
-			Grid.remove_item(grid_of("inv"), item.uid)
-			Game.float_text("Rejuvenated", "#b57cff")
-		"identify":
-			Game.set_ui({"cursor_mode": "identify"})
-			Game.toast("Click an unidentified item.")
-			return
-	Game.commit()
+	var belt: Dictionary = hero.equipped.get("waist", {})
+	if belt.is_empty():
+		return
+	if _has_cursor(hero):
+		if charm_size(hero.cursor) > 0 and insert_charm(hero.cursor):
+			hero.cursor = null
+			Game.commit()
+		return
+	var charms: Array = belt.get("charms", [])
+	if index >= 0 and index < charms.size():
+		hero.cursor = charms[index]
+		charms.remove_at(index)
+		Game.commit()
 
 
 # ---------------------------------------------------------------- equipping
@@ -273,7 +286,7 @@ static func slot_fits(item: Dictionary, slot: String) -> bool:
 	if base.slot == "":
 		return false
 	if base.slot == "ring":
-		return slot == "ring1" or slot == "ring2"
+		return slot in RING_SLOTS
 	return base.slot == slot
 
 
@@ -283,7 +296,10 @@ static func _best_slot_for(item: Dictionary) -> String:
 		return ""
 	if base.slot == "ring":
 		var eq: Dictionary = Game.hero().equipped
-		return "ring1" if not eq.has("ring1") else ("ring2" if not eq.has("ring2") else "ring1")
+		for r in RING_SLOTS:
+			if not eq.has(r):
+				return r
+		return "ring1"
 	return base.slot
 
 
@@ -291,10 +307,6 @@ static func click_equip(slot: String) -> void:
 	var hero := Game.hero()
 	var current: Dictionary = hero.equipped.get(slot, {})
 	var held = hero.cursor
-
-	if Game.ui.get("cursor_mode", "") == "identify":
-		_use_scroll_on(current)
-		return
 
 	if not held is Dictionary:
 		if not current.is_empty():
@@ -330,10 +342,6 @@ static func click_equip(slot: String) -> void:
 # ------------------------------------------------------------------ selling
 static func sell(item: Dictionary) -> void:
 	var hero := Game.hero()
-	var base := ItemBases.get_base(item.baseId)
-	if base.category == "quest":
-		Game.toast("Varn would never forgive you.")
-		return
 	var price := ItemText.sell_price(item)
 	Grid.remove_item(grid_of("inv"), item.uid)
 	hero.gold += price

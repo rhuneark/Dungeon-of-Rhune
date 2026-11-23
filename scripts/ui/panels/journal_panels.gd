@@ -1,57 +1,10 @@
 class_name JournalPanels
-## Lore quests and Varn's Codex (uniques found, rhunes, rhunewords, lore).
-
-
-class QuestsPanel extends UiPanel:
-	func _init() -> void:
-		title = "Lore Quests"
-		panel_width = 360
-
-	func build(body: VBoxContainer) -> void:
-		var hero := Game.hero()
-		var sa := scroll_area("q", 330)
-		var box: VBoxContainer = sa[1]
-		var active := []
-		var done := []
-		for id in hero.quests:
-			if hero.quests[id].state == "active":
-				active.append(id)
-			elif hero.quests[id].state == "done":
-				done.append(id)
-		if active.is_empty():
-			box.add_child(UiKit.para("No open quests. Talk to people — they always want something.", "t10", UiKit.DIM))
-		for id in active:
-			var q := QuestDefs.get_quest(id)
-			if q.is_empty():
-				continue
-			var st: Dictionary = hero.quests[id]
-			box.add_child(UiKit.para("%s — %s" % [q.title, Npcs.get_npc(q.giver).get("name", "")], "t10", UiKit.GOLD))
-			box.add_child(UiKit.para(q.summary))
-			for o in q.objectives:
-				var p := int(st.progress.get(o.id, 0))
-				var c := int(o.count)
-				var ok := p >= c
-				box.add_child(UiKit.para("%s %s%s" % ["+" if ok else "·", o.text, " (%d/%d)" % [p, c] if c > 1 else ""], "t10", UiKit.GOOD if ok else UiKit.DIM))
-			box.add_child(UiKit.gap(2))
-			box.add_child(UiKit.hline(UiKit.ROW_LINE))
-			box.add_child(UiKit.gap(2))
-		if not done.is_empty():
-			box.add_child(UiKit.label("COMPLETED", "label", UiKit.DIM))
-			for id in done:
-				box.add_child(UiKit.label("+ %s" % QuestDefs.get_quest(id).get("title", id), "t10", UiKit.FAINT))
-		var unseen := 0
-		for q in QuestDefs.all():
-			if not hero.quests.has(q.id):
-				unseen += 1
-		if unseen > 0:
-			box.add_child(UiKit.gap(4))
-			box.add_child(UiKit.para("%d more quest%s waiting to be found in Thornwick." % [unseen, "s" if unseen > 1 else ""], "t10", UiKit.DIM))
-		body.add_child(sa[0])
+## Varn's Codex: uniques found (and how good the best roll was), rhunes and
+## rhunewords.
 
 
 class CodexPanel extends UiPanel:
 	var tab := "uniques"
-	var lore := ""
 
 	func _init() -> void:
 		title = "Varn's Codex"
@@ -59,10 +12,6 @@ class CodexPanel extends UiPanel:
 
 	func _set_tab(id: String) -> void:
 		tab = id
-		mark()
-
-	func _set_lore(id: String) -> void:
-		lore = id
 		mark()
 
 	func build(body: VBoxContainer) -> void:
@@ -73,7 +22,7 @@ class CodexPanel extends UiPanel:
 				found += 1
 		var tabs := UiKit.hbox(3)
 		tabs.alignment = BoxContainer.ALIGNMENT_CENTER
-		for t in [["uniques", "Uniques %d/%d" % [found, Uniques.all().size()]], ["rhunes", "Rhunes"], ["words", "Rhunewords"], ["lore", "Lore"]]:
+		for t in [["uniques", "Uniques %d/%d" % [found, Uniques.all().size()]], ["rhunes", "Rhunes"], ["words", "Rhunewords"]]:
 			var id: String = t[0]
 			tabs.add_child(UiKit.button(t[1], _set_tab.bind(id), 6, tab == id))
 		body.add_child(tabs)
@@ -84,7 +33,6 @@ class CodexPanel extends UiPanel:
 			"uniques": _uniques(box, codex)
 			"rhunes": _rhunes(box, codex)
 			"words": _words(box, codex)
-			"lore": _lore(box)
 		body.add_child(sa[0])
 
 	func _tile(sz: Vector2, draw_fn: Callable, tip: Callable) -> Control:
@@ -149,24 +97,6 @@ class CodexPanel extends UiPanel:
 			box.add_child(line)
 			box.add_child(UiKit.para(ItemTooltip._join(w.stats), "t10", UiKit.MAGIC))
 			box.add_child(UiKit.hline(UiKit.ROW_LINE))
-
-	func _lore(box: VBoxContainer) -> void:
-		var hero := Game.hero()
-		var row := UiKit.hbox(6)
-		var list := UiKit.vbox(1)
-		list.custom_minimum_size.x = 130
-		for l in Lore.all():
-			var has: bool = l.id in hero.lore
-			var b := UiKit.button(l.title if has else "— undiscovered —", _set_lore.bind(String(l.id)), 3, lore == l.id)
-			b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-			b.disabled = not has
-			b.clip_text = true
-			b.custom_minimum_size.x = 130
-			list.add_child(b)
-		row.add_child(list)
-		var text: String = Lore.get_lore(lore).get("text", "") if lore != "" else "Lore is found by poking at the world. Pick an entry."
-		row.add_child(UiKit.para(text))
-		box.add_child(row)
 
 	class _Tile extends PanelContainer:
 		var draw_fn: Callable

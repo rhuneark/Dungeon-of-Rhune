@@ -69,7 +69,7 @@ func _rebuild() -> void:
 		var n := UiKit.label(hero.name, "t20")
 		n.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		v.add_child(n)
-		var lv := UiKit.label("Level %d %s" % [int(hero.level), Disciplines.combo_title(hero.disciplines[0], hero.disciplines[1])], "t10", UiKit.GOLD)
+		var lv := UiKit.label("Level %d · Deepest floor %d" % [int(hero.level), int(hero.get("bestFloor", 0))], "t10", UiKit.GOLD)
 		lv.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		v.add_child(lv)
 		v.add_child(UiKit.button("Continue", _play, 6))
@@ -103,7 +103,7 @@ func _rebuild() -> void:
 			v.add_child(UiKit.button("Back", func():
 				creating = false
 				_rebuild()))
-		v.add_child(UiKit.para("No classes. Choose two Disciplines as you go; everything that makes sense, works.", "t10", UiKit.DIM, HORIZONTAL_ALIGNMENT_CENTER))
+		v.add_child(UiKit.para("No classes, no skill trees: your gear is your build. Climb down the Sealed Stair, one room at a time, to floor 100.", "t10", UiKit.DIM, HORIZONTAL_ALIGNMENT_CENTER))
 	col.add_child(box)
 
 	var row := UiKit.hbox(4)
@@ -114,7 +114,7 @@ func _rebuild() -> void:
 	col.add_child(row)
 	add_child(col)
 
-	var hint := UiKit.label("CLICK TO MOVE · I C K Q L O · %sESC" % ("` LOOT LAB · " if Platform.dev_tools else ""), "label", UiKit.FAINT)
+	var hint := UiKit.label("CLICK TO MOVE / ATTACK · Q FLASK · T TOWN · I C L O · %sESC" % ("` LOOT LAB · " if Platform.dev_tools else ""), "label", UiKit.FAINT)
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint.size = Vector2(size.x, 10)
 	hint.position = Vector2(0, size.y - 16)
@@ -136,10 +136,10 @@ func _open_options() -> void:
 func _start() -> void:
 	var nm := _name.strip_edges()
 	Game.save.hero = HeroData.new_hero(nm if nm != "" else "Wanderer")
-	QuestRules.start_auto_quests(Game.save.hero)
 	Game.commit()
 	_enter()
-	get_tree().create_timer(0.6).timeout.connect(func(): Game.toast("Welcome to Thornwick. Talk to Old Varn (the tower, north-east of the square).", "#d9b26a"))
+	get_tree().create_timer(0.6).timeout.connect(func(): Game.toast("Thornwick is stuck in one endless night. The way out is a hundred floors down.", "#d9b26a"))
+	get_tree().create_timer(4.0).timeout.connect(func(): Game.toast("Talk to Captain Maren at the Sealed Stair when you're ready.", "#d9b26a"))
 
 
 func _play() -> void:

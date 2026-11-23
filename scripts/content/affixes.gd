@@ -1,5 +1,6 @@
 class_name Affixes
-## Prefix / suffix pool. Magic items roll up to 1 prefix + 1 suffix; rares
+## Prefix / suffix pool. Gear is the whole build: there are no skills.
+## Magic items roll up to 1 prefix + 1 suffix; rares
 ## roll 3-6 affixes (max 3 of each kind). A tier rolls only when the item
 ## level >= its alvl — so the SAME base gets better affixes deeper in the Pit.
 ##
@@ -55,12 +56,6 @@ static func all() -> Array:
 		t("Reinforced", 8, [r("localArmor", 9, 15)]),
 		t("Bulwarked", 16, [r("localArmor", 16, 30)]),
 	]))
-	a.append(_a("mana", "prefix", "mana", ["helm", "chest", "jewelry", "caster", "curio"], 20, [
-		t("Glinting", 1, [r("mana", 5, 10)]),
-		t("Lucent", 6, [r("mana", 11, 20)]),
-		t("Radiant", 12, [r("mana", 21, 30)]),
-		t("Brilliant", 20, [r("mana", 31, 45)]),
-	]))
 	for e in [
 		["fire", ["Charred", "Kilnfired", "Emberwoven"]],
 		["cold", ["Frosted", "Rimebound", "Wintersworn"]],
@@ -91,22 +86,17 @@ static func all() -> Array:
 		]))
 	for e in [
 		["projectile", "Piercing", "Impaling"],
-		["area", "Sweeping", "Cataclysmic"],
 		["spell", "Arcane", "Eldritch"],
 		["melee", "Martial", "Warlord's"],
-		["minion", "Commanding", "Sovereign"],
-		["dot", "Festering", "Lingering"],
+		["ranged", "Fletched", "Marksman's"],
 	]:
 		var tag: String = e[0]
 		a.append(_a("tag_" + tag, "prefix", "tag_" + tag, ["weapon", "jewelry", "offhand", "gloves"], 8, [
 			t(e[1], 4, [r("tagPct:" + tag, 8, 15)]), t(e[2], 16, [r("tagPct:" + tag, 16, 30)]),
 		]))
-	# +Discipline skills — the D2 "class amulet" homage. Rare, chase-worthy.
-	for d in Disciplines.DISCIPLINE_IDS:
-		var names: Array = Disciplines.DISCIPLINE_AFFIX_NAMES[d]
-		a.append(_a("skilldisc_" + d, "prefix", "skilldisc", ["amulet", "caster", "helm", "curio_large"], 3, [
-			t(names[0], 10, [r("skillDisc:" + d, 1, 1)]), t(names[1], 26, [r("skillDisc:" + d, 2, 2)]),
-		]))
+	a.append(_a("flask_potency", "prefix", "flaskpot", ["belt", "chest", "amulet"], 10, [
+		t("Herbalist's", 5, [r("flaskPotency", 10, 20)]), t("Apothecary's", 18, [r("flaskPotency", 21, 35)]),
+	]))
 	a.append(_a("gold", "prefix", "gold", ["armor", "jewelry", "curio"], 10, [
 		t("Gilded", 1, [r("findGold", 15, 40)]), t("Avaricious", 10, [r("findGold", 41, 80)]),
 	]))
@@ -149,9 +139,6 @@ static func all() -> Array:
 		]))
 	a.append(_a("attack_speed", "suffix", "ias", ["weapon", "gloves", "jewelry"], 12, [
 		t("of Readiness", 3, [r("attackSpeed", 8, 12)]), t("of Alacrity", 12, [r("attackSpeed", 13, 20)]), t("of Flurries", 24, [r("attackSpeed", 21, 30)]),
-	], ["caster"]))
-	a.append(_a("cast_speed", "suffix", "fcr", ["caster", "jewelry", "chest", "tome"], 12, [
-		t("of Murmurs", 3, [r("castSpeed", 8, 12)]), t("of Incantation", 12, [r("castSpeed", 13, 20)]), t("of the Choir", 24, [r("castSpeed", 21, 30)]),
 	]))
 	a.append(_a("move_speed", "suffix", "frw", ["boots"], 25, [
 		t("of Wandering", 2, [r("moveSpeed", 10, 10)]), t("of the Wind", 12, [r("moveSpeed", 20, 20)]), t("of the Gale", 22, [r("moveSpeed", 30, 30)]),
@@ -176,7 +163,7 @@ static func all() -> Array:
 		var alvls := [1, 10, 22]
 		for i in 3:
 			tiers.append(t(n[i], alvls[i], [r("addDmg:" + ty, v[i][0], v[i][1], v[i][2], v[i][3])]))
-		a.append(_a("add_" + ty, "suffix", "add_" + ty, ["weapon", "gloves", "ring", "curio"], 10, tiers, ["caster"]))
+		a.append(_a("add_" + ty, "suffix", "add_" + ty, ["weapon", "gloves", "ring", "curio"], 10, tiers))
 	a.append(_a("crit_chance", "suffix", "crit", ["weapon", "ring", "amulet", "gloves"], 10, [
 		t("of Precision", 5, [r("critChance", 3, 5)]), t("of Lethality", 18, [r("critChance", 6, 10)]),
 	]))
@@ -185,9 +172,6 @@ static func all() -> Array:
 	]))
 	a.append(_a("life_leech", "suffix", "leech", ["weapon", "gloves", "ring", "amulet"], 8, [
 		t("of the Leech", 5, [r("lifeLeech", 2, 4)]), t("of the Lamprey", 15, [r("lifeLeech", 5, 7)]),
-	], ["caster"]))
-	a.append(_a("mana_leech", "suffix", "mleech", ["weapon", "gloves", "ring", "amulet"], 6, [
-		t("of the Moth", 5, [r("manaLeech", 2, 4)]), t("of the Wisp", 15, [r("manaLeech", 5, 7)]),
 	]))
 	a.append(_a("life_on_kill", "suffix", "lok", ["weapon", "gloves", "ring"], 8, [
 		t("of the Vulture", 3, [r("lifeOnKill", 2, 4)]), t("of the Carrion", 14, [r("lifeOnKill", 5, 9)]),
@@ -195,8 +179,8 @@ static func all() -> Array:
 	a.append(_a("life_regen", "suffix", "regen", ["jewelry", "chest", "belt", "helm"], 10, [
 		t("of Mending", 1, [r("lifeRegen", 1, 2)]), t("of Renewal", 12, [r("lifeRegen", 3, 5)]),
 	]))
-	a.append(_a("mana_regen", "suffix", "mregen", ["jewelry", "caster", "helm", "tome"], 10, [
-		t("of the Spring", 3, [r("manaRegen", 10, 20)]), t("of the Wellspring", 14, [r("manaRegen", 21, 40)]),
+	a.append(_a("flask_recovery", "suffix", "flask", ["belt", "amulet", "curio"], 12, [
+		t("of Haste", 3, [r("flaskRecovery", 8, 12)]), t("of the Spring", 14, [r("flaskRecovery", 13, 20)]), t("of the Wellspring", 26, [r("flaskRecovery", 21, 30)]),
 	]))
 	a.append(_a("thorns", "suffix", "thorns", ["chest", "shield"], 8, [
 		t("of Brambles", 1, [r("thorns", 2, 5)]), t("of Thorns", 10, [r("thorns", 6, 12)]), t("of Spite", 20, [r("thorns", 13, 25)]),
@@ -227,7 +211,7 @@ static func all() -> Array:
 	a.append(_a("crude_w", "prefix", "quality", [], 0, [t("Crude", 1, [r("localDmgPct", -25, -15)])]))
 	a.append(_a("crude_a", "prefix", "quality", [], 0, [t("Crude", 1, [r("localArmorPct", -25, -15)])]))
 
-	# ============================================ CURIO-ONLY affixes (backpack charms)
+	# ========================================= CHARM-ONLY affixes (base ids: curio_*)
 	a.append(_a("c_life", "suffix", "life", ["curio"], 30, [
 		t("of Vitality", 1, [r("life", 3, 8)]), t("of Vigor", 10, [r("life", 9, 15)]), t("of Hardiness", 20, [r("life", 16, 25)]),
 	]))

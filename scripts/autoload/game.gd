@@ -12,7 +12,7 @@ extends Node
 signal changed
 signal ui_changed(keys: Array)
 signal toast_added(text: String, color: String)
-## origin: "player" | "well" | Vector2 (world px)
+## origin: "player" | Vector2 (world px)
 signal drops_requested(drops: Array, origin: Variant)
 ## at: null (over the player) or Vector2 (world px)
 signal float_text_requested(text: String, color: String, at: Variant)
@@ -23,14 +23,23 @@ var ui := {
 	"phase": "loading", # loading | menu | playing
 	"load_progress": 0.0,
 	"paused": false,
-	"left": "", # "" | character | stash | vendor | herbs | gamble | smith | codex | quests | well | lab | options
+	"left": "", # "" | character | stash | vendor | gamble | smith | codex | lab | options
 	"right": "", # "" | inventory
-	"overlay": "", # "" | skills
-	"dialog": {}, # {} | {npcId, title, sub, line, notes: Array[String]}
+	"overlay": "", # unused for now
+	"dialog": {}, # {} | {npcId, title, sub, line, notes: Array[String], (floors: true)}
 	"service_npc": "",
-	"cursor_mode": "", # "" | identify
+	"cursor_mode": "",
 	"hover_name": {}, # {} | {text, color, sub}
+	"location": "town", # town | dungeon
+	"floor": 0, # dungeon floor (1-100)
+	"zone_title": "Thornwick",
+	"zone_sub": "Town · Safe",
+	"dead": false,
 }
+
+## The flask refills in real time (ms, Time.get_ticks_msec).
+var _flask_from := 0
+var _flask_ready := 0
 
 var _sheet: Dictionary = {}
 var _sheet_rev := -1
@@ -95,10 +104,80 @@ func set_ui(patch: Dictionary) -> void:
 
 ## Close every panel/dialog (Esc). Returns true if anything was open.
 func close_all() -> bool:
-	var any: bool = ui.left != "" or ui.right != "" or ui.overlay != "" or not ui.dialog.is_empty() or ui.cursor_mode != ""
+	var dialog_open: bool = not ui.dialog.is_empty() and not ui.dialog.get("modal", false)
+	var any: bool = ui.left != "" or ui.right != "" or dialog_open
 	if any:
-		set_ui({"left": "", "right": "", "overlay": "", "dialog": {}, "service_npc": "", "cursor_mode": ""})
+		set_ui({"left": "", "right": "", "dialog": {} if dialog_open else ui.dialog, "service_npc": ""})
 	return any
+
+
+# ------------------------------------------------------------ the flask
+## 0..1, how full the rejuvenation flask is (1 = ready).
+func flask_fraction() -> float:
+	var now := Time.get_ticks_msec()
+	if now >= _flask_ready:
+		return 1.0
+	return clampf(float(now - _flask_from) / maxf(1.0, float(_flask_ready - _flask_from)), 0.0, 1.0)
+
+
+func drink_flask() -> void:
+	if not has_hero() or ui.phase != "playing" or ui.dead:
+		return
+	var h := hero()
+	var sh := sheet()
+	if flask_fraction() < 1.0:
+		float_text("Not ready.", "#c68cff")
+		return
+	if float(h.life) >= float(sh.life):
+		float_text("I'm fine.", "#e8e4d8")
+		return
+	var heal: int = sh.flask.heal
+	h.life = minf(float(sh.life), float(h.life) + heal)
+	var now := Time.get_ticks_msec()
+	_flask_from = now
+	_flask_ready = now + int(float(sh.flask.cooldown) * 1000.0)
+	float_text("+%d" % heal, "#c68cff")
+
+
+func reset_flask() -> void:
+	_flask_from = 0
+	_flask_ready = 0
+
+
+# ------------------------------------------------------------ where you are
+## Go down the Sealed Stair to `floor` (1, or a checkpoint).
+func enter_dungeon(floor: int) -> void:
+	var h := hero()
+	h.bestFloor = maxi(int(h.get("bestFloor", 0)), floor)
+	commit()
+	set_ui({"location": "dungeon", "floor": floor, "dead": false, "dialog": {}, "left": "", "service_npc": ""})
+
+
+func next_floor() -> void:
+	enter_dungeon(int(ui.floor) + 1)
+
+
+## Back to Thornwick (the portal, the Town button, or after dying): the
+## townsfolk patch you up.
+func return_to_town() -> void:
+	if not has_hero():
+		return
+	hero().life = sheet().life
+	reset_flask()
+	commit()
+	flush()
+	set_ui({"location": "town", "floor": 0, "dead": false, "dialog": {}, "left": "", "service_npc": ""})
+
+
+## Floors you may start a descent from: 1 and every 5th floor you've reached.
+func checkpoints() -> Array:
+	var out := [1]
+	var best := int(hero().get("bestFloor", 0))
+	var f := 5
+	while f <= best:
+		out.append(f)
+		f += 5
+	return out
 
 
 func toast(text: String, color := "") -> void:

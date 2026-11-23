@@ -3,7 +3,7 @@ extends UiPanel
 ## with any fortune, or simulate thousands of drops to see the odds. This is
 ## where loot tuning happens.
 
-const ORDER := ["gold", "consumable", "crude", "normal", "superior", "magic", "rare", "unique", "rhune"]
+const ORDER := ["gold", "crude", "normal", "superior", "magic", "rare", "unique", "rhune"]
 
 var tc := "elite"
 var level := 12
@@ -137,8 +137,8 @@ func build(body: VBoxContainer) -> void:
 	ch.add_child(UiKit.button("+1,000 xp", func():
 		Progression.gain_xp(Game.hero(), 1000)
 		Game.commit()))
-	ch.add_child(UiKit.button("+5 Path Points", func():
-		Game.hero().pathPoints = int(Game.hero().pathPoints) + 5
+	ch.add_child(UiKit.button("Best floor +5", func():
+		Game.hero().bestFloor = int(Game.hero().get("bestFloor", 0)) + 5
 		Game.commit()))
 	body.add_child(ch)
 

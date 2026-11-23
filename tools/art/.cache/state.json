@@ -3,7 +3,14 @@
     "player": {
       "id": "ac79e0ac-0c9e-4140-b05b-c235496f1cf5",
       "anim:walking-8-frames": "done",
-      "anim:breathing-idle": "done"
+      "anim:breathing-idle": "done",
+      "anim:attack:group": "bc0694e4-fa9c-4917-b85e-d6179b33d684",
+      "anim:attack:dirs": [
+        "south"
+      ],
+      "anim:attack": "done",
+      "anim:falling-back-death:group": "66baaa64-623b-46b2-8d56-76690d252396",
+      "anim:falling-back-death": "done"
     },
     "npc_smith": {
       "id": "f599afbc-13ab-434c-b118-1438a78f310d",
@@ -28,6 +35,62 @@
     "npc_gambler": {
       "id": "7d23fcb1-7ee8-46b7-9b84-dde61109e64a",
       "anim:breathing-idle": "done"
+    },
+    "mob_skeleton": {
+      "id": "9f554a43-8c44-448b-a920-c9a340cbec29",
+      "anim:walking-8-frames:group": "2c2b102a-6fdb-4c83-921b-139f06952511",
+      "anim:walking-8-frames": "done",
+      "anim:attack:group": "a0a9b468-f479-4e16-9ea7-725c21a1a5d2",
+      "anim:attack": "done",
+      "anim:falling-back-death:group": "a3c4367a-00aa-4405-9f9b-4d081e22c5f4",
+      "anim:falling-back-death": "done"
+    },
+    "mob_archer": {
+      "id": "d6f283d6-003b-4f6e-9061-daff831da542",
+      "anim:walking-8-frames:group": "5b666ab3-506a-4fd2-9273-c6860cfb39ba",
+      "anim:walking-8-frames": "done",
+      "anim:attack:group": "747b600f-2e3b-489e-ac42-504f536e1f5d",
+      "anim:attack": "done",
+      "anim:falling-back-death:group": "5ae264bb-28cf-47b5-bce7-ba1cafcbeb7a",
+      "anim:falling-back-death": "done"
+    },
+    "mob_ghoul": {
+      "id": "e5edb929-9672-4599-b050-6057dfa12777",
+      "anim:walking-8-frames": "done",
+      "anim:attack:group": "bd534478-dffc-41e2-a3db-794de4886865",
+      "anim:attack": "done",
+      "anim:falling-back-death:group": "5e9aecec-a2c0-40f8-ab1d-1517a36b7ba2",
+      "anim:falling-back-death": "done"
+    },
+    "mob_brute": {
+      "id": "93234353-12ba-4bbd-b2e0-45d0f628cac4",
+      "anim:walking-8-frames": "done",
+      "anim:attack:group": "7bd0e232-b880-4512-ac26-b8e824f3cb2c",
+      "anim:attack": "done",
+      "anim:falling-back-death:group": "36262da5-af09-4a27-8fa7-569cea9003f0",
+      "anim:falling-back-death": "done"
+    },
+    "mob_cultist": {
+      "id": "7928def4-9b2e-41bf-854f-2fc4d41b7208",
+      "anim:walking-8-frames:group": "3655e4ae-94de-458a-8d75-a6d5a07ca846",
+      "anim:walking-8-frames": "done",
+      "anim:attack:group": "ad1ec7a3-d745-42d6-83ff-eecc4eaf32b1",
+      "anim:attack": "done",
+      "anim:falling-back-death:group": "d45288e1-9bd4-46ec-bea5-98dd97ce48e9",
+      "anim:falling-back-death": "done"
+    },
+    "boss_warden": {
+      "id": "9ae05dfa-af9c-4701-b16b-54159ef01515",
+      "anim:walking-8-frames": "done",
+      "anim:attack:group": "d26574c0-fcd3-42f1-aae4-a04569251998"
+    },
+    "mob_wraith": {
+      "id": "ee0fff6d-ec50-400d-a29f-1682bb7e7dd4",
+      "anim:walking-8-frames": "done",
+      "anim:attack:group": "b0119f04-f1b4-4604-8409-4ca947bd234a",
+      "anim:attack": "done",
+      "anim:falling-back-death:group": "41c0d614-7c8f-4bfd-b70c-f34f7c1ae09d",
+      "anim:falling-back-death": "done"
     }
   },
   "tilesets": {

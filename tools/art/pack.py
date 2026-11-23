@@ -101,7 +101,8 @@ def pack_tiles(name):
         im = recolour(Image.open(io.BytesIO(base64.b64decode(t["image"]["base64"]))).convert("RGBA"), table)
         ims.append(im)
         c = t["corners"]
-        key = "".join("1" if c[k] == "upper" else "0" for k in ("NW", "NE", "SW", "SE"))
+        # 0 lower, 1 upper, 2 transition (cliff sets: the wall face under an upper edge)
+        key = "".join({"upper": "1", "transition": "2"}.get(c[k], "0") for k in ("NW", "NE", "SW", "SE"))
         entries.append({"i": i, "key": key})
         if key in ("0000", "1111"):
             solid[key] = im

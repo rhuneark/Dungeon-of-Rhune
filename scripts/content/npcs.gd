@@ -1,7 +1,9 @@
 class_name Npcs
-## The people of Thornwick. Each NPC offers services (which panels open) and
-## a few lines of talk.
-## Services: trade, herbs, gamble, smith, identify, codex, gate.
+## The people of Thornwick: a town that has lived the same night for longer
+## than anyone can count. Somewhere under the Sealed Stair an hourglass has
+## stopped; conquer floor 100 and the sand runs again. Until then, everyone
+## helps however they can: identifying, the flask, the forge, trade, luck.
+## Services: identify, codex, flask, smith, trade, gamble, descend.
 ##
 ## Npc: {id, name, title, sprite (character sheet name), services, greeting, chatter}
 
@@ -17,11 +19,23 @@ static func all() -> Array:
 				"title": "Lorekeeper",
 				"sprite": "npc_lore",
 				"services": ["identify", "codex"],
-				"greeting": ["Sit, sit. Let an old man ramble.", "You have the look of someone who reads the tooltip. Good. Most don’t."],
+				"greeting": ["Bring me everything that hums. I read it for nothing. What else would I spend the night on?", "Another night, another descent. Show me what you found."],
 				"chatter": [
-					"Every rhune is a word. I have spent my life learning to pronounce eleven of them.",
+					"Every rhune is a word. I have spent this one night learning to pronounce eleven of them. Several thousand times.",
 					"Unidentified, it is a mystery. Identified, it is usually a disappointment. That is scholarship.",
-					"The Pit goes down further than the maps. The maps were drawn by optimists.",
+					"The Stair goes down a hundred floors. I counted. I had time.",
+				],
+			},
+			{
+				"id": "ysolde",
+				"name": "Mother Ysolde",
+				"title": "Herbalist",
+				"sprite": "npc_herbalist",
+				"services": ["flask"],
+				"greeting": ["Your flask. Give it here. No, don't smell it first.", "You're bleeding on my herbs again. Same blood as yesterday, I'd wager."],
+				"chatter": [
+					"The flask refills itself. Don't ask me how; ask the hourglass, when you find it.",
+					"Bring me back from deeper down and I'll brew it stronger. Floor twenty. Floor fifty. I've done it before. You don't remember.",
 				],
 			},
 			{
@@ -30,21 +44,12 @@ static func all() -> Array:
 				"title": "Smith",
 				"sprite": "npc_smith",
 				"services": ["smith"],
-				"greeting": ["Hammer’s hot. What do you need?", "Plain gear with empty holes is worth more than you think. Ask me why."],
+				"greeting": ["Hammer's hot. Always is. It never gets the chance to cool.", "Plain gear with empty holes is worth more than you think. Ask me why."],
 				"chatter": [
-					"Three of the same rhune in my crucible and you get the next one up. Don’t ask how. I don’t know how.",
-					"Magic items can’t take a Rhuneword. Too much talking already.",
-					"I am NOT an Emberwright. The forge just likes me.",
+					"Three of the same rhune in my crucible and you get the next one up. Don't ask how. I don't know how.",
+					"Magic items can't take a Rhuneword. Too much talking already.",
+					"I've forged the same horseshoe four thousand times. It's a very good horseshoe.",
 				],
-			},
-			{
-				"id": "ysolde",
-				"name": "Mother Ysolde",
-				"title": "Herbalist",
-				"sprite": "npc_herbalist",
-				"services": ["herbs"],
-				"greeting": ["Drink this. No, don’t smell it first.", "You’re bleeding on my herbs."],
-				"chatter": ["The well talks at night. I talk back. We’re very close.", "Red for blood, blue for wits, purple for when it’s gone very wrong."],
 			},
 			{
 				"id": "pell",
@@ -52,10 +57,10 @@ static func all() -> Array:
 				"title": "Trader",
 				"sprite": "npc_trader",
 				"services": ["trade"],
-				"greeting": ["Buying, selling, browsing, loitering? All welcome. Loitering is extra.", "Everything has a price. Most of it is reasonable."],
+				"greeting": ["Buying, selling, browsing? My stock changes every time the night does. Which is always.", "Everything has a price. Most of it is reasonable."],
 				"chatter": [
-					"My stock changes when you’re not looking. Trade secret.",
-					"Unidentified goods? I’ll take them, but I won’t pay much. Varn reads them for free, you know.",
+					"I'll buy anything you drag up the Stair. Varn reads it for free, so read it first.",
+					"Gold is the only thing that still adds up in this town.",
 				],
 			},
 			{
@@ -64,17 +69,20 @@ static func all() -> Array:
 				"title": "Purveyor of Sealed Goods",
 				"sprite": "npc_gambler",
 				"services": ["gamble"],
-				"greeting": ["Sealed goods! Could be anything! Legally, it’s mostly something!", "Feeling lucky? I am. I always am."],
-				"chatter": ["One in a hundred is legendary. Or one in fifty. I lose count.", "Never trust a goose. Never trust a man who trusts a goose."],
+				"greeting": ["Sealed goods! Could be anything! Legally, it's mostly something!", "Feeling lucky? I am. Same luck every night."],
+				"chatter": ["One in a hundred is legendary. Or one in fifty. I lose count. Then the night resets and I count again."],
 			},
 			{
 				"id": "maren",
 				"name": "Captain Maren",
-				"title": "Gate Captain",
+				"title": "Warden of the Stair",
 				"sprite": "npc_captain",
-				"services": ["gate"],
-				"greeting": ["State your business. If it’s the Wilds, the answer is not yet.", "Gate stays shut until the scouts are back."],
-				"chatter": ["The goose outranks me. I checked.", "Something has been eating the scouts’ rations. Small. Greedy. Jingles."],
+				"services": ["descend"],
+				"greeting": ["You're going down again. Good. Someone has to.", "Floor one, or where you left off? Every fifth floor, the way back down remembers you."],
+				"chatter": [
+					"Every room down there seals until it's empty. Empty it. Then the chest. Then the next stair.",
+					"Every tenth floor something guards the way. It has an hourglass where its heart should be.",
+				],
 			},
 		]
 	return _all

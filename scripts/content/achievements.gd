@@ -9,11 +9,11 @@ const ALL := [
 	{"id": "FIRST_UNIQUE", "name": "Grail-Hunter", "description": "Identify your first unique item."},
 	{"id": "CODEX_10", "name": "Collector", "description": "Record 10 different uniques in the Codex."},
 	{"id": "FIRST_RHUNEWORD", "name": "It Speaks", "description": "Speak your first Rhuneword."},
-	{"id": "TWO_PATHS", "name": "Two Paths", "description": "Walk two Disciplines at once."},
-	{"id": "GOOSE", "name": "Have a Word", "description": "Resolve the Goose Problem."},
-	{"id": "LOCAL_KNOWLEDGE", "name": "Local Knowledge", "description": "Finish every lore quest in Thornwick."},
-	{"id": "BOTTOMLESS", "name": "Bottomless", "description": "Make 25 wishes at the Wishing Well."},
 	{"id": "ODDS_ARE", "name": "Odds Are", "description": "Buy 25 of Odo's sealed goods."},
+	{"id": "FLOOR_10", "name": "Ten Down", "description": "Reach floor 10 of the Sealed Stair."},
+	{"id": "FIRST_WARDEN", "name": "Sand in the Gears", "description": "Defeat an Hourglass Warden."},
+	{"id": "FLOOR_50", "name": "Halfway to Morning", "description": "Reach floor 50 of the Sealed Stair."},
+	{"id": "DAWN", "name": "Dawn", "description": "Conquer floor 100. The sand runs again."},
 ]
 
 
@@ -26,12 +26,9 @@ static func _hero(save: Dictionary):
 	return h if h is Dictionary else null
 
 
-static func _done(save: Dictionary, q: String) -> bool:
+static func _best_floor(save: Dictionary) -> int:
 	var h = _hero(save)
-	if h == null:
-		return false
-	var qs: Dictionary = h.get("quests", {})
-	return qs.has(q) and qs[q].get("state", "") == "done"
+	return int(h.get("bestFloor", 0)) if h != null else 0
 
 
 static func _codex_count(save: Dictionary, prefix: String) -> int:
@@ -54,25 +51,16 @@ static func check(id: String, save: Dictionary) -> bool:
 			return _codex_count(save, "u:") >= 10
 		"FIRST_RHUNEWORD":
 			return _codex_count(save, "w:") >= 1
-		"TWO_PATHS":
-			var h = _hero(save)
-			if h == null:
-				return false
-			for d in h.get("disciplines", []):
-				if d == null or d == "":
-					return false
-			return true
-		"GOOSE":
-			return _done(save, "goose_problem")
-		"LOCAL_KNOWLEDGE":
-			for q in QuestDefs.all():
-				if not _done(save, q.id):
-					return false
-			return true
-		"BOTTOMLESS":
-			return _stat(save, "wishes") >= 25
 		"ODDS_ARE":
 			return _stat(save, "gambles") >= 25
+		"FLOOR_10":
+			return _best_floor(save) >= 10
+		"FIRST_WARDEN":
+			return _stat(save, "wardens") >= 1
+		"FLOOR_50":
+			return _best_floor(save) >= 50
+		"DAWN":
+			return _stat(save, "conquered") >= 1
 	return false
 
 

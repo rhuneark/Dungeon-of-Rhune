@@ -1,6 +1,6 @@
 class_name TreasureClasses
-## Treasure Classes: D2's drop model, simplified. A source (monster, chest,
-## the wishing well...) names a TC; the TC makes `picks` weighted picks from
+## Treasure Classes: D2's drop model, simplified. A source (monster, room
+## chest...) names a TC; the TC makes `picks` weighted picks from
 ## its entries, where "noDrop" is a competing weight for nothing at all.
 ##  - Item Quantity shrinks noDrop (more stuff)
 ##  - <Kind> Find multiplies the weight of matching entries (more of THAT stuff)
@@ -26,104 +26,31 @@ static var _by_id: Dictionary = {}
 
 static func all() -> Array:
 	if _all.is_empty():
+		var std := func(gold: float, gold_mult: float, w: float, a: float, j: float, c: float, r: float) -> Array:
+			return [
+				{"pick": {"kind": "gold", "mult": gold_mult}, "weight": gold},
+				{"pick": {"kind": "equip", "category": "weapon"}, "weight": w},
+				{"pick": {"kind": "equip", "category": "armor"}, "weight": a},
+				{"pick": {"kind": "equip", "category": "jewelry"}, "weight": j},
+				{"pick": {"kind": "equip", "category": "curio"}, "weight": c},
+				{"pick": {"kind": "rhune"}, "weight": r},
+			]
 		_all = [
-			{
-				"id": "mob",
-				"name": "Monster",
-				"picks": 1,
-				"noDrop": 100,
-				"entries": [
-					{"pick": {"kind": "gold"}, "weight": 35},
-					{"pick": {"kind": "potion"}, "weight": 20},
-					{"pick": {"kind": "scroll"}, "weight": 3},
-					{"pick": {"kind": "equip", "category": "weapon"}, "weight": 9},
-					{"pick": {"kind": "equip", "category": "armor"}, "weight": 12},
-					{"pick": {"kind": "equip", "category": "jewelry"}, "weight": 2},
-					{"pick": {"kind": "equip", "category": "curio"}, "weight": 1.2},
-					{"pick": {"kind": "rhune"}, "weight": 1.4},
-				],
-			},
-			{
-				"id": "champion",
-				"name": "Champion",
-				"picks": 2,
-				"noDrop": 40,
-				"entries": [
-					{"pick": {"kind": "gold"}, "weight": 35},
-					{"pick": {"kind": "potion"}, "weight": 20},
-					{"pick": {"kind": "scroll"}, "weight": 3},
-					{"pick": {"kind": "equip", "category": "weapon"}, "weight": 9},
-					{"pick": {"kind": "equip", "category": "armor"}, "weight": 12},
-					{"pick": {"kind": "equip", "category": "jewelry"}, "weight": 2},
-					{"pick": {"kind": "equip", "category": "curio"}, "weight": 1.2},
-					{"pick": {"kind": "rhune"}, "weight": 1.4},
-				],
-				"quality": {"magic": 1.5, "rare": 1.3, "unique": 1.2},
-			},
-			{
-				"id": "elite",
-				"name": "Unique Monster",
-				"picks": 4,
-				"noDrop": 20,
-				"entries": [
-					{"pick": {"kind": "gold", "mult": 2}, "weight": 20},
-					{"pick": {"kind": "potion"}, "weight": 8},
-					{"pick": {"kind": "equip", "category": "weapon"}, "weight": 18},
-					{"pick": {"kind": "equip", "category": "armor"}, "weight": 24},
-					{"pick": {"kind": "equip", "category": "jewelry"}, "weight": 6},
-					{"pick": {"kind": "equip", "category": "curio"}, "weight": 3},
-					{"pick": {"kind": "rhune"}, "weight": 4},
-				],
-				"quality": {"magic": 2, "rare": 1.8, "unique": 1.6},
-			},
-			{
-				"id": "boss",
-				"name": "Boss",
-				"picks": 6,
-				"noDrop": 0,
-				"entries": [
-					{"pick": {"kind": "gold", "mult": 2}, "weight": 20},
-					{"pick": {"kind": "potion"}, "weight": 8},
-					{"pick": {"kind": "equip", "category": "weapon"}, "weight": 18},
-					{"pick": {"kind": "equip", "category": "armor"}, "weight": 24},
-					{"pick": {"kind": "equip", "category": "jewelry"}, "weight": 6},
-					{"pick": {"kind": "equip", "category": "curio"}, "weight": 3},
-					{"pick": {"kind": "rhune"}, "weight": 4},
-				],
-				"quality": {"magic": 3, "rare": 2.5, "unique": 2.5},
-			},
-			{
-				"id": "gobbler",
-				"name": "Coin-Gobbler",
-				"picks": 8,
-				"noDrop": 0,
-				"entries": [
-					{"pick": {"kind": "gold", "mult": 4}, "weight": 40},
-					{"pick": {"kind": "potion"}, "weight": 8},
-					{"pick": {"kind": "equip", "category": "weapon"}, "weight": 18},
-					{"pick": {"kind": "equip", "category": "armor"}, "weight": 24},
-					{"pick": {"kind": "equip", "category": "jewelry"}, "weight": 6},
-					{"pick": {"kind": "equip", "category": "curio"}, "weight": 3},
-					{"pick": {"kind": "rhune"}, "weight": 4},
-				],
-				"quality": {"magic": 2, "rare": 2, "unique": 2},
-			},
-			{
-				"id": "well",
-				"name": "Wishing Well",
-				"picks": 1,
-				"noDrop": 0,
-				"entries": [
-					{"pick": {"kind": "equip", "category": "weapon"}, "weight": 24},
-					{"pick": {"kind": "equip", "category": "armor"}, "weight": 30},
-					{"pick": {"kind": "equip", "category": "jewelry"}, "weight": 9},
-					{"pick": {"kind": "equip", "category": "curio"}, "weight": 5},
-					{"pick": {"kind": "rhune"}, "weight": 5},
-					{"pick": {"kind": "potion"}, "weight": 10},
-					{"pick": {"kind": "gold", "mult": 0.5}, "weight": 10},
-				],
-				"quality": {"magic": 1.6, "rare": 1.2, "unique": 1.2},
-			},
+			# Monsters drop a little as you fight; the room's chest is the real haul.
+			{"id": "mob", "name": "Monster", "picks": 1, "noDrop": 140, "entries": std.call(40, 1, 9, 12, 2, 1.2, 1.4)},
+			{"id": "champion", "name": "Champion", "picks": 2, "noDrop": 40, "entries": std.call(35, 1, 9, 12, 2, 1.2, 1.4),
+				"quality": {"magic": 1.5, "rare": 1.3, "unique": 1.2}},
+			{"id": "elite", "name": "Unique Monster", "picks": 4, "noDrop": 20, "entries": std.call(20, 2, 18, 24, 6, 3, 4),
+				"quality": {"magic": 2, "rare": 1.8, "unique": 1.6}},
+			{"id": "boss", "name": "Boss", "picks": 6, "noDrop": 0, "entries": std.call(20, 2, 18, 24, 6, 3, 4),
+				"quality": {"magic": 3, "rare": 2.5, "unique": 2.5}},
+			{"id": "gobbler", "name": "Coin-Gobbler", "picks": 8, "noDrop": 0, "entries": std.call(40, 4, 18, 24, 6, 3, 4),
+				"quality": {"magic": 2, "rare": 2, "unique": 2}},
+			# The chest that rises when a room is cleared (rolled more times deeper down).
+			{"id": "chest", "name": "Room Chest", "picks": 3, "noDrop": 8, "entries": std.call(30, 2, 16, 22, 6, 4, 5),
+				"quality": {"magic": 1.6, "rare": 1.4, "unique": 1.3}},
+			{"id": "chest_boss", "name": "Warden's Hoard", "picks": 7, "noDrop": 0, "entries": std.call(20, 3, 18, 24, 8, 5, 6),
+				"quality": {"magic": 3, "rare": 2.8, "unique": 3}},
 		]
 		for t in _all:
 			_by_id[t.id] = t

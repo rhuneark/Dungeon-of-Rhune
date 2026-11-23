@@ -13,10 +13,11 @@ extends Node2D
 ## The UI lives on its own CanvasLayer and is never tinted.
 
 const LIGHT_MASK := 1
-## Moonlit dusk. Multiplies every world pixel that isn't lit or emissive.
-@export var ambient := Color(0.66, 0.68, 0.80)
-@export var fog_color := Color(0.70, 0.75, 0.84)
-@export var fog_density := 0.26
+## Moonlit dusk by default; each Zone sets its own (ambient, fog_density, hero_light).
+var ambient := Color(0.66, 0.68, 0.80)
+var fog_color := Color(0.70, 0.75, 0.84)
+var fog_density := 0.26
+var hero_light := 96.0
 
 ## art -> {radius_mul, energy_mul, kind (overrides the detected colour), embers}.
 const LIGHT_TUNING := {
@@ -25,6 +26,11 @@ const LIGHT_TUNING := {
 	"smithy": {"radius_mul": 1.5, "energy_mul": 1.15, "kind": "fire", "embers": true},
 	"brazier": {"radius_mul": 2.0, "energy_mul": 1.2, "kind": "fire", "embers": true},
 	"gate": {"radius_mul": 1.3, "energy_mul": 1.0, "kind": "fire"},
+	"wall_torch": {"radius_mul": 2.0, "energy_mul": 1.2, "kind": "fire", "embers": true},
+	"pillar": {"radius_mul": 1.6, "energy_mul": 1.0, "kind": "fire"},
+	"door_open": {"radius_mul": 1.5, "energy_mul": 0.9, "kind": "rune"},
+	"town_portal": {"radius_mul": 1.8, "energy_mul": 1.1, "kind": "rune"},
+	"summon_circle": {"radius_mul": 1.2, "energy_mul": 0.7, "kind": "fire"},
 	"waypoint": {"radius_mul": 1.4, "energy_mul": 0.9},
 	"pit_entrance": {"radius_mul": 1.3, "energy_mul": 0.9},
 	"statue": {"radius_mul": 1.6, "energy_mul": 1.0},
@@ -42,19 +48,23 @@ var _player_light: PointLight2D
 
 
 func setup(zone: Zone, map_px: Vector2) -> void:
+	ambient = zone.ambient
+	fog_density = zone.fog_density
+	hero_light = zone.hero_light
 	var cm := CanvasModulate.new()
 	cm.color = ambient
 	add_child(cm)
 	for p in ZoneRuntime._all(zone, "Prop"):
 		if p.texture:
-			_light_prop(p)
-	_add_fog(map_px)
+			light_prop(p)
+	if fog_density > 0.0:
+		_add_fog(map_px)
 	_add_vignette()
 
 
 ## A soft light that follows the hero, so they never vanish in the dark.
 func attach_player_light(sprite: Node2D) -> void:
-	_player_light = _make_light(Color(0.85, 0.82, 0.72), 96, 0.55)
+	_player_light = _make_light(Color(0.85, 0.82, 0.72), int(hero_light), 0.55 if hero_light < 120 else 0.8)
 	_player_light.position = Vector2(0, -18)
 	sprite.add_child(_player_light)
 
@@ -67,7 +77,16 @@ func _process(delta: float) -> void:
 
 
 # ------------------------------------------------------------ prop lights
-func _light_prop(p: Prop) -> void:
+## Light a prop that appeared (or changed art) after setup; replaces any
+## glow and lights it had before.
+func light_prop(p: Prop) -> void:
+	var old = p.get_node_or_null("Glow")
+	if old:
+		old.free()
+	for i in range(_lights.size() - 1, -1, -1):
+		if _lights[i].get("prop") == p:
+			_lights[i].light.queue_free()
+			_lights.remove_at(i)
 	var clusters: Array = Art.prop_meta(p.art).get("glow", [])
 	var glow_tex := Art.glow_texture(p.art)
 	if clusters.is_empty() or glow_tex == null:
@@ -75,6 +94,7 @@ func _light_prop(p: Prop) -> void:
 	var tune: Dictionary = LIGHT_TUNING.get(p.art, {})
 	# Glow layer: the emissive pixels, unshaded, drawn over the prop.
 	var glow := Sprite2D.new()
+	glow.name = "Glow"
 	glow.texture = glow_tex
 	glow.centered = false
 	glow.offset = p.offset
@@ -96,7 +116,7 @@ func _light_prop(p: Prop) -> void:
 		var light := _make_light(COLORS.get(kind, COLORS.warm), radius, energy)
 		light.position = at.round()
 		add_child(light)
-		_lights.append({"light": light, "base": energy, "t": randf() * 10.0, "speed": randf_range(0.8, 1.2)})
+		_lights.append({"light": light, "base": energy, "t": randf() * 10.0, "speed": randf_range(0.8, 1.2), "prop": p})
 		if i == 0 and tune.get("embers", false):
 			_add_embers(at)
 

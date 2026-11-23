@@ -75,3 +75,59 @@ func sparkle(at: Vector2, color: Color) -> void:
 	add_child(p)
 	p.emitting = true
 	get_tree().create_timer(1.2).timeout.connect(p.queue_free)
+
+
+## A quick swing arc (melee hits), in front of the hero.
+func slash(at: Vector2, dir: Vector2) -> void:
+	var arc := SlashArc.new()
+	arc.position = at.round()
+	arc.rotation = dir.angle()
+	add_child(arc)
+
+
+## A damage number that hops up and fades (crits bigger and gold).
+func number(at: Vector2, value: float, crit := false, color := Color("#e8e4d8")) -> void:
+	var l := pixel_label(str(roundi(value)) + ("!" if crit else ""), Color("#f3d34a") if crit else color, 20 if crit else 10, 2)
+	add_child(l)
+	l.reset_size()
+	l.position = (at - Vector2(l.size.x / 2.0 + randf_range(-6, 6), l.size.y)).round()
+	var tw := create_tween()
+	tw.tween_property(l, "position:y", l.position.y - 16, 0.6).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+	tw.parallel().tween_property(l, "modulate:a", 0.0, 0.3).set_delay(0.35)
+	tw.tween_callback(l.queue_free)
+
+
+## Sparks where a projectile breaks.
+func spark(at: Vector2, color: Color) -> void:
+	var p := CPUParticles2D.new()
+	p.position = at.round()
+	p.one_shot = true
+	p.amount = 6
+	p.lifetime = 0.3
+	p.explosiveness = 1.0
+	p.spread = 180.0
+	p.initial_velocity_min = 20.0
+	p.initial_velocity_max = 45.0
+	p.color = color
+	var mat := CanvasItemMaterial.new()
+	mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	p.material = mat
+	add_child(p)
+	p.emitting = true
+	get_tree().create_timer(0.6).timeout.connect(p.queue_free)
+
+
+class SlashArc extends Node2D:
+	var t := 0.0
+
+	func _process(delta: float) -> void:
+		t += delta
+		queue_redraw()
+		if t > 0.14:
+			queue_free()
+
+	func _draw() -> void:
+		var a := 1.0 - t / 0.14
+		for i in 3:
+			draw_arc(Vector2.ZERO, 14.0 + i * 3.0, -1.0, 1.0, 9, Color(1, 0.96, 0.85, a * (0.7 - i * 0.2)), 2.0 - i * 0.5)
+

@@ -1,10 +1,12 @@
 class_name DialogBox
 extends PanelContainer
-## NPC conversation box (D2's talk window): line, quest notes, services.
+## NPC conversation box (D2's talk window): line, notes, service buttons.
+## A dialog may also carry its own `buttons` ([{text, action: Callable}]) and
+## be `modal` (no Leave button: the death screen).
 
 const SERVICE_LABEL := {
-	"trade": "Trade", "herbs": "Trade", "gamble": "Sealed Goods", "smith": "Crucible & Sockets",
-	"identify": "Identify Items", "codex": "Codex", "gate": "The Wilds?",
+	"trade": "Trade", "gamble": "Sealed Goods", "smith": "Crucible & Sockets",
+	"identify": "Identify All (free)", "codex": "Codex", "flask": "Refill Flask", "descend": "Descend",
 }
 
 
@@ -46,7 +48,11 @@ func _rebuild() -> void:
 			var s: String = sv
 			row.add_child(UiKit.button(SERVICE_LABEL.get(s, s), func(): Interact.npc_service(npc_id, s)))
 		row.add_child(UiKit.button("Talk", func(): Interact.talk_to(npc_id)))
-	row.add_child(UiKit.button("Leave", func(): Game.set_ui({"dialog": {}})))
+	for b in d.get("buttons", []):
+		var act: Callable = b.action
+		row.add_child(UiKit.button(b.text, act))
+	if not d.get("modal", false):
+		row.add_child(UiKit.button("Leave", func(): Game.set_ui({"dialog": {}})))
 	v.add_child(row)
 	add_child(v)
 	reset_size()

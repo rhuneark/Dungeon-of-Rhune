@@ -305,19 +305,3 @@ static func fmt_int(n: int) -> String:
 
 static func fmt_num(v: float, decimals := 1) -> String:
 	return str(int(v)) if is_equal_approx(v, roundf(v)) else String.num(v, decimals)
-
-
-## Discipline-coloured letter tile standing in for skill icons.
-static func skill_glyph(skill: Dictionary, sz := 28, dim := false) -> Control:
-	var d := Disciplines.get_discipline(skill.discipline)
-	var color: Color = FAINT if dim else Color(d.get("color", "#aaaaaa"))
-	var p := PanelContainer.new()
-	var sb := _sb(_rings([Color("#3a2c1e") if dim else color], WELL), 1, [0, 0, 0, 0])
-	p.add_theme_stylebox_override("panel", sb)
-	p.custom_minimum_size = Vector2(sz, sz)
-	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var l := label(String(skill.name).substr(0, 1), "t20" if sz >= 28 else "t10", color)
-	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	p.add_child(l)
-	return p

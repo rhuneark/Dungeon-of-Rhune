@@ -51,7 +51,7 @@ static func all() -> Array:
 			"effects": _fx([_m("localDmgPct", 20)], [_m("localArmorPct", 20)], [_m("block", 8)]),
 			"lore": "\"Endure.\" The word on every door of the old Pit."},
 		{"id": "tide", "name": "Tide", "qlvl": 11, "weight": 90,
-			"effects": _fx([_m("manaLeech", 4)], [_m("manaRegen", 15)], [_m("mana", 20)]),
+			"effects": _fx([_m("lifeLeech", 2)], [_m("flaskRecovery", 15)], [_m("life", 20)]),
 			"lore": "\"Return.\" Always found facing the sea, wherever it lies."},
 		{"id": "hollow", "name": "Hollow", "qlvl": 13, "weight": 60,
 			"effects": _fx([_m("addDmg:void", 5, 12)], [_m("res:void", 25)], [_m("res:void", 30)]),
@@ -63,7 +63,7 @@ static func all() -> Array:
 			"effects": _fx([_m("critChance", 8)], [_m("findRarity", 15)], [_m("findRarity", 12)]),
 			"lore": "\"Soon.\" Gamblers swear by it. Gamblers swear by everything."},
 		{"id": "zenith", "name": "Zenith", "qlvl": 23, "weight": 10,
-			"effects": _fx([_m("skillAll", 1)], [_m("resAll", 10)], [_m("resAll", 12)]),
+			"effects": _fx([_m("dmgPctAll", 10)], [_m("resAll", 10)], [_m("resAll", 12)]),
 			"lore": "\"Above all.\" A shard of the stone the others were cut from."},
 	]
 	return _all
@@ -101,7 +101,7 @@ static func rhunewords() -> Array:
 			"stats": [_m("life", 30), _m("lifeRegen", 4), _m("res:cold", 15)],
 			"flavor": "Come in out of the cold."},
 		{"id": "whisper", "name": "Whisper", "rhunes": ["ash", "thorn"], "tags": ["helm", "chest"],
-			"stats": [_m("moveSpeed", 20), _m("castSpeed", 20), _m("mana", 15)],
+			"stats": [_m("moveSpeed", 20), _m("attackSpeed", 20), _m("life", 15)],
 			"flavor": "They never heard you coming."},
 		{"id": "lodestone", "name": "Lodestone", "rhunes": ["iron", "iron"], "tags": ["shield"],
 			"stats": [_m("localArmorPct", 60), _m("dmgReduce", 5), _m("resAll", 8)],
@@ -116,10 +116,10 @@ static func rhunewords() -> Array:
 			"stats": [_m("findGold", 60), _m("findRarity", 35), _m("seek:unique", 20)],
 			"flavor": "Fortune favours the shameless."},
 		{"id": "murmur", "name": "Murmur", "rhunes": ["tide", "omen", "ash"], "tags": ["staff", "wand", "tome"],
-			"stats": [_m("skillAll", 1), _m("manaRegen", 40), _m("castSpeed", 20)],
+			"stats": [_m("dmgPctAll", 10), _m("flaskRecovery", 40), _m("attackSpeed", 20)],
 			"flavor": "The stones talk, if you let them."},
 		{"id": "hollow_crown", "name": "Hollow Crown", "rhunes": ["hollow", "crown", "zenith"], "tags": ["weapon"],
-			"stats": [_m("skillAll", 1), _m("dmgPct:void", 60), _m("localDmgPct", 120), _m("findRarity", 25)],
+			"stats": [_m("dmgPctAll", 10), _m("dmgPct:void", 60), _m("localDmgPct", 120), _m("findRarity", 25)],
 			"flavor": "It was always going to be you."},
 	]
 	return _words

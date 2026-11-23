@@ -1,13 +1,13 @@
 class_name Stats
-## Stat registry — every number an item, rhune, skill or passive can grant.
+## Stat registry — every number an item or rhune can grant. There are no
+## skills: gear is the build, and levels only buy attribute points.
 ##
 ## Stats are plain string ids so content stays data-driven:
 ##   "might", "res:fire", "addDmg:cold", "tagPct:projectile", "seek:rhune",
-##   "skill:cinder_bolt", "skillDisc:emberwright", "quirk:honk" ...
-##
-## Design rule ("most things viable if they make sense"): damage scaling is by
-## TAG and DAMAGE TYPE, never by a specific skill. Skill trees convert
-## tags/types, so gear stays relevant across builds.
+##   "quirk:honk" ...
+## Attribute ids keep their original names (saves and data use them); players
+## see them as Strength (might), Dexterity (finesse), Stamina (vigor) and
+## Intelligence (spirit).
 ##
 ## A stat mod is a Dictionary {stat: String, value: number, value2?: number}
 ## (value2 is the max of an "X-Y" range).
@@ -22,16 +22,15 @@ const DAMAGE_TYPE_NAMES := {
 	"void": "Void",
 }
 
-## Skill/attack tags that "+% <Tag> Damage" stats scale.
-const DAMAGE_TAGS: Array[String] = ["melee", "ranged", "spell", "projectile", "area", "minion", "dot"]
+## Attack tags that "+% <Tag> Damage" stats scale. A weapon's attack is melee
+## (swords, axes, maces...), ranged + projectile (bows) or spell + projectile
+## (caster weapons: wands, staves).
+const DAMAGE_TAGS: Array[String] = ["melee", "ranged", "spell", "projectile"]
 const DAMAGE_TAG_NAMES := {
 	"melee": "Melee",
 	"ranged": "Ranged",
 	"spell": "Spell",
 	"projectile": "Projectile",
-	"area": "Area",
-	"minion": "Minion",
-	"dot": "Damage over Time",
 }
 
 ## Targeted Find ("seek") categories. Rarity Find makes drops BETTER; seek makes
@@ -41,7 +40,7 @@ const SEEK_NAMES := {
 	"weapon": "Weapon",
 	"armor": "Armor",
 	"jewelry": "Jewelry",
-	"curio": "Curio",
+	"curio": "Charm",
 	"rhune": "Rhune",
 	"unique": "Unique",
 }
@@ -58,13 +57,11 @@ static func defs() -> Dictionary:
 	if not _defs.is_empty():
 		return _defs
 	var d := {
-		# skills (always first in tooltips, like D2)
-		"skillAll": _d("+{0} to All Skills", "skill", 0),
 		# attributes
-		"might": _d("+{0} to Might", "attribute", 10),
-		"finesse": _d("+{0} to Finesse", "attribute", 11),
-		"vigor": _d("+{0} to Vigor", "attribute", 12),
-		"spirit": _d("+{0} to Spirit", "attribute", 13),
+		"might": _d("+{0} to Strength", "attribute", 10),
+		"finesse": _d("+{0} to Dexterity", "attribute", 11),
+		"vigor": _d("+{0} to Stamina", "attribute", 12),
+		"spirit": _d("+{0} to Intelligence", "attribute", 13),
 		"allAttr": _d("+{0} to All Attributes", "attribute", 9),
 		# local item modifiers
 		"localDmgPct": _d("+{0}% Enhanced Damage", "offense", 20, true),
@@ -75,23 +72,17 @@ static func defs() -> Dictionary:
 		"sockets": _d("Socketed ({0})", "utility", 99, true),
 		# offense
 		"attackSpeed": _d("+{0}% Increased Attack Speed", "offense", 30),
-		"castSpeed": _d("+{0}% Faster Cast Rate", "offense", 31),
 		"critChance": _d("+{0}% Critical Strike Chance", "offense", 32),
 		"critDamage": _d("+{0}% Critical Strike Damage", "offense", 33),
 		"dmgPctAll": _d("+{0}% Damage", "offense", 34),
 		"lifeLeech": _d("{0}% Life Stolen per Hit", "offense", 40),
-		"manaLeech": _d("{0}% Mana Stolen per Hit", "offense", 41),
 		"lifeOnKill": _d("+{0} Life after each Kill", "offense", 42),
-		"manaOnKill": _d("+{0} Mana after each Kill", "offense", 43),
 		"projectiles": _d("+{0} Projectiles", "offense", 44),
-		"areaPct": _d("+{0}% Area of Effect", "offense", 45),
 		# defense
 		"life": _d("+{0} to Life", "defense", 50),
 		"lifePct": _d("+{0}% Maximum Life", "defense", 51),
-		"mana": _d("+{0} to Mana", "defense", 52),
-		"manaPct": _d("+{0}% Maximum Mana", "defense", 53),
 		"lifeRegen": _d("Replenish Life +{0}", "defense", 54),
-		"manaRegen": _d("Regenerate Mana {0}%", "defense", 55),
+		"flaskPotency": _d("+{0}% Flask Potency", "defense", 55),
 		"armor": _d("+{0} Armor", "defense", 56),
 		"armorPct": _d("+{0}% Armor", "defense", 57),
 		"block": _d("{0}% Increased Chance of Blocking", "defense", 58),
@@ -106,6 +97,7 @@ static func defs() -> Dictionary:
 		"moveSpeed": _d("+{0}% Faster Run/Walk", "utility", 90),
 		"lightRadius": _d("+{0} to Light Radius", "utility", 91),
 		"xpGain": _d("+{0}% Experience Gained", "utility", 92),
+		"flaskRecovery": _d("+{0}% Faster Flask Recovery", "utility", 93),
 		"reqPct": _d("Requirements -{0}%", "utility", 98),
 	}
 	for t in DAMAGE_TYPES:
@@ -128,19 +120,11 @@ static func is_range_stat(stat: String) -> bool:
 	return stat.begins_with("addDmg:")
 
 
-## Definition for any stat id, including dynamic families (skill:, skillDisc:, quirk:).
+## Definition for any stat id, including the quirk: family.
 static func get_stat_def(stat: String) -> Dictionary:
 	var all := defs()
 	if all.has(stat):
 		return all[stat]
-	if stat.begins_with("skill:"):
-		var id := stat.substr(6)
-		var sk := Disciplines.get_skill(id)
-		return _d("+{0} to " + (sk.name if not sk.is_empty() else id), "skill", 2)
-	if stat.begins_with("skillDisc:"):
-		var id := stat.substr(10)
-		var dd := Disciplines.get_discipline(id)
-		return _d("+{0} to " + (dd.name if not dd.is_empty() else id) + " Skills", "skill", 1)
 	if stat.begins_with("quirk:"):
 		var id := stat.substr(6)
 		return _d(Uniques.QUIRKS.get(id, id), "quirk", 200)

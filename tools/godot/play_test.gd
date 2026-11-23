@@ -10,6 +10,7 @@ var fails := 0
 var start_pos := Vector2.ZERO
 var inv_count := 0
 var target_npc := ""
+var target_mob = null
 
 
 func _ready() -> void:
@@ -18,7 +19,6 @@ func _ready() -> void:
 	steps = [
 		[90, func():
 			game.save.hero = HeroData.new_hero("Tester")
-			QuestRules.start_auto_quests(game.save.hero)
 			game.commit()
 			game.set_ui({"phase": "playing"})],
 		[100, func():
@@ -58,18 +58,42 @@ func _ready() -> void:
 		[520, func(): _check("clicking an NPC walks over and talks", game.ui.dialog.get("npcId", "") == target_npc, str(game.ui.dialog.get("npcId")))],
 		[525, func(): _key(KEY_I)],
 		[535, func(): _check("I opens inventory", game.ui.right == "inventory")],
-		[540, func(): _key(KEY_K)],
-		[550, func(): _check("K opens skills", game.ui.overlay == "skills")],
-		[555, func(): _key(KEY_ESCAPE)],
-		[565, func(): _check("Esc closes everything", game.ui.right == "" and game.ui.overlay == "" and game.ui.dialog.is_empty())],
-		[570, func(): _key(KEY_ESCAPE)],
-		[590, func(): _check("Esc with nothing open returns to menu", game.ui.phase == "menu")],
-		[600, func():
+		[540, func(): _key(KEY_ESCAPE)],
+		[550, func(): _check("Esc closes everything", game.ui.right == "" and game.ui.dialog.is_empty())],
+		[555, func():
+			game.hero().life = 10
+			_key(KEY_Q)],
+		[565, func(): _check("Q drinks the flask", float(game.hero().life) > 10, str(game.hero().life))],
+		[570, func():
+			Interact.descend_dialog()
+			var b: Array = game.ui.dialog.get("buttons", [])
+			_check("the Stair offers floor 1", b.size() == 1 and b[0].text == "Floor 1", str(b))
+			b[0].action.call()],
+		[620, func():
+			_check("descending builds a floor", Arena.current != null and game.ui.location == "dungeon" and game.ui.zone_title == "The Sealed Stair")
+			rt = _find(get_tree().root, "ZoneRuntime")],
+		[760, func():
+			var m = null
+			for x in Arena.current.mobs:
+				if not x.dead and x.state != "spawn":
+					m = x
+					break
+			_check("monsters spawned", m != null)
+			if m:
+				target_mob = m
+				_click(_screen(m.position + Vector2(0, -m.height() / 2.0)))],
+		[770, func(): _check("clicking a monster targets it", rt.player.target == target_mob)],
+		[980, func(): _check("the hero hits it", target_mob == null or not is_instance_valid(target_mob) or target_mob.dead or target_mob.life < target_mob.max_life, str(target_mob.life if is_instance_valid(target_mob) else -1))],
+		[985, func(): _key(KEY_T)],
+		[1030, func(): _check("T returns to town", game.ui.location == "town" and Arena.current == null and float(game.hero().life) == float(game.sheet().life))],
+		[1035, func(): _key(KEY_ESCAPE)],
+		[1055, func(): _check("Esc with nothing open returns to menu", game.ui.phase == "menu")],
+		[1065, func():
 			game.flush()
 			_check("save file written", FileAccess.file_exists(SaveIO.path()))
 			var loaded := SaveIO.load_game()
 			_check("save round-trips the hero", loaded.get("hero") != null and loaded.hero.name == "Tester")],
-		[610, func():
+		[1075, func():
 			print("PLAYTEST ", "FAIL" if fails else "OK", " fails=", fails)
 			SaveIO.wipe_save()
 			get_tree().quit(1 if fails else 0)],

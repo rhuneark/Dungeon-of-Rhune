@@ -142,6 +142,16 @@ static func _roll_plain_sockets(base: Dictionary, rng: Rng) -> int:
 
 static func create_item(base_id: String, opts: Dictionary = {}) -> Dictionary:
 	var rng: Rng = opts.get("rng") if opts.get("rng") != null else Rng.new()
+	var item := _create(base_id, opts, rng)
+	# Belts roll their charm slots last, so every other roll is unchanged.
+	var slots: Array = ItemBases.get_base(base_id).charmSlots
+	if not slots.is_empty():
+		item.charmSlots = rng.int_range(int(slots[0]), int(slots[1]))
+		item.charms = []
+	return item
+
+
+static func _create(base_id: String, opts: Dictionary, rng: Rng) -> Dictionary:
 	var base := ItemBases.get_base(base_id)
 	var ilvl := maxi(1, Rng.jround(float(opts.get("ilvl", 1))))
 	var quality: String = opts.get("quality", "normal")
@@ -159,10 +169,8 @@ static func create_item(base_id: String, opts: Dictionary = {}) -> Dictionary:
 		"socketed": [],
 	}
 
-	if base.category in ["consumable", "quest", "rhune"]:
+	if base.category == "rhune":
 		item.quality = "normal"
-		if base.category == "consumable":
-			item.qty = 1
 		return item
 
 	if base.alwaysMagic and quality in ["normal", "superior", "crude"]:
@@ -234,8 +242,3 @@ static func rare_second_pool(base: Dictionary) -> Array:
 	var slot: String = base.slot if base.slot != "" else "weapon"
 	return RareNames.SECOND.get(slot, RareNames.SECOND.weapon)
 
-
-static func make_consumable(base_id: String, qty := 1) -> Dictionary:
-	var item := create_item(base_id, {"ilvl": 1})
-	item.qty = qty
-	return item

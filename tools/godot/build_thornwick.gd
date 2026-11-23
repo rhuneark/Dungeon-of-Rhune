@@ -1,13 +1,18 @@
 extends SceneTree
-## One-time converter: bakes the original Thornwick layout into an editable
-## scene, res://scenes/world/thornwick.tscn.
+## Builds res://scenes/world/thornwick.tscn: the hub. Thornwick is a walled
+## hamlet stuck in one endless night above the Sealed Stair, laid out like a
+## Rogue Encampment: everything you need is a few steps from the campfire.
 ##   godot --headless --path . -s tools/godot/build_thornwick.gd
 ##
-## After this, the .tscn is the source of truth — edit it in the Godot editor.
-## Re-running this script OVERWRITES those edits.
+## North: the Sealed Stair (Captain Maren picks your floor). Around the square,
+## each townsperson at their own door: Varn's tower (identify, Codex),
+## Brannoc's forge (sockets, crucible), Ysolde's cottage (the flask), Pell's
+## trading post, Odo's wagon. The stash sits by the fire. South: the gate,
+## which no longer opens.
+## Re-running this script OVERWRITES edits made to the scene in the editor.
 
-const W := 60
-const H := 46
+const W := 34
+const H := 27
 const TILE := 32
 const OUT := "res://scenes/world/thornwick.tscn"
 
@@ -84,23 +89,16 @@ func plaza(x0: int, y0: int, x1: int, y1: int, t: int) -> void:
 func paint() -> void:
 	cells.resize(W * H)
 	cells.fill(GRASS)
-	# Old flagstones: the Sealed Stair's forecourt, the causeway down, the square.
-	plaza(25, 3, 34, 10, COBBLE)
-	rect(28, 11, 31, 18, COBBLE)
-	plaza(22, 19, 37, 28, COBBLE)
-	# Mud: the south road to the gate and a lane to every door.
-	rect(28, 29, 30, H - 1, DIRT)
-	rect(12, 26, 21, 27, DIRT) # smithy
-	rect(38, 24, 48, 25, DIRT) # trading post
-	rect(16, 16, 22, 18, DIRT) # tavern
-	rect(37, 16, 41, 18, DIRT) # Varn's tower
-	rect(16, 35, 27, 36, DIRT) # herbalist
-	rect(32, 33, 41, 34, DIRT) # Odo's wagon
-	rect(13, 6, 24, 7, DIRT) # to the chapel...
-	rect(12, 6, 13, 10, DIRT)
-	rect(7, 9, 13, 10, DIRT) # ...and along the graves
-	# The marsh pond.
-	ellipse(49, 35, 5.5, 3.6, WATER)
+	# The square, and the Stair's forecourt north of it: old flagstones.
+	plaza(11, 12, 23, 20, COBBLE)
+	plaza(13, 6, 21, 11, COBBLE)
+	# Worn mud from the square to every door, and the south road.
+	rect(6, 11, 10, 12, DIRT) # Varn's tower
+	rect(24, 12, 27, 13, DIRT) # the forge
+	rect(7, 20, 10, 21, DIRT) # Ysolde's cottage
+	rect(24, 20, 27, 21, DIRT) # Pell's
+	rect(16, 21, 17, H - 1, DIRT) # to the gate
+	rect(18, 22, 21, 23, DIRT) # Odo's wagon
 
 
 ## Vertex terrain = strongest of the 4 surrounding cells (water only if all are water).
@@ -208,15 +206,12 @@ func _initialize() -> void:
 	paint()
 	blocked.resize(W * H)
 	blocked.fill(0)
-	for i in W * H:
-		if cells[i] == WATER:
-			blocked[i] = 1
 
 	var root := Zone.new()
 	root.name = "Thornwick"
 	root.zone_name = "Thornwick"
 	root.level = 1
-	root.critter_area = Rect2i(42, 29, 14, 12)
+	root.fog_density = 0.16
 
 	var ground := TileMapLayer.new()
 	ground.name = "Ground"
@@ -241,62 +236,41 @@ func _initialize() -> void:
 	blockers.name = "Blockers"
 	root.add_child(blockers)
 
-	# ---- landmarks & buildings
-	add_prop(things, "pit_entrance", 29.5, 9.5, {"node": "SealedStair", "block": Vector2i(5, 2), "action": "inspect", "name": "The Sealed Stair"})
-	add_prop(things, "chapel", 9.2, 8.4, {"node": "Chapel", "block": Vector2i(5, 2), "name": "Chapel of the Thorn (ruined)"})
-	add_prop(things, "tavern", 17.5, 16, {"node": "Tavern", "block": Vector2i(7, 3), "name": "The Crooked Lantern (closed)"})
-	add_prop(things, "lore_tower", 41, 16, {"node": "VarnsTower", "block": Vector2i(3, 2), "name": "Varn's Tower"})
-	add_prop(things, "smithy", 13, 25.5, {"node": "Smithy", "block": Vector2i(6, 3), "name": "Brannoc's Smithy"})
-	add_prop(things, "trader", 47.5, 24, {"node": "TradingPost", "block": Vector2i(5, 3), "name": "Pell's Trading Post"})
-	add_prop(things, "herbalist", 15.5, 35, {"node": "HerbalistCottage", "block": Vector2i(5, 3), "name": "Ysolde's Cottage"})
-	add_prop(things, "gambler_wagon", 41.5, 33, {"node": "OdosWagon", "block": Vector2i(3, 2), "name": "Odo's Wagon"})
-	add_prop(things, "house_a", 6.5, 32, {"node": "Cottage", "block": Vector2i(4, 2), "name": "Cottage"})
-	add_prop(things, "house_b", 52, 14, {"node": "Cottage", "block": Vector2i(4, 2), "name": "Cottage"})
-	add_prop(things, "house_a", 7.5, 42, {"node": "Cottage", "block": Vector2i(4, 2), "name": "Cottage", "flip": true})
-	add_prop(things, "market_stall", 24, 30.5, {"node": "MarketStall", "block": Vector2i(4, 1), "name": "Market Stall"})
-	add_prop(things, "gate", 29.5, H, {"node": "SouthGate", "block": Vector2i(6, 1), "action": "gate", "name": "South Gate", "approach_dy": -2.2})
+	# ---- the Sealed Stair, north
+	add_prop(things, "pit_entrance", 17, 8.6, {"node": "SealedStair", "block": Vector2i(5, 2), "action": "stair", "name": "The Sealed Stair"})
+	for x in [13.6, 20.4]:
+		add_prop(things, "brazier", x, 9.6, {"node": "Brazier", "block": Vector2i(1, 1)})
 
-	# ---- the square
-	add_prop(things, "wishing_well", 30, 23.5, {"node": "WishingWell", "block": Vector2i(2, 1), "action": "well", "name": "Wishing Well"})
-	add_prop(things, "notice_board", 34.5, 19.5, {"node": "NoticeBoard", "block": Vector2i(2, 1), "action": "quests", "name": "Notice Board"})
-	add_prop(things, "statue", 24.5, 20.5, {"node": "Statue", "block": Vector2i(1, 1), "action": "statue", "name": "Statue of Aldra Thornwick"})
-	add_prop(things, "strongbox", 26.5, 26.5, {"node": "Strongbox", "block": Vector2i(1, 1), "action": "stash", "name": "Your Strongbox"})
-	var wp := add_prop(decals, "waypoint", 35, 27.5, {"node": "RhunestoneCircle", "action": "waypoint", "name": "Rhunestone Circle"})
-	wp.approach_dy = -1.4
+	# ---- the townsfolk's doors, all facing the square
+	add_prop(things, "lore_tower", 7.5, 10.4, {"node": "VarnsTower", "block": Vector2i(3, 2), "name": "Varn's Tower"})
+	add_prop(things, "smithy", 27.5, 11.6, {"node": "Smithy", "block": Vector2i(6, 3), "name": "Brannoc's Forge"})
+	add_prop(things, "herbalist", 7.2, 19.4, {"node": "HerbalistCottage", "block": Vector2i(5, 3), "name": "Ysolde's Cottage"})
+	add_prop(things, "trader", 27.5, 19.4, {"node": "TradingPost", "block": Vector2i(5, 3), "name": "Pell's Trading Post"})
+	add_prop(things, "gambler_wagon", 21.6, 24.4, {"node": "OdosWagon", "block": Vector2i(3, 2), "name": "Odo's Wagon"})
+	add_prop(things, "gate", 17, H + 0.4, {"node": "SouthGate", "block": Vector2i(6, 1), "action": "statue", "name": "South Gate (it no longer opens)", "approach_dy": -2.0})
 
-	# ---- clutter
-	for p in [Vector2(27.5, 14), Vector2(32.5, 14), Vector2(21.5, 21.5), Vector2(38.5, 21.5), Vector2(27, 29.5), Vector2(33, 32), Vector2(33, 38)]:
-		add_prop(things, "lamp_post", p.x, p.y, {"node": "Lantern", "block": Vector2i(1, 1), "name": "Street Lantern"})
-	for p in [Vector2(26.2, 10.8), Vector2(32.8, 10.8)]:
-		add_prop(things, "brazier", p.x, p.y, {"node": "Brazier", "block": Vector2i(1, 1), "name": "Brazier"})
-	# The graveyard around the ruined chapel, walled on the south side.
-	for g in [[4.6, 9.6, "grave_b"], [4.4, 12.2, "grave_a"], [6.6, 12.8, "grave_b"], [11.2, 13.6, "grave_a"], [12.4, 12.4, "grave_b"], [14.6, 12, "grave_a"]]:
-		add_prop(things, g[2], g[0], g[1], {"node": "Grave", "block": Vector2i(1, 1), "name": "Old Grave"})
-	for wl in [[4.5, 14.9], [10.4, 14.9]]:
-		add_prop(things, "stone_wall", wl[0], wl[1], {"node": "GraveyardWall", "block": Vector2i(3, 1)})
-	add_prop(things, "tree_dead", 2.6, 11.2, {"node": "DeadTree", "block": Vector2i(1, 1), "name": "Dead Tree"})
-	add_prop(things, "tree_dead_b", 15.6, 9.8, {"node": "DeadTree", "block": Vector2i(1, 1), "name": "Dead Tree"})
-	add_prop(things, "tree_dead", 53.4, 31.2, {"node": "DeadTree", "block": Vector2i(1, 1), "name": "Dead Tree"})
-	for cr in [[7.4, 13.3, false], [27.4, 11.8, true], [3.4, 11.6, false], [34.6, 41.9, true]]:
-		add_prop(things, "crow", cr[0], cr[1], {"node": "Crow", "flip": cr[2]})
-	for st in [[3.6, 20.4], [56.4, 8.6], [56.2, 39.4], [21.2, 42.6], [44.6, 6.2]]:
-		add_prop(things, "standing_stone", st[0], st[1], {"node": "StandingStone", "block": Vector2i(1, 1), "name": "Standing Stone"})
+	# ---- the square: stash by the fire, Aldra's statue, lanterns at the corners
+	add_prop(things, "strongbox", 15.9, 16.6, {"node": "Stash", "block": Vector2i(1, 1), "action": "stash", "name": "Your Stash"})
+	add_prop(things, "campfire", 18.1, 16.7, {"node": "Campfire", "block": Vector2i(1, 1), "name": "Campfire"})
+	add_prop(things, "statue", 13.2, 13.6, {"node": "Statue", "block": Vector2i(1, 1), "action": "statue", "name": "Statue of Aldra Thornwick"})
+	for p in [Vector2(11.5, 12.6), Vector2(22.5, 12.6), Vector2(11.5, 20.4), Vector2(22.5, 20.4), Vector2(15.4, 24.2), Vector2(18.6, 24.2)]:
+		add_prop(things, "lamp_post", p.x, p.y, {"node": "Lantern", "block": Vector2i(1, 1)})
+	for x in [14.9, 19.1]:
+		add_prop(things, "banner", x, 26.2, {"node": "Banner", "block": Vector2i(1, 1)})
+
+	# ---- work clutter, where the work happens
 	for c in [
-		["barrel", 17.6, 22.5, Vector2i(1, 1)], ["barrel", 18.5, 22.8, Vector2i(1, 1)], ["crates", 9.2, 26.6, Vector2i(1, 1)],
-		["crates", 43.2, 25, Vector2i(1, 1)], ["barrel", 51.2, 24.8, Vector2i(1, 1)], ["cart", 51, 27.5, Vector2i(2, 1)],
-		["hay", 10.5, 33, Vector2i(1, 1)], ["hay", 4, 34, Vector2i(1, 1)], ["fence", 12.5, 37.5, Vector2i(2, 1)],
-		["fence", 18.8, 38, Vector2i(2, 1)], ["banner", 25.2, 41.5, Vector2i(1, 1)], ["banner", 33.8, 41.5, Vector2i(1, 1)],
-		["barrel", 36.5, 30.5, Vector2i(1, 1)], ["bush", 21, 26.5, Vector2i(1, 1)], ["bush", 38.5, 26.5, Vector2i(1, 1)],
-		["rock_big", 55, 30, Vector2i(1, 1)], ["rock_big", 44, 40, Vector2i(1, 1)],
-		["tree_oak", 36, 12, Vector2i(1, 1)], ["tree_oak", 23, 13.4, Vector2i(1, 1)], ["tree_pine", 46, 9, Vector2i(1, 1)],
-		["tree_oak_b", 54, 20, Vector2i(1, 1)], ["tree_pine_b", 6, 22, Vector2i(1, 1)], ["tree_oak", 23.5, 39.5, Vector2i(1, 1)],
-		["tree_oak_b", 39, 41, Vector2i(1, 1)], ["tree_pine", 52, 41, Vector2i(1, 1)],
+		["barrel", 22.8, 10.6], ["barrel", 23.5, 11.0], ["crates", 31.4, 12.6], # forge
+		["crates", 23.6, 18.6], ["barrel", 31.2, 20.4], ["cart", 31.0, 22.6], # trader
+		["hay", 3.8, 20.6], ["mushrooms", 10.4, 17.6], ["flowers", 4.2, 17.4], # herbalist's garden
+		["crates", 4.6, 11.4], ["rocks_small", 10.8, 7.2], # tower
+		["market_stall", 12.6, 23.6], ["barrel", 10.4, 23.0], # south market
 	]:
-		add_prop(things, c[0], c[1], c[2], {"block": c[3]})
-	add_prop(things, "campfire", 37, 40.5, {"node": "Campfire", "block": Vector2i(1, 1), "name": "Campfire"})
-	add_prop(things, "signpost", 33, 29.5, {"node": "Signpost", "block": Vector2i(1, 1), "name": "Signpost: \"Wilds - south.  Pit - north.  Goose: everywhere.\""})
+		add_prop(things, c[0], c[1], c[2], {"block": Vector2i(2, 1) if c[0] in ["cart", "market_stall"] else Vector2i(1, 1)})
+	for c in [["fence", 3.6, 22.4], ["fence", 5.6, 22.4], ["fence", 28.6, 23.6], ["fence", 30.6, 23.6]]:
+		add_prop(things, c[0], c[1], c[2], {"block": Vector2i(2, 1)})
 
-	# ---- forest edge: decorative trees + invisible walls around the map
+	# ---- the forest that walls the town in
 	var tree_at := func(x: float, y: float) -> void:
 		var roll := rng.randf()
 		var art := "tree_pine" if roll < 0.62 else "tree_oak" if roll < 0.9 else "tree_dead"
@@ -306,30 +280,30 @@ func _initialize() -> void:
 		p.mirrored = rng.randf() < 0.5
 	var x := 0.0
 	while x <= W:
-		tree_at.call(x, 1.6)
-		if x < 25 or x > 35:
-			tree_at.call(x + 0.8, H + 0.2)
-		x += 1.6
+		if x < 12 or x > 22:
+			tree_at.call(x, 1.4)
+		if x < 13 or x > 21:
+			tree_at.call(x + 0.8, H + 0.3)
+		x += 1.7
 	var y := 3.0
 	while y <= H:
-		tree_at.call(0.9, y)
-		tree_at.call(W - 0.9, y)
-		y += 1.7
-	for b in [[0, 0, W, 2], [0, 0, 2, H], [W - 2, 0, 2, H], [0, H - 2, W, 2]]:
+		tree_at.call(0.8, y)
+		tree_at.call(W - 0.8, y)
+		y += 1.8
+	for t in [[3.0, 15.2, "tree_oak"], [31.2, 15.6, "tree_oak_b"], [2.6, 25.0, "tree_pine_b"], [31.6, 26.0, "tree_pine"], [11.6, 3.6, "tree_pine"], [22.6, 3.4, "tree_pine_b"]]:
+		add_prop(things, t[2], t[0], t[1], {"node": "Tree", "block": Vector2i(1, 1)})
+	for b in [[0, 0, W, 2], [0, 0, 2, H], [W - 2, 0, 2, H], [0, H - 1, W, 1]]:
 		var bl := Blocker.new()
 		bl.name = unique_name("Wall")
 		bl.position = Vector2(b[0] * TILE, b[1] * TILE)
 		bl.size = Vector2i(b[2], b[3])
 		blockers.add_child(bl)
-		for cy in range(b[1], b[1] + b[3]):
-			for cx in range(b[0], b[0] + b[2]):
-				blocked[cy * W + cx] = 1
 
-	# ---- scattered decor on open grass (flat, under everything)
-	var decor := ["grass_tuft", "flowers", "mushrooms", "rocks_small", "grass_tuft", "grass_tuft", "bush"]
-	for cy in range(2, H - 2):
-		for cx in range(2, W - 2):
-			if get_t(cx, cy) != GRASS or blocked[cy * W + cx] == 1 or rng.randf() >= 0.07:
+	# ---- a little life on the open grass, kept off the paths
+	var decor := ["grass_tuft", "grass_tuft", "flowers", "rocks_small", "mushrooms"]
+	for cy in range(3, H - 2):
+		for cx in range(3, W - 3):
+			if get_t(cx, cy) != GRASS or blocked[cy * W + cx] == 1 or rng.randf() >= 0.05:
 				continue
 			var near_road := false
 			for dy in [-1, 0, 1]:
@@ -338,28 +312,20 @@ func _initialize() -> void:
 						near_road = true
 			if near_road:
 				continue
-			add_prop(decals, decor[rng.randi_range(0, decor.size() - 1)], cx + 0.5 + rng.randi_range(-8, 8) / 32.0, cy + 0.875 + rng.randi_range(-6, 4) / 32.0, {"node": "Decor"})
+			add_prop(decals, decor[rng.randi_range(0, decor.size() - 1)], cx + 0.5 + rng.randi_range(-8, 8) / 32.0, cy + 0.875, {"node": "Decor"})
 
-	# ---- NPCs and placed items
-	for n in [["varn", 41, 18], ["brannoc", 18, 25.6], ["pell", 45.5, 26], ["ysolde", 19.5, 36.5], ["odo", 38.5, 34.5], ["maren", 34.8, 39.6]]:
+	# ---- the townsfolk
+	for n in [["maren", 21.9, 10.7], ["varn", 10.6, 12.0], ["brannoc", 23.9, 13.0], ["ysolde", 10.6, 20.8], ["pell", 24.0, 20.9], ["odo", 19.4, 23.4]]:
 		var s := NpcSpot.new()
 		s.name = String(n[0]).capitalize()
 		s.npc_id = n[0]
 		s.sheet = NPC_SHEETS[n[0]]
 		s.position = Vector2(roundf(n[1] * TILE), roundf(n[2] * TILE))
 		things.add_child(s)
-	for it in [["page_graveyard", 10.7, 11.5], ["page_tavern", 22.8, 16.6], ["page_pond", 55.5, 34.5]]:
-		var pi := PlacedItem.new()
-		pi.name = unique_name("TornPage")
-		pi.key = it[0]
-		pi.base_id = "lore_page"
-		pi.icon = "page"
-		pi.position = Vector2(roundf(it[1] * TILE), roundf(it[2] * TILE))
-		items.add_child(pi)
 
 	var spawn := Marker2D.new()
 	spawn.name = "Spawn"
-	spawn.position = Vector2(30 * TILE, 36 * TILE)
+	spawn.position = Vector2(17 * TILE, 18.6 * TILE)
 	root.add_child(spawn)
 
 	for c in root.get_children():

@@ -1,9 +1,11 @@
 # Dungeon of Rhune
 
-A pixel-art ARPG homage: Diablo II's loot, Grim Dawn's dual masteries, Last Epoch's per-skill
-trees, and Diablo's weird little things, with its own twists. No story mode; the world
-explains itself through small lore quests. This build is the **foundation + the main town,
-Thornwick**. Combat, the Wilds and the Pit come next.
+A pixel-art ARPG you can pick up for half an hour and come back to every day. **One town, one
+dungeon.** Thornwick is stuck in one endless night; somewhere a hundred floors down the Sealed
+Stair an hourglass has stopped, and the only way anyone leaves is for someone to conquer floor
+100. So you go down: one sealed room at a time, a horde to clear in each, a chest when it's
+empty, and the stair to the next floor. The townsfolk help however they can. D2-style loot is
+the heart of it, and **your gear is your build**: no classes, no skill trees.
 
 **Engine:** Godot 4.7 (GDScript, Compatibility renderer). **Platforms:** Steam (Windows,
 Linux/Steam Deck; macOS optional) and the web, all from Godot export presets. All art is
@@ -43,58 +45,71 @@ Shipping on Steam (App ID, GodotSteam, exports, SteamPipe, Cloud, achievements, 
 | | |
 |---|---|
 | Click / hold | walk (A* pathing); click people, objects and loot labels to use them |
+| Click a monster | walk into range and keep attacking it until it falls (hold to chain to the next) |
+| Shift + click | attack where you stand (hold to keep attacking) |
+| Q (or 1) | drink the rejuvenation flask |
+| T | portal back to Thornwick (in the dungeon) |
 | WASD / arrows / left stick | walk directly |
-| I (B) · C · K (T) · Q · L · O | Inventory · Character · Skills · Quests · Codex · Options |
-| Right-click item | use / equip; sell when a shop is open; move to/from stash or crucible |
+| I (B) · C · L · O | Inventory · Character · Codex · Options |
+| Right-click item | equip (rings fill all four fingers); slot a charm into your belt; sell when a shop is open; move to/from stash or crucible |
 | Esc / Space | close panels (Esc with nothing open → menu) |
 | `` ` `` (backtick) | **Loot Lab** dev tool: roll any treasure class, simulate 5,000 drops, cheats (debug builds, `--dev-tools`, `RHUNE_DEVTOOLS=1`, `?dev` on the web) |
 | F11 / Alt+Enter | fullscreen |
 
 All keys are input actions (Project Settings → Input Map), so rebinding is a settings change.
 
-## What's in the foundation
+## The game
+
+**The Sealed Stair (the dungeon).** Talk to Captain Maren (or click the Stair) and pick a
+start: floor 1, or any 5th floor you've reached. Every floor is one sealed room about the size
+of an Infernal Hordes arena (hall, round or cross shaped). Waves pour out of four summoning
+circles; deeper down come archers, brutes, ember cultists, wraiths and champions (tougher, blue,
+better loot). Every 10th floor an **Hourglass Warden** holds the room. When the last monster
+falls, a chest rises in the middle (the real haul), the sealed door opens onto the next floor,
+and a portal home appears. Die and the town drags you home: you keep everything you carry.
+About a minute a floor early on.
+
+**Combat is your weapon.** Swords, axes and maces swing in an arc and hit everything in it; bows
+shoot arrows; wands and staves cast bolts with a little splash. The weapon also decides which
+attribute adds physical damage: Strength (melee), Dexterity (bows), Intelligence (casters).
+Monster hits go through your block, armor, resistances and damage reduction; life leech, life
+on kill and thorns all work.
+
+**Levels are attribute points.** 5 per level: Strength, Dexterity, Stamina (life),
+Intelligence (elemental damage). Everything else is gear.
+
+**The flask.** No potions to carry: one rejuvenation flask on a cooldown (Q). Small heals 250;
+Mother Ysolde brews a Medium (500) once you reach floor 20 and a Large (1000) at floor 50. Flask
+potency and faster recovery roll on belts, amulets and charms.
 
 **Loot (the heart).** D2-style item model: base types with item levels, tiered prefixes/suffixes
 gated by affix level, quality ladder (crude → normal → superior → magic → rare → unique), magic
-items drop **unidentified** (Old Varn reads them for free, or use a Scroll of Insight), rares get
-two-word names, uniques roll **variable stats** (perfect rolls are tracked). Treasure classes with
-picks and "no drop" weights. Grid ("tetris") inventory, paperdoll, shared stash, D2 cursor
-pickup/place/swap. Ground loot pops out in arcs with coloured labels; uniques get a light beam.
+items drop **unidentified** (Old Varn reads them for free), rares get two-word names, uniques
+roll **variable stats** (perfect rolls are tracked). Treasure classes with picks and "no drop"
+weights. Grid ("tetris") inventory, paperdoll with **four ring slots** (two each side), shared
+stash, D2 cursor pickup/place/swap. Ground loot pops out in arcs with coloured labels; uniques
+get a light beam.
 
-**Fortune: "magic find of certain things".** Three classic stats plus **Targeted Find**:
+**Belts and charms.** Every belt rolls 1-8 charm slots (Sash 1-3, Belt 2-5, Heavy Belt 4-6, War
+Girdle 6-8). Charms only work slotted into your equipped belt, and take slots by size: Small 1,
+Large 2, Grand 3. A better belt is a bigger charm rack.
 
-- *Rarity Find*: better quality on everything (D2 diminishing returns on rare/unique)
-- *Item Quantity*: fewer empty drops · *Extra Gold*
-- *Weapon / Armor / Jewelry / Curio / Rhune Find*: more of THAT kind of drop
-- *Unique Find*: boosts only the unique roll
-
-Gear can roll these ("Scribe's" = Rhune Find, "Grailseeker's" = Unique Find, ...), so players can
-build a hunting kit for exactly what they're chasing. Tune it all in the Loot Lab.
+**Fortune: "magic find of certain things".** Rarity Find (better quality), Item Quantity (fewer
+empty drops), Extra Gold, and **Targeted Find**: Weapon / Armor / Jewelry / Charm / Rhune Find
+(more of THAT kind of drop) and Unique Find. Tune it all in the Loot Lab.
 
 **Rhunes & Rhunewords** (the namesake). 12 rhunes with weapon/armor/shield effects; socket the
 right ones *in order* into a plain item with exactly that many sockets to speak one of 9
 Rhunewords. Brannoc's **Crucible** fuses 3 identical rhunes into the next, reforges magic items,
 and can strip sockets; he also punches sockets into plain gear.
 
-**Curios**: charms that work from the backpack (small/medium/grand). Every cell they use is a
-cell you can't fill with loot.
+**Thornwick (the town).** Compact, like a Rogue Encampment: the stash by the campfire, the Stair
+to the north, and each townsperson at their own door: Old Varn (identify everything, free; the
+Codex), Mother Ysolde (the flask), Brannoc (crucible, sockets), Pell (trade), "Lucky" Odo
+(sealed goods = gambling), Captain Maren (the Stair). The town patches you up whenever you're
+home.
 
-**Disciplines (Grim Dawn) + skill trees (Last Epoch).** No classes. Pick any two of four
-Disciplines (Bulwark, Emberwright, Galeborn, Hollowcaller); every pair has a title (Forgeguard,
-Ashbinder, Nightwind...). Path Points (1/level + lore quests) raise Discipline rank: passive stats
-per rank, skills unlock at rank thresholds. Specialize up to 5 skills; each has its own node tree,
-and specialized skills level up with your XP (one tree point per level, plus +skill gear). Nodes
-include cross-discipline conversions (a Bulwark slam that turns to fire, thralls that use forge
-fire). If it makes sense, it works. Tree effects are data the combat layer will read.
-
-**Thornwick.** Six NPCs with services: Old Varn (identify, Codex), Brannoc (crucible, sockets),
-Pell (trader), Mother Ysolde (potions/scrolls), "Lucky" Odo (sealed goods = gambling), Captain
-Maren (the gate). Plus the Wishing Well (gold → loot), your Strongbox, the Sealed Stair, a
-Rhunestone Circle (future waypoint), a graveyard, a pond and **the Goose**. Eight lore quests are
-completable in town and pay out Path Points, XP, items and lore entries.
-
-**The Codex**: Holy Grail tracking for every unique (with best roll %), rhune and rhuneword
-you've found, plus unlocked lore.
+**The Codex**: Holy Grail tracking for every unique (with best roll %), rhune and rhuneword.
 
 **Crisp pixels.** No window stretching: the world camera zooms by a whole number (~480 world px
 visible vertically) and the UI layer scales by a whole number (UI canvas ≥ 690×430), so every
@@ -105,18 +120,14 @@ Options (O) lets players pick UI scale and world zoom. World: 32px tiles, 64px c
 32px per inventory cell. Text uses one plain pixel face (Jersey 10) in bright colours; the gothic
 face is only the logo.
 
-**Perspective.** Classic 16-bit "top-down three-quarter": ground seen from above, buildings and
-characters seen from the front.
+**Look.** Classic 16-bit top-down three-quarter view. Thornwick is a gothic hamlet at night;
+the Stair is near-black stone lit only by wall torches, braziers and summoning circles (Diablo
+II-dark). All world art shares one 47-colour palette (`PALETTE` in `tools/art/spec.py`).
+`scripts/world/atmosphere.gd` tints each zone (town dusk, dungeon dark) and lights it: torches,
+braziers, lit windows and runes get real flickering lights, found automatically from their
+colours. The UI and loot labels are never tinted.
 
-**Look.** Grim gothic high fantasy at dusk: an old frontier hamlet of dark stone and black
-timber, steep slate roofs, pointed arches, a ruined chapel over the graveyard, gnarled oaks and
-dark firs, mist and candlelight. All world art shares one 47-colour palette (`PALETTE` in
-`tools/art/spec.py`). In game, `scripts/world/atmosphere.gd` tints the world to a cold dusk and
-lights it: lit windows, lanterns, braziers, the forge and glowing runes get real flickering
-lights (found automatically from their colours), plus drifting mist, embers and a vignette. The
-UI and loot labels are never tinted.
-
-## Editing Thornwick
+## Editing Thornwick and the Stair
 
 `scenes/world/thornwick.tscn` is a normal Godot scene, edited in the 2D editor:
 
@@ -124,49 +135,55 @@ UI and loot labels are never tinted.
   autotile). Water is not walkable.
 - **Things** (y-sorted) and **Decals** (flat, under everything): `Prop` nodes. Pick the `art`
   (any file in `assets/art/props/`), set `block` (footprint in tiles, drawn red in the editor),
-  `action` (stash, well, quests, inspect, waypoint, statue, gate), `display_name`, and
-  `approach_dy` (where the player stands to use it, the cyan dot). The node's position is
-  where the prop meets the ground.
+  `action` (stash, stair, statue), `display_name`, and `approach_dy` (where the player stands to
+  use it, the cyan dot). The node's position is where the prop meets the ground.
 - **NpcSpot**: where an NPC stands (`npc_id` from `scripts/content/npcs.gd`).
-- **Items**: `PlacedItem` quest items on the ground (`key` is remembered once taken).
 - **Blockers**: invisible walls (magenta). **Spawn**: where the hero appears.
-- `critter_area` on the root: where the goose wanders.
+- The root `Zone` sets the mood: `ambient` tint, `fog_density`, `hero_light` radius.
 
-`tools/godot/build_thornwick.gd` builds this scene (terrain lanes, buildings, the graveyard and
-chapel, clutter, the forest edge). Re-running it overwrites edits made in the editor, so either
-make layout changes in the builder and re-run it, or edit the scene and stop re-running it.
-Lights come from the art itself: a prop whose art has lamplight, fire or rune colours glows on
-its own (tune per art in `LIGHT_TUNING`, `scripts/world/atmosphere.gd`).
+`tools/godot/build_thornwick.gd` builds this scene. Re-running it overwrites edits made in the
+editor, so either make layout changes in the builder and re-run it, or edit the scene and stop
+re-running it. Lights come from the art itself: a prop whose art has lamplight, fire or rune
+colours glows on its own (tune per art in `LIGHT_TUNING`, `scripts/world/atmosphere.gd`).
+
+Dungeon floors aren't scenes: `scripts/world/arena_builder.gd` builds each room at runtime
+(shape, walls from the dungeon cliff tileset, torches, pillars, spawn circles, the door) and
+`scripts/world/arena.gd` runs it (waves, monsters, hits, the chest). Monster stats and the
+floor-by-floor scaling are data in `scripts/content/monsters.gd`.
 
 ## Where things live
 
 ```
 project.godot           settings, autoloads, input map, [rhune] Steam settings
-scenes/main.tscn        entry scene → scripts/main.gd (boot, loading screen, phase router, lifecycle)
-scenes/world/           zone scenes (thornwick.tscn)
+scenes/main.tscn        entry scene → scripts/main.gd (boot, loading screen, phase router,
+                        town or dungeon floor, lifecycle)
+scenes/world/           thornwick.tscn (the town)
 scripts/autoload/       View (pixel-perfect scaling) · Platform (Steam, fullscreen, quit, dev tools)
-                        Art (sprite sheets/atlases) · Game (save session + UI state + world bridge)
+                        Art (sprite sheets/atlases) · Game (save session, UI state, the flask,
+                        town/dungeon travel, checkpoints, world bridge)
 scripts/content/        pure data, where the design lives
   stats.gd item_bases.gd affixes.gd uniques.gd rhunes.gd rare_names.gd treasure_classes.gd
-  disciplines.gd (skills + trees) lore.gd quest_defs.gd npcs.gd achievements.gd
+  monsters.gd npcs.gd achievements.gd
 scripts/systems/        rules over the data (no rendering)
-  item_gen.gd loot.gd   item creation, treasure-class resolution, quality rolls
+  item_gen.gd loot.gd   item creation (belts roll charm slots), treasure classes, quality rolls
   item_text.gd          derived item view: names, colours, final damage/defense, prices
-  character_sheet.gd    stat sheet (gear, curios, disciplines, passives, tree nodes)
-  actions.gd            item flow: pickup, cursor, equip, socketing, identify, sell
-  economy.gd            vendors, gambling, wishing well, sockets, crucible recipes
-  skill_rules.gd quest_rules.gd progression.gd hero_data.gd grid.gd save_io.gd rng.gd
-scripts/world/          zone.gd + editor node types (prop, npc_spot, placed_item, blocker),
-                        zone_runtime.gd (player, NPCs, goose, input, camera), zone_nav.gd (A*),
+  character_sheet.gd    stat sheet (gear + belt charms), the weapon's attack, the flask
+  actions.gd            item flow: pickup, cursor, equip (4 rings), charms, socketing, identify, sell
+  economy.gd            vendor, gambling, sockets, crucible recipes
+  progression.gd hero_data.gd grid.gd save_io.gd rng.gd
+scripts/world/          zone.gd + editor node types (prop, npc_spot, blocker),
+                        zone_runtime.gd (player, NPCs, input, camera, the hero's attacks),
+                        arena.gd + arena_builder.gd (dungeon floors), zone_nav.gd (A*),
                         ground_items.gd (loot labels/beams), fx.gd, interact.gd (what clicking does),
-                        atmosphere.gd (dusk tint, prop lights, mist, embers, vignette)
+                        atmosphere.gd (tint, prop lights, mist, embers, vignette)
 scripts/ui/             UI built in code: ui_kit.gd (palette, fonts, frames), ui_panel.gd (base
-                        window), hud.gd, playing_ui.gd (panel slots + hotkeys), main_menu.gd,
-                        grid_view.gd, item_icon.gd, ui_tip.gd + item_tooltip.gd, panels/
+                        window), hud.gd (life, flask, boss bar), playing_ui.gd (panel slots +
+                        hotkeys), main_menu.gd, grid_view.gd, item_icon.gd, ui_tip.gd +
+                        item_tooltip.gd, panels/ (inventory with the belt strip, character, ...)
 assets/                 art (packed sprites + glow masks + art_meta.json), fonts, tiles/terrain.tres, icon
-tests/test_systems.tscn 207 rules tests (loot/item parity with the original web build)
+tests/test_systems.tscn rules tests (items, loot, rings, charms, flask, floors, rooms, saves)
 tools/art/              PixelLab pipeline (prompts → generation → packing into assets/art/)
-tools/godot/            tileset/scene builders and test drivers (play_test, shots, tour)
+tools/godot/            builders and test drivers (play_test, dungeon_test, shots, tour)
 ```
 
 ## Tests
@@ -174,16 +191,18 @@ tools/godot/            tileset/scene builders and test drivers (play_test, shot
 ```bash
 godot --headless --path . --import                      # once, after cloning
 godot --headless --path . res://tests/test_systems.tscn # rules: prints PASS/FAIL, exits non-zero on failure
-# plays the real game with synthetic input (walk, pick up, talk, hotkeys, save):
+# plays the real game with synthetic input (walk, pick up, talk, flask, descend, hit, portal, save):
 xvfb-run -a godot --path . --resolution 1600x900 -s tools/godot/run.gd -- res://tools/godot/play_test.gd
+# a bot clears floors 1-2 (or from any floor: add `<out_dir> <floor>`), opens the chests, takes the stair:
+xvfb-run -a godot --path . --resolution 1600x900 -s tools/godot/run.gd -- res://tools/godot/dungeon_test.gd
 ```
 
 ## Next up (proposed)
 
-1. **Combat**: basic attack + the 12 skills reading their tree effects; life/mana; monsters with
-   treasure classes; the Coin-Gobbler (loot goblin) already has a TC.
-2. **The Wilds**: first outdoor zone south of the gate (a new zone scene), then the Pit's first
-   floors below the Sealed Stair (~1/4 of a D2 act for the first release).
-3. Waypoints (Rhunestone Circles), sets, more uniques/rhunewords, skill icons and attack
-   animations (PixelLab can add them to the existing characters), sound.
-4. Secrets: the Goose's key, a bright-and-cheerful secret level, Omens (temporary Targeted Find).
+1. **Balance the climb to 100**: monster scaling vs. gear power past floor 30 (more item tiers:
+   exceptional/elite bases, affix tiers past level 30), floor modifiers.
+2. **Gear-granted powers**: procs and "grants a skill" affixes/uniques (on-hit novas, chain
+   lightning, frost armor), so builds come from what you wear.
+3. Monster affixes for champions and uniques (fire-enchanted, extra fast, ...), the Coin-Gobbler
+   (loot goblin; its treasure class already exists), sets.
+4. Sound and music.

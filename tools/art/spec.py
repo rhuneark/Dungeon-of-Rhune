@@ -300,6 +300,8 @@ ICONS = {
     "greaves": (2, 2, "pair of steel plated boots"),
     "sash": (2, 1, "knotted cloth sash belt, horizontal"),
     "belt": (2, 1, "leather belt with iron buckle and pouches, horizontal"),
+    "heavy_belt": (2, 1, "wide heavy leather belt with iron studs, a large iron buckle and charm loops, horizontal"),
+    "war_girdle": (2, 1, "thick steel plated war girdle with rivets, a skull buckle and charm hooks, horizontal"),
     # jewelry
     "ring_a": (1, 1, "gold ring with a red ruby"),
     "ring_b": (1, 1, "silver ring with a blue sapphire"),

@@ -335,11 +335,12 @@ func test_rings_and_charms() -> void:
 	large.affixes = []
 	var grand := ItemGen.create_item("curio_large", {"ilvl": 18})
 	grand.affixes = []
+	var base: int = CharacterSheet.compute_sheet(h).life # the magic rings may roll life
 	Grid.auto_place(Actions.grid_of("inv"), small)
-	eq("charms: in the bag they do nothing", CharacterSheet.compute_sheet(h).life, 74)
+	eq("charms: in the bag they do nothing", CharacterSheet.compute_sheet(h).life, base)
 	Actions.right_click_item("inv", small.uid)
 	check("charms: right-click slots it into the belt", h.equipped.waist.charms.has(small) and Actions._find_uid(h.inventory, small.uid).is_empty())
-	eq("charms: slotted they count", CharacterSheet.compute_sheet(h).life, 80)
+	eq("charms: slotted they count", CharacterSheet.compute_sheet(h).life, base + 6)
 	eq("charms: sizes", [Actions.charm_size(small), Actions.charm_size(large), Actions.charm_size(grand)], [1, 2, 3])
 	check("charms: sash (2 slots) refuses a large charm on top of a small", not Actions.insert_charm(large))
 	h.equipped.waist.charmSlots = 8
@@ -350,7 +351,7 @@ func test_rings_and_charms() -> void:
 	h.cursor = null
 	var belt: Dictionary = h.equipped.waist
 	h.equipped.erase("waist")
-	eq("charms: no belt, no charms", CharacterSheet.compute_sheet(h).life, 74)
+	eq("charms: no belt, no charms", CharacterSheet.compute_sheet(h).life, base)
 	h.equipped.waist = belt
 
 

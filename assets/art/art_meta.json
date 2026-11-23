@@ -1,5 +1,477 @@
 {
  "chars": {
+  "boss_warden": {
+   "anims": {
+    "attack": {
+     "east": {
+      "frames": 7,
+      "row": 12
+     },
+     "north": {
+      "frames": 7,
+      "row": 14
+     },
+     "north-east": {
+      "frames": 7,
+      "row": 13
+     },
+     "north-west": {
+      "frames": 7,
+      "row": 15
+     },
+     "south": {
+      "frames": 7,
+      "row": 10
+     },
+     "south-east": {
+      "frames": 7,
+      "row": 11
+     },
+     "south-west": {
+      "frames": 7,
+      "row": 17
+     },
+     "west": {
+      "frames": 7,
+      "row": 16
+     }
+    },
+    "falling_backward": {
+     "south": {
+      "frames": 7,
+      "row": 1
+     }
+    },
+    "walking": {
+     "east": {
+      "frames": 8,
+      "row": 4
+     },
+     "north": {
+      "frames": 8,
+      "row": 6
+     },
+     "north-east": {
+      "frames": 8,
+      "row": 5
+     },
+     "north-west": {
+      "frames": 8,
+      "row": 7
+     },
+     "south": {
+      "frames": 8,
+      "row": 2
+     },
+     "south-east": {
+      "frames": 8,
+      "row": 3
+     },
+     "south-west": {
+      "frames": 8,
+      "row": 9
+     },
+     "west": {
+      "frames": 8,
+      "row": 8
+     }
+    }
+   },
+   "bodyTop": 18,
+   "cell": [
+    124,
+    124
+   ],
+   "footY": 106,
+   "rotations": {
+    "east": [
+     2,
+     0
+    ],
+    "north": [
+     4,
+     0
+    ],
+    "north-east": [
+     3,
+     0
+    ],
+    "north-west": [
+     5,
+     0
+    ],
+    "south": [
+     0,
+     0
+    ],
+    "south-east": [
+     1,
+     0
+    ],
+    "south-west": [
+     7,
+     0
+    ],
+    "west": [
+     6,
+     0
+    ]
+   }
+  },
+  "mob_archer": {
+   "anims": {
+    "attack": {
+     "east": {
+      "frames": 7,
+      "row": 12
+     },
+     "north": {
+      "frames": 7,
+      "row": 14
+     },
+     "north-east": {
+      "frames": 7,
+      "row": 13
+     },
+     "north-west": {
+      "frames": 7,
+      "row": 15
+     },
+     "south": {
+      "frames": 7,
+      "row": 10
+     },
+     "south-east": {
+      "frames": 7,
+      "row": 11
+     },
+     "south-west": {
+      "frames": 7,
+      "row": 17
+     },
+     "west": {
+      "frames": 7,
+      "row": 16
+     }
+    },
+    "falling_backward": {
+     "south": {
+      "frames": 7,
+      "row": 1
+     }
+    },
+    "walking": {
+     "east": {
+      "frames": 8,
+      "row": 4
+     },
+     "north": {
+      "frames": 8,
+      "row": 6
+     },
+     "north-east": {
+      "frames": 8,
+      "row": 5
+     },
+     "north-west": {
+      "frames": 8,
+      "row": 7
+     },
+     "south": {
+      "frames": 8,
+      "row": 2
+     },
+     "south-east": {
+      "frames": 8,
+      "row": 3
+     },
+     "south-west": {
+      "frames": 8,
+      "row": 9
+     },
+     "west": {
+      "frames": 8,
+      "row": 8
+     }
+    }
+   },
+   "bodyTop": 12,
+   "cell": [
+    80,
+    80
+   ],
+   "footY": 68,
+   "rotations": {
+    "east": [
+     2,
+     0
+    ],
+    "north": [
+     4,
+     0
+    ],
+    "north-east": [
+     3,
+     0
+    ],
+    "north-west": [
+     5,
+     0
+    ],
+    "south": [
+     0,
+     0
+    ],
+    "south-east": [
+     1,
+     0
+    ],
+    "south-west": [
+     7,
+     0
+    ],
+    "west": [
+     6,
+     0
+    ]
+   }
+  },
+  "mob_brute": {
+   "anims": {
+    "attack": {
+     "east": {
+      "frames": 7,
+      "row": 4
+     },
+     "north": {
+      "frames": 7,
+      "row": 6
+     },
+     "north-east": {
+      "frames": 7,
+      "row": 5
+     },
+     "north-west": {
+      "frames": 7,
+      "row": 7
+     },
+     "south": {
+      "frames": 7,
+      "row": 2
+     },
+     "south-east": {
+      "frames": 7,
+      "row": 3
+     },
+     "south-west": {
+      "frames": 7,
+      "row": 9
+     },
+     "west": {
+      "frames": 7,
+      "row": 8
+     }
+    },
+    "falling_backward": {
+     "south": {
+      "frames": 7,
+      "row": 1
+     }
+    },
+    "walking": {
+     "east": {
+      "frames": 8,
+      "row": 12
+     },
+     "north": {
+      "frames": 8,
+      "row": 14
+     },
+     "north-east": {
+      "frames": 8,
+      "row": 13
+     },
+     "north-west": {
+      "frames": 8,
+      "row": 15
+     },
+     "south": {
+      "frames": 8,
+      "row": 10
+     },
+     "south-east": {
+      "frames": 8,
+      "row": 11
+     },
+     "south-west": {
+      "frames": 8,
+      "row": 17
+     },
+     "west": {
+      "frames": 8,
+      "row": 16
+     }
+    }
+   },
+   "bodyTop": 15,
+   "cell": [
+    84,
+    84
+   ],
+   "footY": 71,
+   "rotations": {
+    "east": [
+     2,
+     0
+    ],
+    "north": [
+     4,
+     0
+    ],
+    "north-east": [
+     3,
+     0
+    ],
+    "north-west": [
+     5,
+     0
+    ],
+    "south": [
+     0,
+     0
+    ],
+    "south-east": [
+     1,
+     0
+    ],
+    "south-west": [
+     7,
+     0
+    ],
+    "west": [
+     6,
+     0
+    ]
+   }
+  },
+  "mob_cultist": {
+   "anims": {
+    "attack": {
+     "east": {
+      "frames": 7,
+      "row": 11
+     },
+     "north": {
+      "frames": 7,
+      "row": 13
+     },
+     "north-east": {
+      "frames": 7,
+      "row": 12
+     },
+     "north-west": {
+      "frames": 7,
+      "row": 14
+     },
+     "south": {
+      "frames": 7,
+      "row": 9
+     },
+     "south-east": {
+      "frames": 7,
+      "row": 10
+     },
+     "south-west": {
+      "frames": 7,
+      "row": 16
+     },
+     "west": {
+      "frames": 7,
+      "row": 15
+     }
+    },
+    "falling_backward": {
+     "south": {
+      "frames": 7,
+      "row": 17
+     }
+    },
+    "walking": {
+     "east": {
+      "frames": 8,
+      "row": 3
+     },
+     "north": {
+      "frames": 8,
+      "row": 5
+     },
+     "north-east": {
+      "frames": 8,
+      "row": 4
+     },
+     "north-west": {
+      "frames": 8,
+      "row": 6
+     },
+     "south": {
+      "frames": 8,
+      "row": 1
+     },
+     "south-east": {
+      "frames": 8,
+      "row": 2
+     },
+     "south-west": {
+      "frames": 8,
+      "row": 8
+     },
+     "west": {
+      "frames": 8,
+      "row": 7
+     }
+    }
+   },
+   "bodyTop": 14,
+   "cell": [
+    84,
+    84
+   ],
+   "footY": 70,
+   "rotations": {
+    "east": [
+     2,
+     0
+    ],
+    "north": [
+     4,
+     0
+    ],
+    "north-east": [
+     3,
+     0
+    ],
+    "north-west": [
+     5,
+     0
+    ],
+    "south": [
+     0,
+     0
+    ],
+    "south-east": [
+     1,
+     0
+    ],
+    "south-west": [
+     7,
+     0
+    ],
+    "west": [
+     6,
+     0
+    ]
+   }
+  },
   "mob_ghoul": {
    "anims": {
     "attack": {
@@ -201,6 +673,124 @@
     80
    ],
    "footY": 67,
+   "rotations": {
+    "east": [
+     2,
+     0
+    ],
+    "north": [
+     4,
+     0
+    ],
+    "north-east": [
+     3,
+     0
+    ],
+    "north-west": [
+     5,
+     0
+    ],
+    "south": [
+     0,
+     0
+    ],
+    "south-east": [
+     1,
+     0
+    ],
+    "south-west": [
+     7,
+     0
+    ],
+    "west": [
+     6,
+     0
+    ]
+   }
+  },
+  "mob_wraith": {
+   "anims": {
+    "attack": {
+     "east": {
+      "frames": 7,
+      "row": 12
+     },
+     "north": {
+      "frames": 7,
+      "row": 14
+     },
+     "north-east": {
+      "frames": 7,
+      "row": 13
+     },
+     "north-west": {
+      "frames": 7,
+      "row": 15
+     },
+     "south": {
+      "frames": 7,
+      "row": 10
+     },
+     "south-east": {
+      "frames": 7,
+      "row": 11
+     },
+     "south-west": {
+      "frames": 7,
+      "row": 17
+     },
+     "west": {
+      "frames": 7,
+      "row": 16
+     }
+    },
+    "falling_backward": {
+     "south": {
+      "frames": 7,
+      "row": 9
+     }
+    },
+    "walking": {
+     "east": {
+      "frames": 8,
+      "row": 3
+     },
+     "north": {
+      "frames": 8,
+      "row": 5
+     },
+     "north-east": {
+      "frames": 8,
+      "row": 4
+     },
+     "north-west": {
+      "frames": 8,
+      "row": 6
+     },
+     "south": {
+      "frames": 8,
+      "row": 1
+     },
+     "south-east": {
+      "frames": 8,
+      "row": 2
+     },
+     "south-west": {
+      "frames": 8,
+      "row": 8
+     },
+     "west": {
+      "frames": 8,
+      "row": 7
+     }
+    }
+   },
+   "bodyTop": 14,
+   "cell": [
+    88,
+    88
+   ],
+   "footY": 71,
    "rotations": {
     "east": [
      2,
@@ -930,6 +1520,16 @@
    "h": 96,
    "w": 32
   },
+  "heavy_belt": {
+   "bbox": [
+    3,
+    7,
+    61,
+    26
+   ],
+   "h": 32,
+   "w": 64
+  },
   "helm": {
    "bbox": [
     13,
@@ -1308,6 +1908,16 @@
     91
    ],
    "h": 96,
+   "w": 64
+  },
+  "war_girdle": {
+   "bbox": [
+    9,
+    3,
+    55,
+    29
+   ],
+   "h": 32,
    "w": 64
   }
  },

@@ -6,13 +6,13 @@ extends Node
 ##     -s tools/godot/run.gd -- res://tools/godot/tour.gd <out_dir>
 
 const STOPS := [
-	["tour_1_square", Vector2(30, 24.5)],
-	["tour_2_sealed_stair", Vector2(29.5, 12.5)],
-	["tour_3_tavern_graveyard", Vector2(14, 18)],
-	["tour_4_smithy", Vector2(17, 28)],
-	["tour_5_trading_post", Vector2(44, 26.5)],
-	["tour_6_pond_wagon", Vector2(44, 35)],
-	["tour_7_south_gate", Vector2(30, 41.5)],
+	["tour_1_square", Vector2(17, 18)],
+	["tour_2_sealed_stair", Vector2(17, 12)],
+	["tour_3_varn", Vector2(10, 14)],
+	["tour_4_forge", Vector2(24, 14.5)],
+	["tour_5_ysolde", Vector2(10, 22)],
+	["tour_6_pell", Vector2(24, 22)],
+	["tour_7_gate_odo", Vector2(18, 24)],
 ]
 
 var frame := 0

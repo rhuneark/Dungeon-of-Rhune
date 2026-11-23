@@ -82,7 +82,10 @@
     "boss_warden": {
       "id": "9ae05dfa-af9c-4701-b16b-54159ef01515",
       "anim:walking-8-frames": "done",
-      "anim:attack:group": "d26574c0-fcd3-42f1-aae4-a04569251998"
+      "anim:attack:group": "d26574c0-fcd3-42f1-aae4-a04569251998",
+      "anim:attack": "done",
+      "anim:falling-back-death:group": "073b9925-94ee-4cf2-8d70-fd83ad233818",
+      "anim:falling-back-death": "done"
     },
     "mob_wraith": {
       "id": "ee0fff6d-ec50-400d-a29f-1682bb7e7dd4",

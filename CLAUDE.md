@@ -1,5 +1,10 @@
 # Dungeon of Rhune (Godot 4.7, GDScript)
 
+The game: ONE town (Thornwick, a hub) and ONE dungeon (the Sealed Stair, floors 1-100, one sealed
+arena room per floor: waves, then a chest, then the stair down). Gear is the whole build: no
+classes, no skills, no skill trees, no mana, no potions (one rejuvenation flask on a cooldown).
+Levels only give attribute points. Keep it that way unless asked; "we'll build it out later".
+
 Ships on **Steam** (Godot desktop exports + optional GodotSteam GDExtension) and the **web**
 (Godot Web export). There is no RUN.game, no Electron, no npm anymore. Never re-add them.
 
@@ -9,27 +14,35 @@ Ships on **Steam** (Godot desktop exports + optional GodotSteam GDExtension) and
   are actions), Compatibility renderer, nearest filtering, pixel snapping, NO stretch mode,
   `[rhune] steam/app_id` (0 = no Steam), custom user dir "Dungeon of Rhune".
 - **scripts/main.gd** (scenes/main.tscn): boot → loading screen (warms every texture via
-  `Art.warm`) → menu → playing. Owns World (zone + ZoneRuntime) and the UI CanvasLayer
+  `Art.warm`) → menu → playing. While playing, the zone follows `Game.ui.location`: town →
+  thornwick.tscn; dungeon → `ArenaBuilder.build(floor)` + an `Arena`. Owns World (zone +
+  ZoneRuntime) and the UI CanvasLayer
   (scaled by `View.ui_scale`, root Control sized `View.ui_size`). Sets
   `Viewport.oversampling_override = ui_scale`. Flushes the save on focus loss and window close.
 - **scripts/autoload/**: `view.gd` (integer world zoom + UI scale, prefs in user://view.cfg),
   `platform.gd` (Steam via `Engine.get_singleton("Steam")`, fullscreen, quit, achievements,
   `dev_tools`), `art.gd` (art_meta.json, character frames, tile coords, cached textures),
   `game.gd` (the session: `save`, `commit()`, `flush()`, `sheet()`, `ui` + `set_ui()`, toasts,
-  world bridge signals `drops_requested` / `float_text_requested`).
+  the flask (`drink_flask`, `flask_fraction`), travel (`enter_dungeon`, `next_floor`,
+  `return_to_town`, `checkpoints`), world bridge signals `drops_requested` / `float_text_requested`).
 - **scripts/content/**: pure data (static funcs + static var caches). **scripts/systems/**:
   rules (static funcs). Port of the old TS with the SAME dictionary keys (camelCase:
   `baseId`, `uniqueValues`...) so saves are unchanged. `Rng` is mulberry32, bit-identical to the
   TS build.
-- **scenes/world/thornwick.tscn**: the town, BUILT by tools/godot/build_thornwick.gd (terrain
-  lanes, props, graveyard/chapel, forest edge; re-run it after layout changes) and editable in
-  the editor (Ground TileMapLayer with terrains, Decals, Things y-sorted, Items, Blockers, Spawn).
-  Node types in **scripts/world/**:
-  `Prop` (art/block/action/approach_dy, anchored at the visible base), `NpcSpot`,
-  `PlacedItem`, `Blocker`, `Zone` (root: zone_name, level, critter_area).
+- **scenes/world/thornwick.tscn**: the hub, BUILT by tools/godot/build_thornwick.gd (compact,
+  Rogue-Encampment style: stash by the campfire, the Stair north, each NPC at their own door;
+  re-run it after layout changes) and editable in the editor (Ground TileMapLayer with
+  terrains, Decals, Things y-sorted, Items, Blockers, Spawn). Node types in **scripts/world/**:
+  `Prop` (art/block/action/approach_dy, anchored at the visible base), `NpcSpot`, `Blocker`,
+  `Zone` (root: zone_name, level, ambient, fog_density, hero_light).
+- **scripts/world/arena_builder.gd** builds a dungeon floor as a Zone at runtime (room shape,
+  "dungeon" cliff tiles: floor 0 / rock 1 / wall face 2, torches, pillars, spawn circles, door);
+  **arena.gd** runs it (waves, Mob AI, projectiles, every hit both ways, XP/drops, death, the
+  chest, the exit). Monster numbers and floor scaling: scripts/content/monsters.gd.
 - **scripts/world/zone_runtime.gd**: brings a Zone to life (nav from terrain + footprints +
-  blockers, player, NPCs, goose, ground loot, hover/click, camera). `interact.gd`: what using
-  things does (dialogs, panels, quest events). `atmosphere.gd`: the look at runtime (dusk
+  blockers, player, NPCs, ground loot, hover/click, camera, the hero's attacks: walk into range,
+  swing timed by attack speed, `Arena.player_attack` at 55% of the swing). `interact.gd`: what
+  using things does (dialogs, panels, the Stair, chest, exit, portal). `atmosphere.gd`: the look at runtime (dusk
   CanvasModulate, a flickering PointLight2D per glow cluster from art_meta, unshaded glow
   sprites, pixel-snapped fog shader, embers, vignette CanvasLayer). Loot labels and float text
   live on an `Overlay` CanvasLayer (follows the camera) so the tint never dims them.
@@ -60,10 +73,14 @@ Ships on **Steam** (Godot desktop exports + optional GodotSteam GDExtension) and
 - **Mouse routing**: full-screen UI containers are `MOUSE_FILTER_IGNORE`; panels `STOP`. World
   clicks arrive in `ZoneRuntime._unhandled_input`; world hover is skipped while
   `gui_get_hovered_control()` is set. Buttons are `FOCUS_NONE` (Space/Enter must not press them).
-- **Content vs systems**: new items/affixes/uniques/rhunes/skills/quests are DATA in
+- **Content vs systems**: new items/affixes/uniques/rhunes/monsters are DATA in
   `scripts/content/`; rules in `scripts/systems/`. Tooltips and stats are derived, so
   rebalancing data updates existing saves. Stats are string ids (`res:fire`, `seek:rhune`,
-  `tagPct:projectile`, `skill:<id>`, `quirk:<id>`). Scale by tag/damage type, never by skill.
+  `tagPct:projectile`, `flaskRecovery`, `quirk:<id>`). Attack tags: melee / ranged+projectile
+  (bows) / spell+projectile (caster weapons). Attribute ids stay might/finesse/vigor/spirit;
+  players see Strength/Dexterity/Stamina/Intelligence.
+- **Gear rules**: 4 ring slots (ring1-ring4). Belts roll `charmSlots` (1-8); charms (bases
+  curio_*) count ONLY in the equipped belt's `charms`, taking `charmSize` slots (1/2/3).
 - **Save mutations**: mutate `Game.save` / `Game.hero()`, then `Game.commit()` (1.5s debounced
   autosave; `Game.flush()` saves now). Item movement goes through `Actions`.
 - **Errors**: rules return `""` for success or an error string; optional dicts return `{}`.
@@ -97,11 +114,13 @@ Ships on **Steam** (Godot desktop exports + optional GodotSteam GDExtension) and
 
 - `godot --headless --path . --import` clean (no SCRIPT ERROR); `godot --headless --path . -s
   tools/godot/smoke.gd` loads every script (`SMOKE bad=0`).
-- `godot --headless --path . res://tests/test_systems.tscn` → `RESULT 207/207`.
+- `godot --headless --path . res://tests/test_systems.tscn` → `RESULT 218/218`.
 - `xvfb-run -a -s "-screen 0 1600x900x24" godot --path . --audio-driver Dummy --resolution
   1600x900 -s tools/godot/run.gd -- res://tools/godot/play_test.gd` → `PLAYTEST OK` (includes
   "every NPC and usable object is reachable").
 - Screenshots: same with `res://tools/godot/shots.gd <out_dir>` (also try 1366x768 → UI 1.5x);
   `res://tools/godot/tour.gd <out_dir>` walks the town and shoots each landmark at play zoom.
+- Dungeon: same with `res://tools/godot/dungeon_test.gd [out_dir] [floor]` → a bot clears two
+  floors, opens the chests and takes the stair → `DUNGEON OK`.
 - `godot --headless --path . --export-pack "Linux" builds/pck/rhune.pck` then
   `godot --main-pack builds/pck/rhune.pck` boots to the menu (checks export filters).

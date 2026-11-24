@@ -72,8 +72,9 @@ your next descent starts from a checkpoint. About a minute a floor early on, two
 floor 15.
 
 **The climb.** Tuned with a bot that plays like a careful player (wears what drops, shops,
-spends points): it reaches floor 15 at about level 15 in 20-35 minutes, with 0-2 deaths. Monster
-life grows about x5 by floor 15, damage about x3; new kinds join at floors 4, 7, 11 and 16.
+spends points): it reaches floor 15 at level 15-18 with 0-2 deaths, the danger starting around
+floor 7. Monster life grows about x5.6 by floor 15, damage about x3.9; new kinds join at floors 4,
+7, 11 and 16. Archers and casters hold their ground and shoot (they don't kite).
 
 **Combat is your weapon.** Swords, axes and maces swing in an arc and hit everything in it; bows
 shoot arrows; wands and staves cast bolts with a little splash. The weapon also decides which
@@ -128,7 +129,10 @@ Options (O) lets players pick UI scale and world zoom. World: 32px tiles, 64px c
 32px per inventory cell. Text uses one plain pixel face (Jersey 10) in bright colours; the gothic
 face is only the logo.
 
-**Look.** Classic 16-bit top-down three-quarter view. Thornwick is a gothic hamlet at night;
+**Look.** Top-down oblique, like Chronicon or a 2D Diablo: floors seen from straight above,
+everything standing (walls, buildings, chests, pillars, people) seen from the front with a sliver
+of its top, never at an isometric corner angle. Dungeon rooms are axis-aligned halls whose north
+walls show a brick face. Thornwick is a gothic hamlet at night;
 the Stair is near-black stone lit only by wall torches, braziers and summoning circles (Diablo
 II-dark). All world art shares one 47-colour palette (`PALETTE` in `tools/art/spec.py`).
 `scripts/world/atmosphere.gd` tints each zone (town dusk, dungeon dark) and lights it: torches,
@@ -155,7 +159,8 @@ re-running it. Lights come from the art itself: a prop whose art has lamplight, 
 colours glows on its own (tune per art in `LIGHT_TUNING`, `scripts/world/atmosphere.gd`).
 
 Dungeon floors aren't scenes: `scripts/world/arena_builder.gd` builds each room at runtime
-(shape, walls from the dungeon cliff tileset, torches, pillars, spawn circles, the door) and
+(an axis-aligned shape, oblique walls from `assets/art/tiles/dungeon_walls.png`, drawn by
+`tools/art/dungeon_walls.py`; torches, pillars, spawn circles, the door) and
 `scripts/world/arena.gd` runs it (waves, monsters, hits, the chest). Monster stats and the
 floor-by-floor scaling are data in `scripts/content/monsters.gd`.
 
@@ -191,7 +196,8 @@ scripts/ui/             UI built in code: ui_kit.gd (palette, fonts, frames), ui
 assets/                 art (packed sprites + glow masks + art_meta.json), fonts, tiles/terrain.tres, icon
 tests/test_systems.tscn rules tests (items, loot, rings, charms, flask, floors, rooms, saves)
 tools/art/              PixelLab pipeline (prompts → generation → packing into assets/art/)
-tools/godot/            builders and test drivers (play_test, dungeon_test, campaign_test, shots, tour)
+tools/godot/            builders and test drivers (play_test, dungeon_test, campaign_test, shots, tour, room_shots)
+tools/art/              PixelLab art pipeline (spec, gen, pack), dungeon_walls.py, guides.py
 ```
 
 ## Tests

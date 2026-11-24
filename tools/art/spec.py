@@ -53,10 +53,20 @@ FRONT_STYLE = (
 # the look. Lower strength = more freedom.
 REF_STRENGTH = 130
 REF_STRENGTH_OVERRIDES = {"market_stall": 300}
+# Small props that must face the camera like a 16-bit top-down ARPG draws them
+# (Chronicon, Zelda): front toward the viewer, a sliver of top, never an
+# isometric corner view. Their guides are drawn by tools/art/guides.py.
+FRONT_PROPS = {"pillar", "dungeon_chest", "dungeon_chest_open", "strongbox", "crates", "hay", "cart", "gambler_wagon", "statue"}
+FRONT_PROP_STYLE = (
+    "classic 16-bit top-down ARPG map object, front face toward the viewer with only a sliver of its top visible, "
+    f"straight-on, no isometric angle, no corner view, standing alone, no ground under it, {GOTHIC}"
+)
+for _n in FRONT_PROPS:
+    REF_STRENGTH_OVERRIDES[_n] = 70
 PROP_REFS = {
     "smithy", "trader", "herbalist", "tavern", "house_a", "house_b",
     "gate", "market_stall", "pit_entrance",
-}
+} | FRONT_PROPS
 # Props drawn in the "low top-down" view (fronts toward the camera).
 # Everything else uses PROP_STYLE ("high top-down").
 FRONT_FACING = {
@@ -204,7 +214,7 @@ PROPS = {
     "trader": (216, 192, f"old merchant trading post, dark stone ground floor and black timber upper floor, steep slate roof, faded dark crimson cloth awning over the door, crates and sacks of goods, {LIT}"),
     "herbalist": (192, 192, "crooked witch herbalist cottage, rough stone walls, heavy dark mossy thatched roof, bundles of drying herbs and hanging bottles by the door, a small round window with warm candlelight"),
     "lore_tower": (192, 264, "tall round gothic stone library tower, steep conical dark slate spire roof, tall pointed arch windows glowing with warm candlelight, iron lantern by the arched door, creeping ivy"),
-    "gambler_wagon": (128, 96, "covered traveller wagon with a dark plum canvas cover, hanging bone charms and dice, a small lit lantern, old wooden wheels"),
+    "gambler_wagon": (128, 96, "covered traveller wagon with a dark plum canvas cover, hanging bone charms and dice, a small lit lantern, old wooden wheels, seen exactly from the side"),
     "tavern": (288, 240, f"large old two story tavern inn, dark grey stone ground floor and black timber framed upper floor, steep dark slate roof with chimneys, pointed gothic arched door, {LIT}, blank hanging iron sign without any text"),
     "house_a": (192, 192, "small old stone cottage, rough grey fieldstone walls, steep dark mossy thatched roof, heavy wooden door, one small window with warm candlelight"),
     "house_b": (168, 168, "narrow old timber framed house, black beams and grey plaster, steep dark slate roof, crooked stone chimney, one small window with warm candlelight"),
@@ -213,9 +223,9 @@ PROPS = {
     "gate": (240, 192, "fortified town gatehouse of dark weathered stone, two squat crenellated towers, heavy iron portcullis closed over an arched gateway, burning torches on the walls"),
     "waypoint": (96, 96, "ring of ancient weathered standing stones carved with glowing pale blue runes around a flat cracked stone dais, seen from above"),
     "wishing_well": (64, 80, "old moss covered stone well with a small dark slate roof, rope and wooden bucket"),
-    "strongbox": (48, 48, "heavy iron banded dark oak chest with a big iron lock, closed"),
+    "strongbox": (48, 48, "heavy iron banded dark oak strongbox with a flat lid and a big iron lock, closed, seen straight from the front"),
     "notice_board": (64, 64, "weathered dark wooden notice board under a small slate roof, pinned yellowed parchment notices"),
-    "statue": (64, 112, "weathered grey stone statue of a hooded knight holding up a lantern with a warm glowing flame, on a square mossy pedestal"),
+    "statue": (64, 112, "weathered grey stone statue of a hooded knight holding up a lantern with a warm glowing flame, on a square mossy pedestal, seen straight from the front"),
     "market_stall": (144, 120, "old market stall, dark weathered wooden frame, faded dark green and bone striped cloth canopy, baskets of turnips, apples and bread, wooden support posts at each corner"),
     # nature
     "tree_oak": (144, 192, "huge ancient gnarled oak tree, thick twisted dark trunk, exposed roots, dense dark green-grey canopy"),
@@ -234,11 +244,11 @@ PROPS = {
     "mushrooms": (32, 32, "cluster of small pale grey toadstools"),
     # clutter
     "barrel": (32, 32, "old dark wooden barrel with rusted iron bands"),
-    "crates": (48, 48, "stack of old dark wooden crates"),
-    "hay": (48, 40, "old grey-brown hay bale"),
+    "crates": (48, 48, "two stacked old dark wooden crates with flat fronts facing the viewer, seen straight from the front"),
+    "hay": (48, 40, "old grey-brown rectangular hay bale tied with twine, seen from the front"),
     "lamp_post": (32, 80, "tall wrought iron gothic street lantern on a black iron post, glowing warm candle flame inside the glass"),
     "brazier": (32, 48, "tall black iron brazier on three legs filled with burning coals and bright orange flames"),
-    "cart": (80, 64, "old two wheeled wooden hand cart loaded with grey sacks, seen from the side"),
+    "cart": (80, 64, "old two wheeled wooden hand cart loaded with grey sacks, seen exactly from the side, the wheel toward the viewer"),
     "campfire": (48, 48, "campfire with burning logs and bright orange flames in a ring of dark stones"),
     "signpost": (32, 64, "old weathered dark wooden signpost with crooked arrow boards"),
     "fence": (64, 32, "short section of weathered dark wooden fence, horizontal"),
@@ -250,9 +260,9 @@ PROPS = {
     # --------------------------------------------------- the Sealed Stair
     "door_sealed": (96, 96, "massive arched stone dungeon doorway sealed by a rusted iron portcullis, carved frame with faint red runes"),
     "door_open": (96, 96, "massive arched stone dungeon doorway standing open, worn stone steps descending into darkness, faint pale blue glow from below"),
-    "dungeon_chest": (48, 48, "ornate iron bound dark oak treasure chest with tarnished gold trim, closed"),
-    "dungeon_chest_open": (48, 48, "ornate iron bound dark oak treasure chest with tarnished gold trim, lid thrown open, glowing gold coins inside"),
-    "pillar": (48, 96, "thick ancient dark stone dungeon pillar with carved runes and a cracked base"),
+    "dungeon_chest": (48, 48, "ornate iron bound dark oak treasure chest with an arched lid and tarnished gold trim, closed, seen straight from the front"),
+    "dungeon_chest_open": (48, 48, "ornate iron bound dark oak treasure chest with tarnished gold trim, lid standing open behind it, heaped glowing gold coins inside, seen straight from the front"),
+    "pillar": (48, 96, "thick square ancient dark stone dungeon pillar with carved runes, a heavy capital and a cracked plinth, seen straight from the front"),
     "wall_torch": (32, 48, "iron wall sconce holding a burning torch with a bright orange flame"),
     "bones": (32, 32, "scattered old bones and a skull lying on a stone floor"),
     "skull_pile": (48, 32, "small heap of skulls and bones"),

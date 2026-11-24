@@ -3,18 +3,22 @@ class_name ArenaBuilder
 ## the size of an Infernal Hordes arena (roughly two screens across), dark,
 ## lit by wall torches and braziers.
 ##
-## Tiles come from the "dungeon" cliff set: floor (0) inside, rock (1) around,
-## and the brick wall face (2) on the two rows under every rock edge, so the
-## north walls show their face and the others only their lit rim.
-## Zone meta the Arena reads: spawns (Array[Vector2]), center, entry, door (Prop).
+## Top-down oblique, like a 16-bit ARPG: the floor is seen from straight above,
+## walls are blocks. North walls show a two-tile brick face under a dark cap;
+## side and south walls show their cap with a lit rim; walls shade the floor.
+## Rooms are axis-aligned (no diagonal steps). Tiles: assets/art/tiles/
+## dungeon_walls.png, drawn by tools/art/dungeon_walls.py (layout documented
+## there). Zone meta the Arena reads: spawns (Array[Vector2]), center, entry, door (Prop).
 
 const W := 42
 const H := 32
 const TILE := 32
-const SHAPES := ["hall", "round", "cross"]
+const SHAPES := ["hall", "cross", "court"]
+const VOID := 0
+const FLOOR := 1
+const WALL := 2
 
 static var _tileset: TileSet
-static var _keys := {} # "0102" -> Array[Vector2i] atlas coords
 
 
 static func tileset() -> TileSet:
@@ -23,40 +27,58 @@ static func tileset() -> TileSet:
 	var ts := TileSet.new()
 	ts.tile_size = Vector2i(TILE, TILE)
 	var src := TileSetAtlasSource.new()
-	src.texture = Art.tile_texture("dungeon")
+	src.texture = Art.tile_texture("dungeon_walls")
 	src.texture_region_size = Vector2i(TILE, TILE)
 	ts.add_source(src, 0)
-	for e in Art.meta.tiles.get("dungeon", {}).get("tiles", []):
-		var c := Vector2i(int(e.i) % 4, int(e.i) / 4)
-		src.create_tile(c)
-		if not _keys.has(e.key):
-			_keys[e.key] = []
-		_keys[e.key].append(c)
+	for i in 72:
+		src.create_tile(_at(i))
 	_tileset = ts
 	return ts
 
 
-## Atlas coords for a corner key; unknown combos fall back to the nearest the set has.
-static func _coords(key: String, rng: RandomNumberGenerator) -> Vector2i:
-	for k in [key, key.replace("2", "0"), key.replace("2", "1"), "0000"]:
-		if _keys.has(k):
-			var arr: Array = _keys[k]
-			return arr[rng.randi_range(0, arr.size() - 1)]
-	return Vector2i.ZERO
+static func _at(i: int) -> Vector2i:
+	return Vector2i(i % 8, i / 8)
 
 
-static func _inside(shape: String, x: float, y: float) -> bool:
+static func _inside(shape: String, x: int, y: int) -> bool:
 	match shape:
-		"round":
-			return pow((x - 21.0) / 16.5, 2) + pow((y - 17.0) / 11.0, 2) <= 1.0
 		"cross":
-			return (x >= 5 and x <= 37 and y >= 11 and y <= 23) or (x >= 13 and x <= 29 and y >= 6 and y <= 28)
-	# hall: a long room with its corners cut
-	if x < 5 or x > 37 or y < 6 or y > 28:
-		return false
-	var cx := minf(x - 5, 37 - x)
-	var cy := minf(y - 6, 28 - y)
-	return cx + cy >= 3
+			return (x >= 5 and x <= 36 and y >= 11 and y <= 22) or (x >= 13 and x <= 28 and y >= 5 and y <= 27)
+		"court":
+			if x < 5 or x > 36 or y < 5 or y > 27:
+				return false
+			# Four stone islands to fight around.
+			for c in [Vector2i(11, 10), Vector2i(28, 10), Vector2i(11, 20), Vector2i(28, 20)]:
+				if x >= c.x and x <= c.x + 2 and y >= c.y and y <= c.y + 2:
+					return false
+			return true
+	# hall: a long room with a bay on each side
+	return (x >= 7 and x <= 34 and y >= 5 and y <= 27) or (x >= 3 and x <= 38 and y >= 12 and y <= 20)
+
+
+## Cell kinds: FLOOR inside, WALL within reach of the floor (three rows above
+## it for the face + cap, two elsewhere), VOID beyond.
+static func _grid(shape: String) -> Array:
+	var g: Array = []
+	for y in H:
+		var row: Array = []
+		for x in W:
+			row.append(FLOOR if _inside(shape, x, y) else VOID)
+		g.append(row)
+	for y in H:
+		for x in W:
+			if g[y][x] != VOID:
+				continue
+			var near := false
+			for dy in range(-2, 4):
+				for dx in range(-2, 3):
+					var nx := x + dx
+					var ny := y + dy
+					if nx >= 0 and ny >= 0 and nx < W and ny < H and _inside(shape, nx, ny):
+						near = true
+			if near:
+				g[y][x] = WALL
+	return g
 
 
 static func build(floor: int) -> Zone:
@@ -72,29 +94,68 @@ static func build(floor: int) -> Zone:
 	zone.fog_density = 0.10
 	zone.hero_light = 170.0
 
-	# Vertex terrain: 0 floor, 1 rock; floor vertices under rock become wall face (2).
-	var v: Array = []
-	for y in H + 1:
-		var row: Array = []
-		for x in W + 1:
-			row.append(0 if _inside(shape, x, y) else 1)
-		v.append(row)
-	for y in range(1, H + 1):
-		for x in W + 1:
-			if v[y][x] == 0 and v[y - 1][x] == 1:
-				v[y][x] = 2
+	var g := _grid(shape)
+	var kind := func(cx: int, cy: int) -> int:
+		return g[cy][cx] if cx >= 0 and cy >= 0 and cx < W and cy < H else VOID
+	# A wall cell is face if the floor is one (lower) or two (upper) rows below.
+	var face := func(cx: int, cy: int) -> int:
+		if kind.call(cx, cy) != WALL:
+			return -1
+		if kind.call(cx, cy + 1) == FLOOR:
+			return 1
+		if kind.call(cx, cy + 1) == WALL and kind.call(cx, cy + 2) == FLOOR:
+			return 0
+		return -1
+	var lower := func(cx: int, cy: int) -> bool: return kind.call(cx, cy) == FLOOR or face.call(cx, cy) >= 0
 
 	var ground := TileMapLayer.new()
 	ground.name = "Ground"
 	ground.tile_set = _tileset
 	zone.add_child(ground)
+	var shade := TileMapLayer.new()
+	shade.name = "Shade"
+	shade.tile_set = _tileset
+	zone.add_child(shade)
 	var blocked := {}
 	for y in H:
 		for x in W:
-			var key := "%d%d%d%d" % [v[y][x], v[y][x + 1], v[y + 1][x], v[y + 1][x + 1]]
-			ground.set_cell(Vector2i(x, y), 0, _coords(key, rng))
-			if key != "0000":
-				blocked[Vector2i(x, y)] = true
+			var k: int = g[y][x]
+			var c := Vector2i(x, y)
+			if k != FLOOR:
+				blocked[c] = true
+			if k == FLOOR:
+				ground.set_cell(c, 0, _at(rng.randi_range(0, 7)))
+				var m := 0
+				if kind.call(x, y - 1) == WALL:
+					m |= 1
+				if kind.call(x + 1, y) == WALL:
+					m |= 2
+				if kind.call(x, y + 1) == WALL:
+					m |= 4
+				if kind.call(x - 1, y) == WALL:
+					m |= 8
+				if m != 0:
+					shade.set_cell(c, 0, _at(56 + m))
+			elif k == WALL:
+				var part: int = face.call(x, y)
+				if part >= 0:
+					var ends := 0
+					if face.call(x - 1, y) != part:
+						ends |= 1
+					if face.call(x + 1, y) != part:
+						ends |= 2
+					ground.set_cell(c, 0, _at(40 + part * 8 + ends * 2 + rng.randi_range(0, 1)))
+				else:
+					var m := 0
+					if lower.call(x, y - 1):
+						m |= 1
+					if lower.call(x + 1, y):
+						m |= 2
+					if lower.call(x, y + 1):
+						m |= 4
+					if lower.call(x - 1, y):
+						m |= 8
+					ground.set_cell(c, 0, _at(8 + m * 2 + rng.randi_range(0, 1)))
 	var decals := Node2D.new()
 	decals.name = "Decals"
 	zone.add_child(decals)
@@ -123,7 +184,7 @@ static func build(floor: int) -> Zone:
 			bl.size = Vector2i(x - x0, 1)
 			blockers.add_child(bl)
 
-	var floor_at := func(cx: int, cy: int) -> bool: return cx >= 0 and cy >= 0 and cx < W and cy < H and not blocked.has(Vector2i(cx, cy))
+	var floor_at := func(cx: int, cy: int) -> bool: return kind.call(cx, cy) == FLOOR
 	# The north wall: first floor row under the face, at the middle.
 	var mid := W / 2
 	var top := 0
@@ -148,15 +209,16 @@ static func build(floor: int) -> Zone:
 		while fy < H and not floor_at.call(x, fy):
 			fy += 1
 		if fy < H - 2 and fy - top <= 4 and floor_at.call(x, fy):
-			_prop(things, "wall_torch", x + 0.5, fy - 0.35, Vector2i.ZERO)
+			_prop(things, "wall_torch", x + 0.5, fy - 0.55, Vector2i.ZERO)
 	for dx in [-3, 3]:
 		_prop(things, "brazier", mid + dx + 0.5, top + 1.2, Vector2i(1, 1))
-	# Chains and pillars: pillars on the shoulders of the room (cover, not a maze).
-	for p in [Vector2(-9, 0.32), Vector2(9, 0.32), Vector2(-9, 0.72), Vector2(9, 0.72)]:
+	# Pillars on the shoulders of the room (cover, not a maze); the court has its islands.
+	for p in ([] if shape == "court" else [Vector2(-9, 0.32), Vector2(9, 0.32), Vector2(-9, 0.72), Vector2(9, 0.72)]):
 		var px := mid + int(p.x)
 		var py := int(lerpf(top, bottom, p.y))
 		if floor_at.call(px, py) and floor_at.call(px, py - 1):
-			_prop(things, "pillar", px + 0.5, py + 0.9, Vector2i(1, 1))
+			var pil := _prop(things, "pillar", px + 0.5, py + 0.9, Vector2i(1, 1))
+			pil.modulate = Color(0.72, 0.72, 0.78) # the room's darker stone
 	# Spawn circles: the room's four quarters.
 	var spawns: Array = []
 	for p in [Vector2(0.22, 0.30), Vector2(0.78, 0.30), Vector2(0.20, 0.72), Vector2(0.80, 0.72)]:

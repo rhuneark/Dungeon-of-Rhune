@@ -50,15 +50,15 @@ static func pool(floor: int) -> Array:
 
 
 ## Tuned with tools/godot/campaign_test.gd so a hero wearing what drops
-## clears floors 1-15 at about a level per floor (x4.9 life by floor 15).
+## clears floors 1-15 at about a level per floor (x5.6 life, x3.9 damage by floor 15).
 static func life_mult(floor: int) -> float:
 	var f := float(floor - 1)
-	return 1.0 + 0.22 * f + 0.004 * f * f
+	return 1.0 + 0.26 * f + 0.005 * f * f
 
 
 static func damage_mult(floor: int) -> float:
 	var f := float(floor - 1)
-	return 1.0 + 0.14 * f + 0.0015 * f * f
+	return 1.0 + 0.18 * f + 0.002 * f * f
 
 
 static func xp_mult(floor: int) -> float:

@@ -246,7 +246,8 @@ func player_attack(from: Vector2, aim: Vector2, target: Mob) -> void:
 				continue
 			var to: Vector2 = m.position - from
 			var d := to.length()
-			if d <= reach + m.radius() and (d < 10.0 or absf(dirv.angle_to(to)) <= deg_to_rad(65)):
+			# +12px: a target that steps back mid-swing is still hit (monsters get the same).
+			if d <= reach + m.radius() + 12.0 and (d < 10.0 or absf(dirv.angle_to(to)) <= deg_to_rad(65)):
 				_hit_mob(m, sh)
 		rt.fx.slash(from + Vector2(0, -16) + dirv * 16.0, dirv)
 		return
@@ -641,12 +642,11 @@ class Mob extends Node2D:
 				return
 			want = to / dist
 		else:
+			# Archers and casters close to range and hold their ground (D2-style):
+			# backing away from a melee hero only made them kite at the edge of a swing.
 			var sees := nav.line_of_sight(position, ppos, 2.0)
 			if dist > float(def.range) * 0.95 or not sees:
 				want = to / maxf(dist, 0.01)
-			elif dist < float(def.get("keep", 120.0)) * 0.4:
-				# Step back only when crowded, and slowly: a melee hero can catch them.
-				want = -to / maxf(dist, 0.01) * 0.6
 			elif cd <= 0:
 				state = "windup"
 				st = 0.0

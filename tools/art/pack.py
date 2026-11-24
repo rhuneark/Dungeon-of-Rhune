@@ -270,6 +270,9 @@ def main():
     with open(META_JSON, "w") as fh:
         json.dump(art, fh, indent=1, sort_keys=True)
     print("packed", len(chars), "chars,", len(tiles), "tilesets,", len(props), "props,", len(icons), "icons")
+    # The dungeon's oblique walls are drawn from the packed flagstones.
+    import dungeon_walls
+    dungeon_walls.main()
 
 
 if __name__ == "__main__":

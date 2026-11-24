@@ -164,7 +164,7 @@ def map_object(name, w, h, prompt, out_path, view="high top-down", icon=False):
 
 
 def prop_view(name):
-    if name in spec.FRONT_FACING:
+    if name in spec.FRONT_FACING or name in getattr(spec, "FRONT_PROPS", ()):
         return "low top-down"
     return "low top-down" if name in getattr(spec, "LOW_VIEW", ()) else "high top-down"
 
@@ -174,7 +174,12 @@ def gen_props(only=None, variants=0):
     for name, (w, h, prompt) in spec.PROPS.items():
         if only and name not in only:
             continue
-        full = f"{prompt}, {spec.FRONT_STYLE}" if name in spec.FRONT_FACING else f"{prompt}, {spec.PROP_STYLE}"
+        if name in spec.FRONT_FACING:
+            full = f"{prompt}, {spec.FRONT_STYLE}"
+        elif name in getattr(spec, "FRONT_PROPS", ()):
+            full = f"{prompt}, {spec.FRONT_PROP_STYLE}"
+        else:
+            full = f"{prompt}, {spec.PROP_STYLE}"
         if variants:
             for i in range(variants):
                 tasks.append((name, w, h, full, os.path.join(OUT, "candidates", f"{name}_{i}.png"), prop_view(name)))

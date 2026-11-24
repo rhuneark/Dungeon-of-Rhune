@@ -36,8 +36,12 @@ Ships on **Steam** (Godot desktop exports + optional GodotSteam GDExtension) and
   terrains, Decals, Things y-sorted, Items, Blockers, Spawn). Node types in **scripts/world/**:
   `Prop` (art/block/action/approach_dy, anchored at the visible base), `NpcSpot`, `Blocker`,
   `Zone` (root: zone_name, level, ambient, fog_density, hero_light).
-- **scripts/world/arena_builder.gd** builds a dungeon floor as a Zone at runtime (room shape,
-  "dungeon" cliff tiles: floor 0 / rock 1 / wall face 2, torches, pillars, spawn circles, door);
+- **scripts/world/arena_builder.gd** builds a dungeon floor as a Zone at runtime: an
+  axis-aligned room shape (hall with bays / cross / court with stone islands; never diagonal
+  walls), drawn top-down oblique from `assets/art/tiles/dungeon_walls.png` (made by
+  `tools/art/dungeon_walls.py`: flagstone floor, dark wall caps with a lit rim, a 2-tile brick face
+  on every wall with floor below it, a Shade layer of wall shadow on the floor), torches, pillars,
+  spawn circles, door;
   **arena.gd** runs it (waves, Mob AI (straight at the hero when clear, else the nav flow field
   `ZoneNav.flow_to/flow_step`), projectiles (collide on the same feet line the shooters' thin
   line-of-sight checks), every hit both ways, XP/drops, death, the chest, the exit). Monster
@@ -105,8 +109,13 @@ Ships on **Steam** (Godot desktop exports + optional GodotSteam GDExtension) and
   appear in a Prop's `art` picker. LOOK: grim gothic high fantasy at dusk; everything in the
   world is forced onto `spec.PALETTE` (keep it that way, it's what makes the town cohere). The
   lamplight/fire/rune palette colours are for things that emit light: the packer turns them into
-  lights. Buildings use the FRONT style (front-facing, not isometric: square towers drift to a
-  corner view, so towers are round) and are sized so doors fit the 64px characters.
+  lights. PERSPECTIVE: top-down oblique like Chronicon / a 2D Diablo: floors seen from above,
+  everything standing seen from the front with a sliver of top, NEVER an isometric corner view.
+  Buildings use the FRONT style (square towers drift to a corner view, so towers are round) and
+  are sized so doors fit the 64px characters. Small props that drift (chests, crates, pillars,
+  carts...) are `spec.FRONT_PROPS`: `tools/art/guides.py` draws a front-facing composition guide,
+  gen.py passes it at strength 70; generate `--variants 4` and pick the straight-on ones.
+  `tools/godot/room_shots.gd <out_dir>` shoots every dungeon room shape for a look check.
 - **Loot tuning** → `scripts/content/treasure_classes.gd` (TCs + `QUALITY_TUNING`), affix tiers
   and weights in `affixes.gd`; check with the Loot Lab (`` ` ``).
 - **UI** → `scripts/ui/` (new left panel: add to `PlayingUi._make_left`). Palette: `UiKit`.
@@ -129,7 +138,8 @@ Ships on **Steam** (Godot desktop exports + optional GodotSteam GDExtension) and
   floors, opens the chests and takes the stair → `DUNGEON OK`.
 - Balance: `godot --headless --path . --fixed-fps 60 --audio-driver Dummy -s tools/godot/run.gd --
   res://tools/godot/campaign_test.gd 15` → a gear-managing bot plays floors 1-15 (one line per
-  floor) → `CAMPAIGN OK` (expect level ~15, 0-2 deaths, 20-35 game minutes; it's random, so run
-  a few after touching monsters.gd, XP or loot).
+  floor) → `CAMPAIGN OK` (expect level 15-18, 0-2 deaths, 14-20 game minutes (a person takes
+  longer), danger from floor 7; it's random, so run 3-4 in parallel after touching monsters.gd,
+  monster AI, XP, loot or room shapes).
 - `godot --headless --path . --export-pack "Linux" builds/pck/rhune.pck` then
   `godot --main-pack builds/pck/rhune.pck` boots to the menu (checks export filters).

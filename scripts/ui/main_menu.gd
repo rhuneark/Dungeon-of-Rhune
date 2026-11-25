@@ -1,6 +1,7 @@
 class_name MainMenu
 extends Control
-## Title screen: continue / new hero / delete save / options / quit.
+## Title screen: your heroes (pick one to play), a new hero (name, Trade or
+## SSF, this Season or Eternal), delete a hero, options, quit.
 
 const OPTIONS := preload("res://scripts/ui/panels/options_panel.gd")
 
@@ -8,6 +9,8 @@ var creating := false
 var confirm := false
 var _options: UiPanel
 var _name := ""
+var _mode := "trade"
+var _realm: String = Seasons.CURRENT.id
 
 
 func _ready() -> void:
@@ -53,57 +56,21 @@ func _rebuild() -> void:
 	t.add_theme_constant_override("shadow_offset_y", 2)
 	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(t)
-	var sub := UiKit.label("Thornwick waits above the Sealed Stair.", "t10", UiKit.DIM)
+	var sub := UiKit.label("The last of Thornwick holds out in the Refuge. Below lies the Deep.", "t10", UiKit.DIM)
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(sub)
 	col.add_child(UiKit.gap(6))
 
 	var box := PanelContainer.new()
 	box.add_theme_stylebox_override("panel", UiKit.frame(11))
-	box.custom_minimum_size.x = 240
+	box.custom_minimum_size.x = 300
 	box.size_flags_horizontal = SIZE_SHRINK_CENTER
-	var v := UiKit.vbox(6)
+	var v := UiKit.vbox(5)
 	box.add_child(v)
 	if not creating and Game.has_hero():
-		var hero := Game.hero()
-		var n := UiKit.label(hero.name, "t20")
-		n.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		v.add_child(n)
-		var lv := UiKit.label("Level %d · Deepest floor %d" % [int(hero.level), int(hero.get("bestFloor", 0))], "t10", UiKit.GOLD)
-		lv.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		v.add_child(lv)
-		v.add_child(UiKit.button("Continue", _play, 6))
-		v.add_child(UiKit.button("New hero (replaces this one)", func():
-			creating = true
-			_rebuild()))
-		if not confirm:
-			v.add_child(UiKit.button("Delete save", func():
-				confirm = true
-				_rebuild()))
-		else:
-			var b := UiKit.button("Really delete everything?", _wipe)
-			b.add_theme_color_override("font_color", UiKit.BAD)
-			v.add_child(b)
+		_roster(v)
 	else:
-		var p := UiKit.label("Name your wanderer", "t10", UiKit.DIM)
-		p.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		v.add_child(p)
-		var input := LineEdit.new()
-		input.max_length = 16
-		input.placeholder_text = "Wanderer"
-		input.text = _name
-		input.alignment = HORIZONTAL_ALIGNMENT_CENTER
-		input.add_theme_font_size_override("font_size", 20)
-		input.text_changed.connect(func(s): _name = s)
-		input.text_submitted.connect(func(_s): _start())
-		v.add_child(input)
-		input.grab_focus.call_deferred()
-		v.add_child(UiKit.button("Enter Thornwick", _start))
-		if Game.has_hero():
-			v.add_child(UiKit.button("Back", func():
-				creating = false
-				_rebuild()))
-		v.add_child(UiKit.para("No classes, no skill trees: your gear is your build. Climb down the Sealed Stair, one room at a time, to floor 100.", "t10", UiKit.DIM, HORIZONTAL_ALIGNMENT_CENTER))
+		_create(v)
 	col.add_child(box)
 
 	var row := UiKit.hbox(4)
@@ -114,7 +81,7 @@ func _rebuild() -> void:
 	col.add_child(row)
 	add_child(col)
 
-	var hint := UiKit.label("CLICK TO MOVE / ATTACK · Q FLASK · T TOWN · I C L O · %sESC" % ("` LOOT LAB · " if Platform.dev_tools else ""), "label", UiKit.FAINT)
+	var hint := UiKit.label("CLICK TO MOVE / ATTACK · Q FLASK · M MAP · T REFUGE · I C L O · %sESC" % ("` LOOT LAB · " if Platform.dev_tools else ""), "label", UiKit.FAINT)
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint.size = Vector2(size.x, 10)
 	hint.position = Vector2(0, size.y - 16)
@@ -133,13 +100,90 @@ func _open_options() -> void:
 	add_child(_options)
 
 
+## Your heroes: the one you'll play on top, click another to switch.
+func _roster(v: VBoxContainer) -> void:
+	var all := Game.roster()
+	for i in all.size():
+		var h: Dictionary = all[i]
+		var idx := i
+		var line := "%s  ·  Lv %d  ·  %s  ·  Tier %d" % [h.name, int(h.level), Seasons.badge(h), int(h.get("bestTier", 0))]
+		var b := UiKit.button(line, func():
+			Game.select_hero(idx)
+			confirm = false
+			_rebuild(), 6, i == 0)
+		v.add_child(b)
+	v.add_child(UiKit.gap(2))
+	v.add_child(UiKit.button("Play %s" % Game.hero().name, _play, 6))
+	if all.size() < HeroData.MAX_HEROES:
+		v.add_child(UiKit.button("New hero", func():
+			creating = true
+			_rebuild()))
+	if not confirm:
+		v.add_child(UiKit.button("Delete %s" % Game.hero().name, func():
+			confirm = true
+			_rebuild()))
+	else:
+		var d := UiKit.button("Really delete %s?" % Game.hero().name, func():
+			Game.delete_hero(0)
+			confirm = false
+			creating = not Game.has_hero()
+			_rebuild())
+		d.add_theme_color_override("font_color", UiKit.BAD)
+		v.add_child(d)
+
+
+func _create(v: VBoxContainer) -> void:
+	var p := UiKit.label("Name your wanderer", "t10", UiKit.DIM)
+	p.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(p)
+	var input := LineEdit.new()
+	input.max_length = 16
+	input.placeholder_text = "Wanderer"
+	input.text = _name
+	input.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	input.add_theme_font_size_override("font_size", 20)
+	input.text_changed.connect(func(s): _name = s)
+	input.text_submitted.connect(func(_s): _start())
+	v.add_child(input)
+	input.grab_focus.call_deferred()
+	# Realm and mode: chosen once, for good.
+	var realm := UiKit.hbox(4)
+	realm.alignment = BoxContainer.ALIGNMENT_CENTER
+	for r in [Seasons.CURRENT.id, Seasons.ETERNAL]:
+		var rid: String = r
+		realm.add_child(UiKit.button(Seasons.realm_name(rid), func():
+			_realm = rid
+			_rebuild(), 6, _realm == rid))
+	v.add_child(realm)
+	var mode := UiKit.hbox(4)
+	mode.alignment = BoxContainer.ALIGNMENT_CENTER
+	for m in Seasons.MODES:
+		var mid: String = m
+		mode.add_child(UiKit.button(Seasons.MODES[mid], func():
+			_mode = mid
+			_rebuild(), 6, _mode == mid))
+	v.add_child(mode)
+	var why := "Season: a fresh start with its own stash; it joins Eternal when the season ends." if _realm != Seasons.ETERNAL else "Eternal: the realm that never resets."
+	why += " SSF: solo self-found, your own stash, no trading, ever." if _mode == "ssf" else " Trade: shares a stash with your other Trade heroes (trading comes later)."
+	v.add_child(UiKit.para(why, "t10", UiKit.DIM, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UiKit.button("Enter the Refuge", _start))
+	if Game.has_hero():
+		v.add_child(UiKit.button("Back", func():
+			creating = false
+			_rebuild()))
+	v.add_child(UiKit.para("No classes, no skill trees: your gear is your build. Chart expeditions through the Deep, pick your path room by room, and push to harder tiers.", "t10", UiKit.DIM, HORIZONTAL_ALIGNMENT_CENTER))
+
+
 func _start() -> void:
 	var nm := _name.strip_edges()
-	Game.save.hero = HeroData.new_hero(nm if nm != "" else "Wanderer")
-	Game.commit()
+	var err := Game.add_hero(HeroData.new_hero(nm if nm != "" else "Wanderer", _mode, _realm))
+	if err != "":
+		Game.toast(err)
+		return
+	creating = false
 	_enter()
-	get_tree().create_timer(0.6).timeout.connect(func(): Game.toast("Thornwick is stuck in one endless night. The way out is a hundred floors down.", "#d9b26a"))
-	get_tree().create_timer(4.0).timeout.connect(func(): Game.toast("Talk to Captain Maren at the Sealed Stair when you're ready.", "#d9b26a"))
+	get_tree().create_timer(0.6).timeout.connect(func(): Game.toast("Thornwick sank into the Deep. Its last people hold out here, in the Refuge.", "#d9b26a"))
+	get_tree().create_timer(4.0).timeout.connect(func(): Game.toast("Talk to Captain Maren at the map table to chart an expedition.", "#d9b26a"))
 
 
 func _play() -> void:
@@ -147,14 +191,5 @@ func _play() -> void:
 
 
 func _enter() -> void:
-	Game.set_ui({"left": "", "right": "", "overlay": "", "dialog": {}, "cursor_mode": "", "hover_name": {}})
+	Game.set_ui({"left": "", "right": "", "overlay": "", "dialog": {}, "cursor_mode": "", "hover_name": {}, "location": "refuge", "room": ""})
 	Game.set_ui({"phase": "playing"})
-
-
-func _wipe() -> void:
-	SaveIO.wipe_save()
-	Game.save = HeroData.default_save()
-	Game.commit()
-	confirm = false
-	creating = true
-	_rebuild()

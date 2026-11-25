@@ -1,12 +1,13 @@
 class_name Monsters
-## The things on the Sealed Stair. Base numbers are for floor 1; everything
-## scales with the floor (monster level = floor). New kinds join the mix as
-## you go deeper; every 10th floor an Hourglass Warden holds the room.
+## The things in the Deep. Base numbers are for monster level 1; everything
+## scales with the room's monster level (Expedition.level_of: tier + step).
+## New kinds join the mix deeper down; an Hourglass Warden holds each
+## expedition's vault.
 ##
 ## Monster: {id, name, sprite, life, damage: [min, max], type (damage type),
 ##           speed (px/s), range (px), cooldown (s), windup (s, attack start
 ##           to hit), kind: melee|ranged|caster, (projectile: arrow|fire|frost),
-##           (keep: preferred distance for shooters), xp, radius, from (first floor),
+##           (keep: preferred distance for shooters), xp, radius, from (first level),
 ##           weight, (boss)}
 
 const ALL := {
@@ -63,10 +64,6 @@ static func damage_mult(floor: int) -> float:
 
 static func xp_mult(floor: int) -> float:
 	return 1.0 + 0.30 * float(floor - 1)
-
-
-static func is_boss_floor(floor: int) -> bool:
-	return floor % 10 == 0
 
 
 ## How the room fills: [monsters in wave 1, wave 2, ...]. Three waves until

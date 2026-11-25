@@ -1,8 +1,9 @@
 class_name PlayingUi
 extends Control
-## In-game UI: HUD, the left/right panel slots, dialog box, cursor
-## item and tooltip, and the hotkeys (input actions in project.godot): Q/1
-## drinks the flask, T returns to town from the Stair.
+## In-game UI: HUD, the left/right panel slots, the full-screen overlay (the
+## expedition map), dialog box, cursor item and tooltip, and the hotkeys (input
+## actions in project.godot): Q/1 drinks the flask, M opens the map, T returns
+## to the Refuge from a room.
 
 const INVENTORY := preload("res://scripts/ui/panels/inventory_panel.gd")
 const CHARACTER := preload("res://scripts/ui/panels/character_panel.gd")
@@ -11,6 +12,8 @@ const LAB := preload("res://scripts/ui/panels/lab_panel.gd")
 
 var _left: UiPanel
 var _right: UiPanel
+var _overlay: UiPanel
+var _overlay_id := ""
 var _left_id := ""
 var _right_id := ""
 var _panels: Control
@@ -37,7 +40,7 @@ func _layout() -> void:
 
 
 func _on_ui(keys: Array) -> void:
-	if "left" in keys or "right" in keys or "service_npc" in keys:
+	if "left" in keys or "right" in keys or "service_npc" in keys or "overlay" in keys:
 		_sync()
 
 
@@ -69,6 +72,14 @@ func _sync() -> void:
 			_panels.add_child(_right)
 	elif _right:
 		_right.mark() # sell/stash hints depend on the left panel
+	var ov: String = ui.get("overlay", "")
+	if ov != _overlay_id:
+		if _overlay:
+			_overlay.queue_free()
+		_overlay = MapPanel.new() if ov == "map" else null
+		_overlay_id = ov
+		if _overlay:
+			_panels.add_child(_overlay)
 	UiTip.clear()
 
 
@@ -96,8 +107,11 @@ func _unhandled_input(e: InputEvent) -> void:
 	elif e.is_action_pressed("drink_flask"):
 		Game.drink_flask()
 	elif e.is_action_pressed("town_portal"):
-		if Game.ui.location == "dungeon":
-			Game.return_to_town()
+		if Game.ui.location == "room":
+			Game.return_to_refuge()
+	elif e.is_action_pressed("toggle_map"):
+		if Expedition.active(Game.hero()):
+			Game.set_ui({"overlay": "" if Game.ui.overlay == "map" else "map", "dialog": {}})
 	elif e.is_action_pressed("toggle_codex"):
 		_toggle_left("codex")
 	elif e.is_action_pressed("toggle_options"):

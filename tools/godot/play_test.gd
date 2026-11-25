@@ -11,6 +11,7 @@ var start_pos := Vector2.ZERO
 var inv_count := 0
 var target_npc := ""
 var target_mob = null
+var target_room := ""
 
 
 func _ready() -> void:
@@ -65,12 +66,22 @@ func _ready() -> void:
 			_key(KEY_Q)],
 		[565, func(): _check("Q drinks the flask", float(game.hero().life) > 10, str(game.hero().life))],
 		[570, func():
-			Interact.descend_dialog()
+			Interact.expedition_dialog()
 			var b: Array = game.ui.dialog.get("buttons", [])
-			_check("the Stair offers floor 1", b.size() == 1 and b[0].text == "Floor 1", str(b))
+			_check("the map table offers Tier 1", b.size() == 1 and String(b[0].text).begins_with("Tier 1"), str(b))
 			b[0].action.call()],
-		[620, func():
-			_check("descending builds a floor", Arena.current != null and game.ui.location == "dungeon" and game.ui.zone_title == "The Sealed Stair")
+		[590, func():
+			_check("charting opens the map", game.ui.overlay == "map" and Expedition.active(game.hero()))
+			# Click the first open room on the map, through the real UI.
+			var panel = _find(get_tree().root, "MapPanel")
+			var canvas = panel._canvas if panel else null
+			_check("the map shows", canvas != null)
+			if canvas:
+				target_room = Expedition.options(game.expedition())[0]
+				_click(canvas.get_global_transform_with_canvas() * canvas._pos(target_room))],
+		[640, func():
+			var name: String = Expeditions.room(Expedition.node(game.expedition(), target_room).type).name
+			_check("clicking a room walks into it", Arena.current != null and game.ui.location == "room" and game.ui.zone_title == name, "%s / %s" % [game.ui.location, game.ui.zone_title])
 			rt = _find(get_tree().root, "ZoneRuntime")],
 		[760, func():
 			var m = null
@@ -85,7 +96,9 @@ func _ready() -> void:
 		[770, func(): _check("clicking a monster targets it", rt.player.target == target_mob)],
 		[980, func(): _check("the hero hits it", target_mob == null or not is_instance_valid(target_mob) or target_mob.dead or target_mob.life < target_mob.max_life, str(target_mob.life if is_instance_valid(target_mob) else -1))],
 		[985, func(): _key(KEY_T)],
-		[1030, func(): _check("T returns to town", game.ui.location == "town" and Arena.current == null and float(game.hero().life) == float(game.sheet().life))],
+		[1030, func():
+			_check("T returns to the Refuge", game.ui.location == "refuge" and Arena.current == null and float(game.hero().life) == float(game.sheet().life))
+			_check("the unfinished room waits on the map", Expedition.options(game.expedition()) == [target_room])],
 		[1035, func(): _key(KEY_ESCAPE)],
 		[1055, func(): _check("Esc with nothing open returns to menu", game.ui.phase == "menu")],
 		[1065, func():

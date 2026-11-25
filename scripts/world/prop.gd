@@ -9,7 +9,7 @@ extends Sprite2D
 ## anchored bottom-centre) and the cyan dot is where the player stands to use it.
 
 const TILE := 32
-const ACTIONS := ["none", "stash", "stair", "statue", "chest", "exit", "portal"]
+const ACTIONS := ["none", "stash", "stair", "map", "statue", "chest", "exit", "portal"]
 
 @export var art := "":
 	set(v):
@@ -20,7 +20,7 @@ const ACTIONS := ["none", "stash", "stair", "statue", "chest", "exit", "portal"]
 	set(v):
 		block = v
 		queue_redraw()
-@export_enum("none", "stash", "stair", "statue", "chest", "exit", "portal") var action := "none"
+@export_enum("none", "stash", "stair", "map", "statue", "chest", "exit", "portal") var action := "none"
 ## Hover name ("" = not hoverable).
 @export var display_name := ""
 ## Where the player stands to use it, in tiles below the base (negative = above).

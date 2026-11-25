@@ -59,7 +59,7 @@ func setup(z: Zone) -> void:
 	nav = ZoneNav.new(used.end)
 	map_px = Vector2(used.end * TILE)
 
-	# Water tiles (2+ water corners) are not walkable (town terrain only).
+	# Water tiles (2+ water corners) are not walkable (terrain tilesets only; the dungeon has none).
 	if ground.tile_set and ground.tile_set.get_terrain_sets_count() > 0:
 		for c in ground.get_used_cells():
 			var td := ground.get_cell_tile_data(c)

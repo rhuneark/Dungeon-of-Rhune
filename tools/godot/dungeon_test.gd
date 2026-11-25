@@ -1,14 +1,14 @@
 extends Node
-## Plays floors of the Sealed Stair with a simple bot (attack the nearest
-## monster, drink the flask under half life), then opens the chest and takes
-## the stair. Prints DUNGEON OK when a floor is cleared, looted and left.
+## Charts an expedition and plays two rooms with a simple bot (attack the
+## nearest monster, drink the flask under half life), opens each chest and
+## picks the next room on the map. Prints DUNGEON OK after two rooms.
 ## Run via run.gd:
 ##   xvfb-run -a -s "-screen 0 1600x900x24" godot --path . --audio-driver Dummy --resolution 1600x900 \
-##     -s tools/godot/run.gd -- res://tools/godot/dungeon_test.gd [out_dir] [floor]
+##     -s tools/godot/run.gd -- res://tools/godot/dungeon_test.gd [out_dir] [tier]
 
 var frame := 0
 var out := ""
-var start_floor := 1
+var tier := 1
 var phase := "menu"
 var t := 0.0
 var shots := 0
@@ -20,7 +20,7 @@ func _ready() -> void:
 	if a.size() > 0:
 		out = a[0]
 	if a.size() > 1:
-		start_floor = int(a[1])
+		tier = int(a[1])
 	SaveIO.dir = "user://dungeon_test_saves"
 
 
@@ -54,8 +54,9 @@ func _process(delta: float) -> void:
 				t = 0
 		"town":
 			if t > 1.0:
-				Game.hero().bestFloor = start_floor
-				Game.enter_dungeon(start_floor)
+				Game.hero().bestTier = tier - 1
+				Game.start_expedition(tier)
+				Game.enter_room(Expedition.options(Game.expedition())[0])
 				phase = "fight"
 				t = 0
 		"fight":
@@ -64,7 +65,7 @@ func _process(delta: float) -> void:
 			if a == null or rt == null:
 				return
 			if Game.ui.dead:
-				print("DUNGEON DIED floor=%d t=%.1f kills=%d" % [a.floor, t, Game.save.stats.kills])
+				print("DUNGEON DIED room=%s t=%.1f kills=%d" % [a.room.name, t, Game.save.stats.kills])
 				_shot("died")
 				get_tree().quit(1)
 				return
@@ -77,28 +78,29 @@ func _process(delta: float) -> void:
 						best = m
 				rt.player.target = best
 			if shots == 0 and a.state == "fight" and a.alive() >= 4:
-				_shot("fight_%d" % a.floor)
+				_shot("fight_%d" % floors_done)
 				shots += 1
 			if a.state == "cleared":
-				print("CLEARED floor=%d t=%.1f kills=%d level=%d life=%d" % [a.floor, t, Game.save.stats.kills, Game.hero().level, Game.hero().life])
-				_shot("cleared_%d" % a.floor)
+				print("CLEARED %s (level %d) t=%.1f kills=%d hero level=%d life=%d boons=%s" % [a.room.name, a.level, t, Game.save.stats.kills, Game.hero().level, Game.hero().life, Game.expedition().boons])
+				_shot("cleared_%d" % floors_done)
 				a.open_chest()
 				phase = "loot"
 				t = 0
 			elif t > 240:
-				print("DUNGEON TIMEOUT floor=%d alive=%d state=%s" % [a.floor, a.alive(), a.state])
+				print("DUNGEON TIMEOUT room=%s alive=%d state=%s" % [a.room.name, a.alive(), a.state])
 				get_tree().quit(1)
 		"loot":
 			if t > 1.5:
 				var rt = _find(get_tree().root, "ZoneRuntime")
 				print("LOOT on ground: %d" % rt.ground_items.entries.size())
-				_shot("loot_%d" % Arena.current.floor)
+				_shot("loot_%d" % floors_done)
 				floors_done += 1
 				if floors_done >= 2:
-					print("DUNGEON OK floors=%d level=%d best=%d" % [floors_done, Game.hero().level, Game.hero().bestFloor])
+					print("DUNGEON OK rooms=%d level=%d threat=%d" % [floors_done, Game.hero().level, int(Game.expedition().threat)])
 					get_tree().quit(0)
 					return
 				Arena.current.take_exit()
+				Game.enter_room(Expedition.options(Game.expedition())[0])
 				phase = "fight"
 				t = 0
 				shots = 0

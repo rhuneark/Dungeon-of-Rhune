@@ -6,7 +6,7 @@ extends PanelContainer
 
 const SERVICE_LABEL := {
 	"trade": "Trade", "gamble": "Sealed Goods", "smith": "Crucible & Sockets",
-	"identify": "Identify All (free)", "codex": "Codex", "flask": "Refill Flask", "descend": "Descend",
+	"identify": "Identify All (free)", "codex": "Codex", "flask": "Refill Flask", "expedition": "Chart an Expedition",
 }
 
 

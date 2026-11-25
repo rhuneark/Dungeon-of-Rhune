@@ -1,12 +1,11 @@
 extends Node
 ## Boot + phase router. Order: load save → loading screen warms every texture
 ## (progress bar) → main menu → playing (zone + runtime + in-game UI).
-## While playing, the zone follows Game.ui.location: Thornwick, or a floor of
-## the Sealed Stair built on the fly (ArenaBuilder + the Arena that runs it).
+## While playing, the zone follows Game.ui.location: the Refuge (the hub), or
+## the expedition room you walked into, built on the fly (ArenaBuilder + the
+## Arena that runs it).
 ## Also owns the lifecycle hooks: flush the save on focus loss and before the
 ## window closes.
-
-const ZONE_SCENE := "res://scenes/world/thornwick.tscn"
 
 var world: Node2D
 var ui_layer: CanvasLayer
@@ -38,7 +37,7 @@ func _ready() -> void:
 	Game.ui_changed.connect(func(keys):
 		if "phase" in keys:
 			_route()
-		elif ("location" in keys or "floor" in keys) and Game.ui.phase == "playing":
+		elif ("location" in keys or "room" in keys) and Game.ui.phase == "playing":
 			_enter_zone.call_deferred())
 
 	Game.boot()
@@ -93,23 +92,28 @@ func _route() -> void:
 
 func _enter_zone() -> void:
 	_leave_zone()
-	var floor := int(Game.ui.floor)
-	var in_dungeon: bool = Game.ui.location == "dungeon" and floor > 0
-	_zone = ArenaBuilder.build(floor) if in_dungeon else load(ZONE_SCENE).instantiate()
+	var e := Game.expedition()
+	var room_id: String = Game.ui.get("room", "")
+	var in_room: bool = Game.ui.location == "room" and not Expedition.node(e, room_id).is_empty()
+	_zone = ArenaBuilder.build_room(e, Expedition.node(e, room_id)) if in_room else ArenaBuilder.build_refuge()
 	world.add_child(_zone)
 	_runtime = ZoneRuntime.new()
 	_runtime.name = "Runtime"
 	world.add_child(_runtime)
 	_runtime.setup(_zone)
-	if in_dungeon:
+	if in_room:
 		var arena := Arena.new()
 		arena.name = "Arena"
 		_zone.add_child(arena)
-		arena.setup(_zone, _runtime, floor)
+		arena.setup(_zone, _runtime, e, Expedition.node(e, room_id))
 	else:
 		# Home: the townsfolk patch you up.
 		Game.hero().life = Game.sheet().life
-		Game.set_ui({"zone_title": "Thornwick", "zone_sub": "Town · Safe"})
+		if Game.ui.location != "refuge":
+			Game.set_ui({"location": "refuge", "room": ""})
+		if Game.expedition().get("done", false):
+			Game.finish_expedition.call_deferred()
+		Game.set_ui({"zone_title": "The Refuge", "zone_sub": Seasons.badge(Game.hero()) + " · Safe"})
 
 
 func _leave_zone() -> void:

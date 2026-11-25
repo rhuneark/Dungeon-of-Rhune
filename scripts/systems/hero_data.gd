@@ -1,16 +1,20 @@
 class_name HeroData
-## The persisted save: one hero (multi-slot later), a shared stash, and
-## account-wide records (the Codex). Plain JSON; item instances inside.
+## The persisted save: the hero you're playing, the rest of the roster, one
+## stash per realm + mode (Seasons), and account-wide records (the Codex).
+## Plain JSON; item instances inside.
 ##
-## SaveData: {version: 2, hero: HeroSave | null, stash: Array[item],
+## SaveData: {version: 3, hero: HeroSave | null, bench: Array[HeroSave] (the
+##            other heroes), stashes: {"<realm>:<mode>": Array[item]},
+##            reclaim: {mode: Array[item]} (ended-season items awaiting room),
 ##            codex: {"u:<id>"|"w:<id>"|"r:<id>": {at, best}},
-##            stats: {gambles, identified, uniquesFound, rhunesFound, kills, deaths, chests}}
+##            stats: {gambles, identified, uniquesFound, rhunesFound, kills, deaths, chests,
+##                    wardens, expeditions, bestThreat}}
 ## HeroSave: {name, createdAt, level, xp, gold, attrs: {might, finesse, vigor, spirit},
 ##            attrPoints, equipped: {slot: item}, inventory: Array[item],
 ##            cursor: item|null, flags: {key: n}, life, crucible: Array[item],
-##            bestFloor (highest floor entered; 0 = never been down),
-##            resumeFloor (where "Continue" goes: the floor after the last one
-##            cleared; 0 after a death, which sends you back to a checkpoint)}
+##            realm ("eternal" | a season id), mode ("trade" | "ssf"),
+##            bestTier (highest expedition tier finished; 0 = none),
+##            expedition (the run in progress, {} = none; see Expedition)}
 ## Item: {uid, baseId, quality, ilvl, seed, identified, affixes: [{affixId, tier, values}],
 ##        baseRoll, sockets, socketed: Array[item], (uniqueId, uniqueValues,
 ##        rareName: [first, second], rhunewordId, charmSlots, charms: Array[item], x, y)}
@@ -33,6 +37,7 @@ const CRUCIBLE_H := 4
 
 const ATTR_POINTS_PER_LEVEL := 5
 const MAX_LEVEL := 99
+const MAX_HEROES := 12
 
 
 static func now_ms() -> int:
@@ -41,11 +46,13 @@ static func now_ms() -> int:
 
 static func default_save() -> Dictionary:
 	return {
-		"version": 2,
+		"version": 3,
 		"hero": null,
-		"stash": [],
+		"bench": [],
+		"stashes": {},
+		"reclaim": {},
 		"codex": {},
-		"stats": {"gambles": 0, "identified": 0, "uniquesFound": 0, "rhunesFound": 0, "kills": 0, "deaths": 0, "chests": 0, "wardens": 0, "conquered": 0},
+		"stats": {"gambles": 0, "identified": 0, "uniquesFound": 0, "rhunesFound": 0, "kills": 0, "deaths": 0, "chests": 0, "wardens": 0, "expeditions": 0, "bestThreat": 0},
 	}
 
 
@@ -54,7 +61,7 @@ static func xp_to_next(level: int) -> int:
 	return floori(90.0 * pow(level, 1.6) + 150.0)
 
 
-static func new_hero(name: String) -> Dictionary:
+static func new_hero(name: String, mode := "trade", realm := "eternal") -> Dictionary:
 	var rng := Rng.new()
 	var nm := name.strip_edges()
 	var hero := {
@@ -71,8 +78,10 @@ static func new_hero(name: String) -> Dictionary:
 		"flags": {},
 		"life": 1,
 		"crucible": [],
-		"bestFloor": 0,
-		"resumeFloor": 0,
+		"realm": realm,
+		"mode": mode,
+		"bestTier": 0,
+		"expedition": {},
 	}
 	# Starter kit: plain, honest gear.
 	hero.equipped.weapon = ItemGen.create_item("short_sword", {"ilvl": 1, "quality": "normal", "rng": rng})

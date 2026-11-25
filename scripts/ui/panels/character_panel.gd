@@ -31,7 +31,7 @@ func build(body: VBoxContainer) -> void:
 	var n := UiKit.label(hero.name, "t20")
 	n.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	head.add_child(n)
-	var lv := UiKit.label("Level %d · Deepest floor %d" % [int(hero.level), int(hero.get("bestFloor", 0))], "t10", UiKit.GOLD)
+	var lv := UiKit.label("Level %d · Best tier %d · %s" % [int(hero.level), int(hero.get("bestTier", 0)), Seasons.badge(hero)], "t10", UiKit.GOLD)
 	lv.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	head.add_child(lv)
 	var need := HeroData.xp_to_next(int(hero.level))

@@ -70,6 +70,11 @@ static func compute_sheet(hero: Dictionary) -> Dictionary:
 			if meets_reqs(c, hero, attrs1):
 				usable.append(c)
 	var raw := _sum_items(usable)
+	# The expedition in progress: boons, their synergies, Threat's loot bonus,
+	# and the afflictions that weigh on the hero.
+	var exp_stats := Expedition.hero_stats(hero)
+	for k in exp_stats:
+		raw[k] = float(raw.get(k, 0)) + float(exp_stats[k])
 	var attrs := _attrs_of(hero, raw)
 	var g := func(k: String) -> float: return float(raw.get(k, 0))
 
@@ -162,21 +167,21 @@ static func attack_of(weapon: Dictionary) -> Dictionary:
 	return {"kind": "melee", "tags": ["melee"], "range": reach}
 
 
-## The rejuvenation flask: free from Mother Ysolde, bigger as you climb.
-## Small heals 250, Medium 500 (floor 20), Large 1000 (floor 50).
+## The rejuvenation flask: free from Mother Ysolde, bigger as you go deeper.
+## Small heals 250, Medium 500 (finish a Tier 4 expedition), Large 1000 (Tier 11).
 const FLASK_TIERS := [
-	{"name": "Small Rejuvenation Flask", "heal": 250, "floor": 1},
-	{"name": "Medium Rejuvenation Flask", "heal": 500, "floor": 20},
-	{"name": "Large Rejuvenation Flask", "heal": 1000, "floor": 50},
+	{"name": "Small Rejuvenation Flask", "heal": 250, "tier": 0},
+	{"name": "Medium Rejuvenation Flask", "heal": 500, "tier": 4},
+	{"name": "Large Rejuvenation Flask", "heal": 1000, "tier": 11},
 ]
 const FLASK_COOLDOWN := 10.0
 
 
 static func flask_tier(hero: Dictionary) -> int:
-	var best := int(hero.get("bestFloor", 0))
+	var best := int(hero.get("bestTier", 0))
 	var tier := 0
 	for i in FLASK_TIERS.size():
-		if best >= int(FLASK_TIERS[i].floor):
+		if best >= int(FLASK_TIERS[i].tier):
 			tier = i
 	return tier
 

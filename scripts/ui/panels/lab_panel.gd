@@ -138,7 +138,7 @@ func build(body: VBoxContainer) -> void:
 		Progression.gain_xp(Game.hero(), 1000)
 		Game.commit()))
 	ch.add_child(UiKit.button("Best floor +5", func():
-		Game.hero().bestFloor = int(Game.hero().get("bestFloor", 0)) + 5
+		Game.hero().bestTier = int(Game.hero().get("bestTier", 0)) + 1
 		Game.commit()))
 	body.add_child(ch)
 

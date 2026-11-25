@@ -78,9 +78,10 @@ func _ready() -> void:
 	test_new_hero_and_sheet()
 	test_rhuneword_flow()
 	test_rings_and_charms()
-	test_flask_and_floors()
+	test_flask_and_tiers()
 	test_arena()
-	test_continue_and_flow()
+	test_expedition()
+	test_modes()
 	test_economy()
 	test_save()
 	test_loot()
@@ -356,14 +357,15 @@ func test_rings_and_charms() -> void:
 	h.equipped.waist = belt
 
 
-func test_flask_and_floors() -> void:
+func test_flask_and_tiers() -> void:
 	var h := _fresh_hero()
-	eq("floors: checkpoints for a new hero", Game.checkpoints(), [1])
-	h.bestFloor = 23
-	eq("floors: checkpoints every 5th floor reached", Game.checkpoints(), [1, 5, 10, 15, 20])
-	eq("flask: medium from floor 20", CharacterSheet.compute_sheet(h).flask.heal, 500)
-	h.bestFloor = 50
-	eq("flask: large from floor 50", CharacterSheet.compute_sheet(h).flask.heal, 1000)
+	eq("tiers: a new hero may chart tier 1", Expedition.max_tier(h), 1)
+	eq("flask: small for a new hero", CharacterSheet.compute_sheet(h).flask.heal, 250)
+	h.bestTier = 4
+	eq("tiers: one past the best finished", Expedition.max_tier(h), 5)
+	eq("flask: medium after tier 4", CharacterSheet.compute_sheet(h).flask.heal, 500)
+	h.bestTier = 11
+	eq("flask: large after tier 11", CharacterSheet.compute_sheet(h).flask.heal, 1000)
 	var b := ItemGen.create_item("sash", {"ilvl": 30})
 	b.affixes = [{"affixId": "flask_recovery", "tier": 2, "values": [[25]]}, {"affixId": "flask_potency", "tier": 1, "values": [[30]]}]
 	b.quality = "magic"
@@ -386,64 +388,187 @@ func test_flask_and_floors() -> void:
 	Game.set_ui({"phase": "loading"})
 	eq("monsters: floor 1 pool", Monsters.pool(1), ["skeleton", "ghoul"])
 	check("monsters: deeper floors add kinds", Monsters.pool(20).size() == 6 and not "warden" in Monsters.pool(99))
-	eq("monsters: boss floors", [Monsters.is_boss_floor(10), Monsters.is_boss_floor(11), Monsters.is_boss_floor(100)], [true, false, true])
 	eq("monsters: waves", [Monsters.waves(1), Monsters.waves(19).size(), Monsters.waves(20).size(), Monsters.waves(60).size()], [[4, 6, 8], 3, 4, 5])
 	check("monsters: scale up", Monsters.life_mult(100) > 50 and Monsters.damage_mult(100) > 20 and Monsters.life_mult(1) == 1.0)
 
 
-func test_arena() -> void:
-	# Every room shape: spawns, the door and the chest spot are reachable from the entry.
-	for f in [1, 2, 3]:
-		var z := ArenaBuilder.build(f)
-		var nav := ZoneNav.new(Vector2i(ArenaBuilder.W, ArenaBuilder.H))
-		for b in ZoneRuntime._all(z, "Blocker"):
-			nav.block(b.cells())
-		for p in ZoneRuntime._all(z, "Prop"):
-			if p.block != Vector2i.ZERO:
-				nav.block(p.footprint())
-		var entry: Vector2 = z.get_meta("entry")
-		var targets: Array = z.get_meta("spawns").duplicate()
-		targets.append(z.get_meta("center") + Vector2(0, 40))
-		targets.append(z.get_meta("door").approach_point() + Vector2(0, 10))
-		var bad: Array = []
-		for tgt in targets:
-			var path := nav.find_path(entry, tgt)
-			if path.is_empty() or path.back().distance_to(tgt) > 48:
-				bad.append(tgt)
-		eq("arena: floor %d (%s) is connected" % [f, ArenaBuilder.SHAPES[(f - 1) % 3]], bad, [])
-		check("arena: floor %d has 4 spawn circles and a door" % f, z.get_meta("spawns").size() == 4 and z.get_meta("door") is Prop)
-		z.free()
-
-
-func test_continue_and_flow() -> void:
-	var h := _fresh_hero()
-	eq("continue: a new hero has nowhere to continue", Game.resume_floor(), 0)
-	Game.enter_dungeon(7)
-	eq("continue: leaving mid-floor restarts that floor", Game.resume_floor(), 7)
-	h.resumeFloor = 0
-	Game.set_ui({"location": "town", "floor": 0})
-	# Monsters follow the flow field from any spawn circle to the hero, around pillars.
-	var z := ArenaBuilder.build(3)
+## Walk grid of a built zone (walls + blocking props), as the runtime builds it.
+func _nav_of(z: Zone) -> ZoneNav:
 	var nav := ZoneNav.new(Vector2i(ArenaBuilder.W, ArenaBuilder.H))
 	for b in ZoneRuntime._all(z, "Blocker"):
 		nav.block(b.cells())
 	for p in ZoneRuntime._all(z, "Prop"):
 		if p.block != Vector2i.ZERO:
 			nav.block(p.footprint())
-	var goal: Vector2 = z.get_meta("entry")
-	nav.flow_to(goal)
-	var lost: Array = []
-	for sp in z.get_meta("spawns"):
-		var at: Vector2 = sp
-		for i in 200:
-			var wp := nav.flow_step(at)
-			if wp == Vector2.INF:
-				break
-			at = wp
-		if at.distance_to(goal) > 32:
-			lost.append(sp)
-	eq("flow: every spawn circle leads to the hero", lost, [])
-	z.free()
+	return nav
+
+
+func test_arena() -> void:
+	# Every room shape, every room type: spawns, the door and the chest spot are
+	# reachable from the entry, and monsters' flow field reaches the hero.
+	var shapes := {}
+	var types := {}
+	var seed_value := 1
+	while (shapes.size() < ArenaBuilder.SHAPES.size() or types.size() < Expeditions.ROOMS.size()) and seed_value < 60:
+		var e := Expedition.generate(1 + seed_value % 3, seed_value)
+		seed_value += 1
+		for id in e.nodes:
+			var n: Dictionary = e.nodes[id]
+			var z := ArenaBuilder.build_room(e, n)
+			var key := "%s/%s" % [z.get_meta("shape"), n.type]
+			if shapes.has(z.get_meta("shape")) and types.has(n.type):
+				z.free()
+				continue
+			shapes[z.get_meta("shape")] = true
+			types[n.type] = true
+			var nav := _nav_of(z)
+			var entry: Vector2 = z.get_meta("entry")
+			var targets: Array = z.get_meta("spawns").duplicate()
+			targets.append(z.get_meta("center") + Vector2(0, 40))
+			targets.append(z.get_meta("door").approach_point() + Vector2(0, 10))
+			var bad: Array = []
+			for tgt in targets:
+				var path := nav.find_path(entry, tgt)
+				if path.is_empty() or path.back().distance_to(tgt) > 48:
+					bad.append(tgt)
+			nav.flow_to(entry)
+			for sp in z.get_meta("spawns"):
+				var at: Vector2 = sp
+				for i in 200:
+					var wp := nav.flow_step(at)
+					if wp == Vector2.INF:
+						break
+					at = wp
+				if at.distance_to(entry) > 32:
+					bad.append("flow from %s" % sp)
+			eq("rooms: %s is connected" % key, bad, [])
+			var calm: bool = Expeditions.room(n.type).get("calm", false)
+			check("rooms: %s has %s and a door" % [key, "no spawns" if calm else "4 spawn circles"], z.get_meta("spawns").size() == (0 if calm else 4) and z.get_meta("door") is Prop)
+			z.free()
+	eq("rooms: every shape built", shapes.size(), ArenaBuilder.SHAPES.size())
+	eq("rooms: every room type built", types.size(), Expeditions.ROOMS.size())
+	# The Refuge: everyone and everything usable is reachable from where you arrive.
+	var r := ArenaBuilder.build_refuge()
+	var nav := _nav_of(r)
+	var from: Vector2 = r.get_node("Spawn").position
+	var unreachable: Array = []
+	for s in ZoneRuntime._all(r, "NpcSpot"):
+		var path := nav.find_path(from, s.position + Vector2(0, 24))
+		if path.is_empty() or path.back().distance_to(s.position + Vector2(0, 24)) > 40:
+			unreachable.append(s.npc_id)
+	for p in ZoneRuntime._all(r, "Prop"):
+		if p.action != "none":
+			var path := nav.find_path(from, p.approach_point())
+			if path.is_empty() or path.back().distance_to(p.approach_point()) > 40:
+				unreachable.append(p.display_name)
+	eq("refuge: everyone is reachable", unreachable, [])
+	eq("refuge: the six townsfolk", ZoneRuntime._all(r, "NpcSpot").size(), 6)
+	r.free()
+
+
+func test_expedition() -> void:
+	var h := _fresh_hero()
+	var e := Expedition.generate(2, 4242)
+	eq("map: same seed, same map", JSON.stringify(Expedition.generate(2, 4242)), JSON.stringify(e))
+	var steps := {}
+	for id in e.nodes:
+		steps[int(e.nodes[id].step)] = int(steps.get(int(e.nodes[id].step), 0)) + 1
+	check("map: 2-3 rooms per step, one vault", steps.size() == Expeditions.STEPS + 1 and steps[Expeditions.STEPS + 1] == 1 and steps.values().all(func(c): return c >= 1 and c <= 3), steps)
+	# Every room is reachable from the start and leads to the vault.
+	var seen := {Expedition.START: true}
+	var frontier: Array = [Expedition.START]
+	while not frontier.is_empty():
+		var at: String = frontier.pop_back()
+		for to in e.edges[at]:
+			if not seen.has(to):
+				seen[to] = true
+				frontier.append(to)
+	eq("map: every room reachable", seen.size(), e.nodes.size() + 1)
+	var dead_ends: Array = []
+	for id in e.nodes:
+		if id != Expedition.VAULT and e.edges[id].is_empty():
+			dead_ends.append(id)
+	eq("map: no dead ends before the vault", dead_ends, [])
+	var greedy_ok := true
+	for id in e.nodes:
+		var n: Dictionary = e.nodes[id]
+		if n.greedy != (n.afflictions.size() > 0) or (n.greedy and int(n.stacks) != 2):
+			greedy_ok = false
+	check("map: greedy rooms double the boon and carry afflictions", greedy_ok)
+	eq("map: levels by tier and step", [Expedition.level_of(1, 1), Expedition.level_of(1, 7), Expedition.level_of(3, 1)], [1, 7, 9])
+
+	# Walking it.
+	check("walk: can't skip ahead", Expedition.enter(e, Expedition.VAULT) != "")
+	var first: String = Expedition.options(e)[0]
+	eq("walk: enter a first-step room", Expedition.enter(e, first), "")
+	eq("walk: an unfinished room is the only way on", Expedition.options(e), [first])
+	var n0: Dictionary = e.nodes[first]
+	var boon: String = Expeditions.ROOMS[n0.type].boon
+	Expedition.complete(e)
+	check("walk: clearing banks the boon", boon == "respite" or int(e.boons.get(boon, 0)) == int(n0.stacks), e.boons)
+	check("walk: then the next step opens", Expedition.options(e) == e.edges[first])
+
+	# Stacking: boons feed the hero's sheet; afflictions raise Threat; pairs combine.
+	h.expedition = Expedition.generate(1, 7)
+	var x: Dictionary = h.expedition
+	x.boons = {"rhune_resonance": 2, "arsenal": 1, "relics": 1, "midas": 1, "fortune": 1}
+	x.afflictions = {"embers": 1, "exposed": 1, "hardened": 3}
+	x.taken = ["hardened", "embers", "hardened", "exposed", "hardened"]
+	x.threat = 7
+	var names: Array = Expedition.synergies(x).map(func(s): return s.id)
+	check("synergy: prospector and midas touch", "prospector" in names and "midas_touch" in names, names)
+	var dread_ids: Array = Expedition.dreads(x).map(func(d): return d.id)
+	check("dread: wildfire and ironclad", "wildfire" in dread_ids and "ironclad" in dread_ids, dread_ids)
+	var mods := Expedition.monster_mods(x)
+	eq("dread: monster mods stack", [mods.monsterLife, mods.fireShare, mods.championLife], [60.0, 50.0, 50.0])
+	var sh := CharacterSheet.compute_sheet(h)
+	eq("boons: rhune find on the sheet (x2)", sh.fortune.seek.rhune, 150.0)
+	eq("threat: +6% rarity a point, plus fortune boons", sh.fortune.rarity, 7 * Expeditions.THREAT_RARITY + 40.0 + 20.0)
+	eq("affliction: exposed lowers resistances", sh.res.fire, -15)
+	# The Sanctuary lifts the newest affliction.
+	x.nodes["calm"] = {"id": "calm", "step": 3, "lane": 1.0, "type": "sanctuary", "greedy": false, "stacks": 1, "afflictions": [], "threat": 0}
+	x.at = "calm"
+	Expedition.complete(x)
+	eq("sanctuary: lifts the newest affliction", [x.afflictions.get("hardened", 0), x.threat], [2, 6])
+
+	# Finishing and losing.
+	h.expedition = Expedition.generate(1, 9)
+	Expedition.finish(h, Game.save)
+	eq("finish: tier 1 done, tier 2 open", [h.bestTier, Expedition.max_tier(h), h.expedition], [1, 2, {}])
+	eq("start: tiers past the next are closed", Expedition.start(h, 3) != "", true)
+	eq("start: the next tier opens", Expedition.start(h, 2), "")
+	Expedition.abandon(h)
+	check("abandon: the expedition is gone", not Expedition.active(h) and CharacterSheet.compute_sheet(h).fortune.rarity == 0)
+
+
+func test_modes() -> void:
+	Game.save = HeroData.default_save()
+	Game.add_hero(HeroData.new_hero("Tradey", "trade", Seasons.ETERNAL))
+	Game.stash().append(ItemGen.create_item("ring", {"ilvl": 5, "quality": "magic"}))
+	Game.add_hero(HeroData.new_hero("Solo", "ssf", Seasons.CURRENT.id))
+	eq("modes: SSF season hero has its own empty stash", [Game.stash_key(), Game.stash().size()], ["%s:ssf" % Seasons.CURRENT.id, 0])
+	eq("roster: newest first", Game.roster().map(func(r): return r.name), ["Solo", "Tradey"])
+	Game.select_hero(1)
+	eq("roster: switch back, stash follows", [Game.hero().name, Game.stash().size()], ["Tradey", 1])
+	# A season ends: its heroes and stash move to Eternal (mode kept).
+	var old := HeroData.new_hero("Veteran", "ssf", "s0")
+	Game.add_hero(old)
+	Game.save.stashes["s0:ssf"] = [ItemGen.create_item("amulet", {"ilvl": 9, "quality": "magic"})]
+	var moved := Seasons.migrate(Game.save)
+	eq("season end: heroes move to Eternal", [moved, old.realm], [1, Seasons.ETERNAL])
+	eq("season end: stash merges into Eternal SSF", [Game.save.stashes.has("s0:ssf"), Game.save.stashes["eternal:ssf"].size()], [false, 1])
+	Game.delete_hero(0)
+	eq("roster: delete", Game.roster().map(func(r): return r.name), ["Tradey", "Solo"])
+	# A v2 save (one stash, floors) upgrades in place.
+	var v2 := {"version": 2, "hero": HeroData.new_hero("Old"), "stash": [ItemGen.create_item("cap", {"ilvl": 2})], "codex": {}, "stats": {}}
+	v2.hero.erase("realm")
+	v2.hero.erase("mode")
+	v2.hero.erase("bestTier")
+	v2.hero.bestFloor = 13
+	var up := SaveIO.sanitize(SaveIO.normalize(JSON.parse_string(JSON.stringify(v2))))
+	eq("upgrade: one stash becomes Eternal Trade", [up.has("stash"), up.stashes["eternal:trade"].size()], [false, 1])
+	eq("upgrade: floors become tiers", [up.hero.bestTier, up.hero.mode, up.hero.realm, up.hero.has("bestFloor")], [3, "trade", Seasons.ETERNAL, false])
+	Game.save = HeroData.default_save()
 
 
 func test_economy() -> void:
@@ -490,18 +615,18 @@ func test_economy() -> void:
 func test_save() -> void:
 	var h := _fresh_hero("Saver")
 	h.cursor = ItemGen.create_item("ring", {"ilvl": 20, "quality": "rare"})
-	Game.save.stash.append(ItemGen.create_item("gloves", {"ilvl": 9, "quality": "magic"}))
+	Game.stash().append(ItemGen.create_item("gloves", {"ilvl": 9, "quality": "magic"}))
 	var gone := ItemGen.create_item("cap", {"ilvl": 1})
 	gone.baseId = "deleted_base"
-	Game.save.stash.append(gone)
+	Game.stash().append(gone)
 	Game.save.codex["u:lucky_hat"] = {"at": 1700000000000, "best": 0.5}
 	SaveIO.wipe_save()
 	eq("save: missing -> default", SaveIO.load_game(), HeroData.default_save())
 	SaveIO.save_game(Game.save)
 	check("save: file written", FileAccess.file_exists(SaveIO.path()))
 	var loaded := SaveIO.load_game()
-	eq("save: stale base dropped", loaded.stash.size(), 1)
-	Game.save.stash.pop_back()
+	eq("save: stale base dropped", loaded.stashes[Game.stash_key()].size(), 1)
+	Game.stash().pop_back()
 	check("save: round trip", JSON.stringify(loaded) == JSON.stringify(Game.save), "differs")
 	check("save: ints stay ints", typeof(loaded.hero.level) == TYPE_INT and typeof(loaded.hero.equipped.chest.baseRoll[0]) == TYPE_INT and typeof(loaded.hero.cursor.affixes[0].values[0][0]) == TYPE_INT and typeof(loaded.codex["u:lucky_hat"].at) == TYPE_INT)
 	check("save: floats stay floats", typeof(loaded.codex["u:lucky_hat"].best) == TYPE_FLOAT)

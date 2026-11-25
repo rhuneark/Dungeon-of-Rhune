@@ -21,11 +21,21 @@ class StashPanel extends UiPanel:
 		title = "Strongbox"
 
 	func build(body: VBoxContainer) -> void:
-		body.add_child(UiKit.para("Shared by every hero you make. Right-click to move items.", "t10", UiKit.DIM, HORIZONTAL_ALIGNMENT_CENTER))
-		var g := GridView.new(HeroData.STASH_W, HeroData.STASH_H, Game.save.stash)
+		var hero := Game.hero()
+		body.add_child(UiKit.para("%s stash: shared by your %s heroes. Right-click to move items." % [Seasons.badge(hero), Seasons.badge(hero)], "t10", UiKit.DIM, HORIZONTAL_ALIGNMENT_CENTER))
+		var g := GridView.new(HeroData.STASH_W, HeroData.STASH_H, Game.stash())
 		g.clicked.connect(func(cx, cy, uid): Actions.click_grid("stash", cx, cy, uid))
 		g.right_clicked.connect(func(uid): Actions.right_click_item("stash", uid))
 		body.add_child(g)
+		# Items from an ended season that didn't fit when they moved to Eternal.
+		var waiting: Array = Game.save.get("reclaim", {}).get(String(hero.get("mode", "trade")), [])
+		if hero.get("realm", "eternal") == Seasons.ETERNAL and not waiting.is_empty():
+			body.add_child(UiKit.button("Reclaim %d season item%s" % [waiting.size(), "" if waiting.size() == 1 else "s"], func():
+				var grid := Actions.grid_of("stash")
+				for it in waiting.duplicate():
+					if Grid.auto_place(grid, it):
+						waiting.erase(it)
+				Game.commit()))
 
 
 class VendorPanel extends UiPanel:

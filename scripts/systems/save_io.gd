@@ -6,8 +6,9 @@ class_name SaveIO
 ##
 ## JSON turns every number into a float, so loads convert integral floats back
 ## to ints, then sanitize stale content ids (renamed bases are dropped).
-## v2 is the floor-climbing game (gear-only, no skills); v1 saves from the
-## town-only build are left alone on disk and not read.
+## v2 saves (the floor-climbing build) load and are upgraded in place: the
+## one stash becomes the Eternal Trade stash, floors become expedition tiers.
+## v1 saves from the town-only build are left alone on disk and not read.
 
 ## Overridable (tests point it elsewhere so they never touch a real save).
 static var dir := "user://saves"
@@ -46,35 +47,70 @@ static func sanitize(raw: Dictionary) -> Dictionary:
 	save.stats = stats
 	if not save.codex is Dictionary:
 		save.codex = {}
-	save.stash = _clean_items(save.get("stash", []))
+	# v2 had one shared stash: it becomes the Eternal Trade stash.
+	var stashes = save.get("stashes", {})
+	if not stashes is Dictionary:
+		stashes = {}
+	if save.has("stash"):
+		if stashes.is_empty():
+			stashes["eternal:trade"] = save.stash
+		save.erase("stash")
+	for k in stashes.keys():
+		stashes[k] = _clean_items(stashes[k])
+	save.stashes = stashes
+	if not save.get("reclaim") is Dictionary:
+		save.reclaim = {}
+	for k in save.reclaim.keys():
+		save.reclaim[k] = _clean_items(save.reclaim[k])
+	save.version = 3
 	if save.hero is Dictionary:
-		var h: Dictionary = save.hero
-		h.inventory = _clean_items(h.get("inventory", []))
-		var eq = h.get("equipped", {})
-		if not eq is Dictionary:
-			eq = {}
-		for k in eq.keys():
-			if not _valid_item(eq[k]):
-				eq.erase(k)
-			else:
-				eq[k].socketed = _clean_items(eq[k].get("socketed", []))
-				if eq[k].has("charms"):
-					eq[k].charms = _clean_items(eq[k].charms)
-		h.equipped = eq
-		if h.get("cursor") != null and not _valid_item(h.cursor):
-			h.cursor = null
-		elif h.get("cursor") != null:
-			h.cursor.socketed = _clean_items(h.cursor.get("socketed", []))
-		else:
-			h.cursor = null
-		if not h.get("flags") is Dictionary:
-			h.flags = {}
-		h.bestFloor = int(h.get("bestFloor", 0))
-		h.resumeFloor = int(h.get("resumeFloor", 0))
-		h.crucible = _clean_items(h.get("crucible", []))
+		_clean_hero(save.hero)
 	else:
 		save.hero = null
+	var bench: Array = []
+	for h in save.get("bench", []):
+		if h is Dictionary:
+			bench.append(_clean_hero(h))
+	save.bench = bench
+	Seasons.migrate(save)
 	return save
+
+
+static func _clean_hero(h: Dictionary) -> Dictionary:
+	h.inventory = _clean_items(h.get("inventory", []))
+	var eq = h.get("equipped", {})
+	if not eq is Dictionary:
+		eq = {}
+	for k in eq.keys():
+		if not _valid_item(eq[k]):
+			eq.erase(k)
+		else:
+			eq[k].socketed = _clean_items(eq[k].get("socketed", []))
+			if eq[k].has("charms"):
+				eq[k].charms = _clean_items(eq[k].charms)
+	h.equipped = eq
+	if h.get("cursor") != null and not _valid_item(h.cursor):
+		h.cursor = null
+	elif h.get("cursor") != null:
+		h.cursor.socketed = _clean_items(h.cursor.get("socketed", []))
+	else:
+		h.cursor = null
+	if not h.get("flags") is Dictionary:
+		h.flags = {}
+	h.crucible = _clean_items(h.get("crucible", []))
+	# Floors became tiers (about four levels of monster each).
+	if h.has("bestFloor"):
+		h.bestTier = maxi(int(h.get("bestTier", 0)), int(h.bestFloor) / Expeditions.TIER_LEVELS)
+		h.erase("bestFloor")
+	h.erase("resumeFloor")
+	h.bestTier = int(h.get("bestTier", 0))
+	if not h.get("expedition") is Dictionary:
+		h.expedition = {}
+	if not h.get("mode") in Seasons.MODES:
+		h.mode = "trade"
+	if not h.get("realm") is String:
+		h.realm = Seasons.ETERNAL
+	return h
 
 
 ## JSON numbers come back as floats: turn integral ones back into ints.

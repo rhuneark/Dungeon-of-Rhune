@@ -25,15 +25,15 @@ var ui := {
 	"paused": false,
 	"left": "", # "" | character | stash | vendor | gamble | smith | codex | lab | options
 	"right": "", # "" | inventory
-	"overlay": "", # unused for now
+	"overlay": "", # "" | map
 	"dialog": {}, # {} | {npcId, title, sub, line, notes: Array[String], (floors: true)}
 	"service_npc": "",
 	"cursor_mode": "",
 	"hover_name": {}, # {} | {text, color, sub}
-	"location": "town", # town | dungeon
-	"floor": 0, # dungeon floor (1-100)
-	"zone_title": "Thornwick",
-	"zone_sub": "Town · Safe",
+	"location": "refuge", # refuge | room
+	"room": "", # expedition node id while in a room
+	"zone_title": "The Refuge",
+	"zone_sub": "Safe",
 	"dead": false,
 }
 
@@ -110,9 +110,9 @@ func set_ui(patch: Dictionary) -> void:
 ## Close every panel/dialog (Esc). Returns true if anything was open.
 func close_all() -> bool:
 	var dialog_open: bool = not ui.dialog.is_empty() and not ui.dialog.get("modal", false)
-	var any: bool = ui.left != "" or ui.right != "" or dialog_open
+	var any: bool = ui.left != "" or ui.right != "" or ui.overlay != "" or dialog_open
 	if any:
-		set_ui({"left": "", "right": "", "dialog": {} if dialog_open else ui.dialog, "service_npc": ""})
+		set_ui({"left": "", "right": "", "overlay": "", "dialog": {} if dialog_open else ui.dialog, "service_npc": ""})
 	return any
 
 
@@ -148,46 +148,153 @@ func reset_flask() -> void:
 
 
 # ------------------------------------------------------------ where you are
-## Go down the Sealed Stair to `floor` (continue, 1, or a checkpoint).
-## Leaving mid-floor and coming back restarts that floor.
-func enter_dungeon(floor: int) -> void:
-	var h := hero()
-	h.bestFloor = maxi(int(h.get("bestFloor", 0)), floor)
-	h.resumeFloor = floor
+## The expedition in progress ({} = none).
+func expedition() -> Dictionary:
+	if not has_hero():
+		return {}
+	var e = hero().get("expedition", {})
+	return e if e is Dictionary else {}
+
+
+## Chart a new expedition at the Refuge's map table and open the map.
+func start_expedition(tier: int) -> String:
+	var err := Expedition.start(hero(), tier)
+	if err != "":
+		float_text(err, "#e8e4d8")
+		return err
 	commit()
-	set_ui({"location": "dungeon", "floor": floor, "dead": false, "dialog": {}, "left": "", "service_npc": ""})
+	set_ui({"overlay": "map", "dialog": {}, "left": "", "service_npc": ""})
+	toast("Expedition charted: Tier %d. Pick your first room." % tier, "#d9b26a")
+	return ""
 
 
-func next_floor() -> void:
-	enter_dungeon(int(ui.floor) + 1)
+## Walk into a room on the map (the one you left, or one the last room leads to).
+func enter_room(id: String) -> String:
+	var e := expedition()
+	if e.is_empty():
+		return "No expedition."
+	var err := Expedition.enter(e, id)
+	if err != "":
+		float_text(err, "#e8e4d8")
+		return err
+	commit()
+	set_ui({"location": "room", "room": id, "dead": false, "dialog": {}, "left": "", "overlay": "", "service_npc": ""})
+	return ""
 
 
-## Back to Thornwick (the portal, the Town button, or after dying): the
-## townsfolk patch you up.
-func return_to_town() -> void:
+## The room's last monster fell (or the Sanctuary was entered): bank its boon.
+## Returns what complete() reported.
+func room_cleared() -> Dictionary:
+	var e := expedition()
+	if e.is_empty():
+		return {}
+	var got := Expedition.complete(e)
+	if got.is_empty():
+		return got
+	var n: Dictionary = got.node
+	var r: Dictionary = Expeditions.room(n.type)
+	if String(got.get("lifted", "")) != "":
+		toast("The Sanctuary lifts %s." % Expeditions.AFFLICTIONS[got.lifted].name, "#6fd6ff")
+	elif r.boon != "" and r.boon != "respite":
+		toast("%s%s" % [Expeditions.BOONS[r.boon].name, " x2" if int(n.stacks) > 1 else ""], "#6fbf5a")
+	for a in n.afflictions:
+		toast("Affliction: %s" % Expeditions.AFFLICTIONS[a].name, "#e06a5a")
+	commit()
+	return got
+
+
+## The Warden fell: next tier open, expedition over.
+func finish_expedition() -> void:
+	var e := expedition()
+	var tier := int(e.get("tier", 0))
+	var threat := int(e.get("threat", 0))
+	Expedition.finish(hero(), save)
+	commit()
+	set_ui({"dialog": {"npcId": "", "title": "Expedition complete", "sub": "Tier %d" % tier, "notes": [],
+		"line": "The Warden's hourglass cracks and the vault falls quiet. Threat %d. Tier %d is open at the map table." % [threat, tier + 1],
+		"buttons": [{"text": "Back to the Refuge", "action": func(): return_to_refuge()}]}})
+
+
+func abandon_expedition() -> void:
+	Expedition.abandon(hero())
+	commit()
+
+
+## Back to the Refuge (portal, R, the vault's exit, or after dying): the
+## townsfolk patch you up. An unfinished expedition waits on the map.
+func return_to_refuge() -> void:
 	if not has_hero():
 		return
 	hero().life = sheet().life
 	reset_flask()
 	commit()
 	flush()
-	set_ui({"location": "town", "floor": 0, "dead": false, "dialog": {}, "left": "", "service_npc": ""})
+	set_ui({"location": "refuge", "room": "", "dead": false, "dialog": {}, "left": "", "overlay": "", "service_npc": ""})
 
 
-## Where "Continue" takes you (0 = nowhere: start from a checkpoint).
-func resume_floor() -> int:
-	return int(hero().get("resumeFloor", 0)) if has_hero() else 0
-
-
-## Floors you may start a descent from: 1 and every 5th floor you've reached.
-func checkpoints() -> Array:
-	var out := [1]
-	var best := int(hero().get("bestFloor", 0))
-	var f := 5
-	while f <= best:
-		out.append(f)
-		f += 5
+# -------------------------------------------------------------- the roster
+## Every hero on this account: the one being played first, then the bench.
+func roster() -> Array:
+	var out: Array = []
+	if has_hero():
+		out.append(save.hero)
+	out.append_array(save.get("bench", []))
 	return out
+
+
+## Make roster()[i] the hero being played (the current one goes to the bench).
+func select_hero(i: int) -> void:
+	var all := roster()
+	if i <= 0 or i >= all.size():
+		return
+	var pick: Dictionary = all[i]
+	save.bench.erase(pick)
+	if has_hero():
+		save.bench.push_front(save.hero)
+	save.hero = pick
+	reset_flask()
+	commit()
+
+
+func add_hero(h: Dictionary) -> String:
+	if roster().size() >= HeroData.MAX_HEROES:
+		return "The Refuge can't hold more than %d heroes." % HeroData.MAX_HEROES
+	if has_hero():
+		save.bench.push_front(save.hero)
+	save.hero = h
+	reset_flask()
+	commit()
+	return ""
+
+
+## Remove roster()[i] for good (its realm's stash stays for the others).
+func delete_hero(i: int) -> void:
+	var all := roster()
+	if i < 0 or i >= all.size():
+		return
+	if i == 0:
+		save.hero = save.bench.pop_front() if not save.bench.is_empty() else null
+	else:
+		save.bench.erase(all[i])
+	commit()
+	flush()
+
+
+# --------------------------------------------------------------- the stash
+## Stashes are per realm and mode: Season and Eternal, Trade and SSF never share.
+func stash_key(h: Dictionary = {}) -> String:
+	if h.is_empty():
+		h = hero()
+	return "%s:%s" % [String(h.get("realm", "eternal")), String(h.get("mode", "trade"))]
+
+
+func stash() -> Array:
+	if not save.has("stashes") or not save.stashes is Dictionary:
+		save.stashes = {}
+	var k := stash_key()
+	if not save.stashes.has(k):
+		save.stashes[k] = []
+	return save.stashes[k]
 
 
 func toast(text: String, color := "") -> void:

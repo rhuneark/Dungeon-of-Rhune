@@ -56,7 +56,8 @@ REF_STRENGTH_OVERRIDES = {"market_stall": 300}
 # Small props that must face the camera like a 16-bit top-down ARPG draws them
 # (Chronicon, Zelda): front toward the viewer, a sliver of top, never an
 # isometric corner view. Their guides are drawn by tools/art/guides.py.
-FRONT_PROPS = {"pillar", "dungeon_chest", "dungeon_chest_open", "strongbox", "crates", "hay", "cart", "gambler_wagon", "statue"}
+FRONT_PROPS = {"pillar", "dungeon_chest", "dungeon_chest_open", "strongbox", "crates", "hay", "cart", "gambler_wagon", "statue",
+               "weapon_rack", "gold_pile", "altar", "reliquary", "map_table", "rune_stone", "holy_basin"}
 FRONT_PROP_STYLE = (
     "classic 16-bit top-down ARPG map object, front face toward the viewer with only a sliver of its top visible, "
     f"straight-on, no isometric angle, no corner view, standing alone, no ground under it, {GOTHIC}"
@@ -272,6 +273,20 @@ PROPS = {
     "town_portal": (64, 80, "upright oval swirling magic portal of pale blue light"),
     "chains": (32, 64, "rusted iron chains with shackles hanging down"),
     "goose": (32, 32, "grey and white farm goose with an orange beak, looking angry"),
+    # ------------------------------------------- expedition room themes + the Refuge
+    "wall_sigil": (32, 48, "carved dark stone plaque set into a dungeon brick wall bearing one large glowing cold blue rune, front view"),
+    "wall_banner": (32, 64, "long tattered pale grey cloth banner with an embroidered emblem hanging from an iron rod on a wall, front view"),
+    "wall_shield": (48, 48, "battered round iron shield with two crossed swords behind it mounted on a wall, front view"),
+    "wall_shelf": (64, 48, "old wooden wall shelf holding lit candles, small relic boxes, vials and trinkets, front view"),
+    "wall_skulls": (48, 48, "arched stone wall niche packed with skulls and bones, front view"),
+    "weapon_rack": (48, 48, "dark wooden weapon rack holding swords, axes and spears upright, seen straight from the front"),
+    "gold_pile": (48, 32, "heap of gold coins with goblets and a crown, seen straight from the front"),
+    "altar": (64, 48, "long stone altar with lit candles and an open holy book, seen straight from the front"),
+    "reliquary": (48, 64, "tall gothic reliquary cabinet with a glowing relic behind glass, seen straight from the front"),
+    "map_table": (64, 48, "large dark wooden table with an unrolled old map, candles and a dagger stuck in it, seen straight from the front"),
+    "rune_stone": (48, 64, "dark standing obelisk carved with glowing cold blue runes, seen straight from the front"),
+    "holy_basin": (48, 48, "stone basin on a pedestal filled with softly glowing pale water, seen straight from the front"),
+    "floor_sigil": (96, 96, "large circular ritual sigil of pale grey lines engraved in a dark stone floor, seen from directly above"),
 }
 
 # --------------------------------------------------------------------- icons

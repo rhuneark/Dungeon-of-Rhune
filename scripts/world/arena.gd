@@ -1,10 +1,11 @@
 class_name Arena
 extends Node2D
-## One floor of the Sealed Stair, run like an endless horde: the room seals,
-## waves pour out of the summoning circles, and when the last one falls a
-## chest rises in the middle, the sealed door opens onto the stair to the next
-## floor, and a portal home appears. Every 10th floor an Hourglass Warden holds
-## the room.
+## One room of an expedition, run like an endless horde: the room seals,
+## waves pour out of the summoning circles, and when the last one falls the
+## room's boon is banked (Game.room_cleared), a chest rises in the middle, the
+## sealed door opens onto the map, and a portal home appears. The expedition's
+## afflictions shape every monster (Expedition.monster_mods); the vault holds
+## an Hourglass Warden; a Sanctuary has no monsters at all.
 ##
 ## The Arena owns the monsters (Mob), their projectiles and every hit in both
 ## directions; the ZoneRuntime owns the hero and asks player_attack() when a
@@ -20,7 +21,13 @@ const PLAYER_RADIUS := 10.0
 
 var zone: Zone
 var rt: ZoneRuntime
-var floor := 1
+var level := 1
+var exp: Dictionary = {}
+var room_node: Dictionary = {}
+var room: Dictionary = {}
+var mods: Dictionary = {}
+var is_boss := false
+var calm := false
 var waves: Array = []
 var wave := -1
 var to_spawn := 0
@@ -41,24 +48,47 @@ var _dirty_t := 0.0
 var _dirty := false
 
 
-func setup(z: Zone, runtime: ZoneRuntime, f: int) -> void:
+func setup(z: Zone, runtime: ZoneRuntime, e: Dictionary, n: Dictionary) -> void:
 	current = self
 	zone = z
 	rt = runtime
-	floor = f
+	exp = e
+	room_node = n
+	room = Expeditions.room(String(n.type))
+	is_boss = room.get("boss", false)
+	calm = room.get("calm", false)
+	level = Expedition.level_of(int(e.tier), int(n.step))
+	mods = Expedition.monster_mods(e)
 	rt.arena = self
 	rng.randomize()
 	spawns = z.get_meta("spawns", [])
 	if spawns.is_empty():
 		spawns = [z.get_meta("center", Vector2(600, 400))]
 	door = z.get_meta("door", null)
-	waves = [1] if Monsters.is_boss_floor(f) else Monsters.waves(f)
+	waves = _waves()
 	_shots_layer = Shots.new()
 	_shots_layer.arena = self
 	_shots_layer.z_index = 3
 	z.add_child(_shots_layer)
 	_title()
-	Game.toast("Floor %d%s" % [f, " — something waits here" if Monsters.is_boss_floor(f) else ""], "#d9b26a")
+	Game.toast("%s%s" % [room.name, " — something waits here" if is_boss else ""], "#d9b26a")
+	if calm:
+		_cleared.call_deferred()
+
+
+## Wave sizes: the room level's waves, grown by Swarming, plus Relentless waves.
+func _waves() -> Array:
+	if is_boss:
+		return [1]
+	if calm:
+		return []
+	var out: Array = []
+	var grow := 1.0 + float(mods.get("monsterCount", 0)) / 100.0
+	for n in Monsters.waves(level):
+		out.append(maxi(1, roundi(float(n) * grow)))
+	for i in int(mods.get("extraWaves", 0)):
+		out.append(out.back())
+	return out
 
 
 func _exit_tree() -> void:
@@ -67,12 +97,14 @@ func _exit_tree() -> void:
 
 
 func _title() -> void:
-	var sub := "Floor %d" % floor
-	if state == "fight" or state == "intro":
-		sub += " · Wave %d/%d" % [maxi(1, wave + 1), waves.size()] if not Monsters.is_boss_floor(floor) else " · Warden"
+	var sub := "Tier %d · Room %d/%d" % [int(exp.tier), int(room_node.step), Expeditions.STEPS + 1]
+	if calm:
+		sub += " · Calm"
+	elif state == "fight" or state == "intro":
+		sub += " · Wave %d/%d" % [maxi(1, wave + 1), waves.size()] if not is_boss else " · Warden"
 	else:
 		sub += " · Cleared"
-	Game.set_ui({"zone_title": "The Sealed Stair", "zone_sub": sub})
+	Game.set_ui({"zone_title": String(room.get("name", "The Deep")), "zone_sub": sub})
 
 
 func alive() -> int:
@@ -118,7 +150,7 @@ func _process(delta: float) -> void:
 func _run_waves(delta: float) -> void:
 	match state:
 		"intro":
-			if t >= INTRO:
+			if t >= INTRO and not waves.is_empty():
 				_start_wave(0)
 		"fight":
 			if to_spawn > 0:
@@ -145,9 +177,9 @@ func _start_wave(i: int) -> void:
 	state = "fight"
 	to_spawn = waves[i]
 	spawn_t = 0.0
-	if Monsters.is_boss_floor(floor):
+	if is_boss:
 		_spawn("warden", spawns[0].lerp(zone.get_meta("center"), 0.6), false)
-		for k in mini(10, 3 + floor / 10):
+		for k in mini(10, 3 + level / 10):
 			_spawn(_pick_kind(), spawns[k % spawns.size()], false)
 		to_spawn = 0
 	elif i > 0:
@@ -156,7 +188,7 @@ func _start_wave(i: int) -> void:
 
 
 func _pick_kind() -> String:
-	var pool := Monsters.pool(floor)
+	var pool := Monsters.pool(level)
 	var weights: Array = []
 	for id in pool:
 		weights.append(float(Monsters.ALL[id].weight))
@@ -173,7 +205,8 @@ func _pick_kind() -> String:
 
 func _spawn_one() -> void:
 	var at: Vector2 = spawns[rng.randi_range(0, spawns.size() - 1)]
-	var champ := floor >= 3 and rng.randf() < minf(0.15, 0.03 + floor * 0.0025)
+	var bonus := float(mods.get("champions", 0)) / 100.0
+	var champ := (level >= 3 or bonus > 0) and rng.randf() < minf(0.15, 0.03 + level * 0.0025) + bonus
 	_spawn(_pick_kind(), at + Vector2(rng.randf_range(-18, 18), rng.randf_range(-12, 12)), champ)
 
 
@@ -181,7 +214,7 @@ func _spawn(kind: String, at: Vector2, champion: bool) -> void:
 	var def := Monsters.get_def(kind)
 	var m := Mob.new()
 	m.arena = self
-	m.setup(def, floor, champion)
+	m.setup(def, level, champion, mods)
 	m.position = at.round()
 	rt.things.add_child(m)
 	m.shadow = rt._shadow(m.position, m.radius() + 1.0)
@@ -288,14 +321,14 @@ func _hit_mob(m: Mob, sh: Dictionary) -> void:
 func _kill(m: Mob, sh: Dictionary) -> void:
 	m.die()
 	var hero := Game.hero()
-	var xp := float(m.def.xp) * Monsters.xp_mult(floor) * (3.0 if m.champion else 1.0)
+	var xp := float(m.def.xp) * Monsters.xp_mult(level) * (3.0 if m.champion else 1.0)
 	Progression.gain_xp(hero, xp, float(sh.xpGain))
 	var lok := float(sh.raw.get("lifeOnKill", 0))
 	if lok > 0:
 		hero.life = minf(float(sh.life), float(hero.life) + lok)
 	Game.save.stats.kills = int(Game.save.stats.get("kills", 0)) + 1
 	var tc := "boss" if m.boss else ("champion" if m.champion else "mob")
-	var drops := Loot.roll_treasure(tc, {"ilvl": clampi(floor, 1, 99), "fortune": sh.fortune})
+	var drops := Loot.roll_treasure(tc, {"ilvl": clampi(level, 1, 99), "fortune": sh.fortune})
 	if not drops.is_empty():
 		Game.spawn_drops(drops, m.position)
 	if m.boss:
@@ -317,11 +350,17 @@ func hit_player(raw: float, type: String, attacker: Mob) -> void:
 			rt.fx.float_text("Block", Color("#c9c9c9"), rt.player.pos + Vector2(0, -50))
 			return
 		var armor := float(sh.armor)
-		var dr := armor / (armor + 30.0 + 12.0 * floor)
+		var dr := armor / (armor + 30.0 + 12.0 * level)
 		dmg *= 1.0 - minf(0.8, dr)
 	else:
 		var res := clampf(float(sh.res.get(type, 0)), -100.0, float(CharacterSheet.RES_CAP))
 		dmg *= 1.0 - res / 100.0
+	# Embers / Frostbite: part of every blow arrives again as fire / cold.
+	for share in [["fireShare", "fire"], ["coldShare", "cold"]]:
+		var pct := float(mods.get(share[0], 0))
+		if pct > 0:
+			var res := clampf(float(sh.res.get(share[1], 0)), -100.0, float(CharacterSheet.RES_CAP))
+			dmg += raw * pct / 100.0 * (1.0 - res / 100.0)
 	dmg = maxf(1.0, dmg - float(sh.raw.get("dmgReduce", 0)))
 	hero.life = float(hero.life) - dmg
 	rt.flash_hurt()
@@ -339,40 +378,47 @@ func _hero_died() -> void:
 	var hero := Game.hero()
 	hero.life = 0
 	Game.save.stats.deaths = int(Game.save.stats.get("deaths", 0)) + 1
-	hero.resumeFloor = 0
-	var cps := Game.checkpoints()
-	var line := "The Stair takes you. Somewhere above, the night starts over, and Thornwick drags you home."
-	line += " You keep everything you carry. Next descent: floor %d or any checkpoint." % int(cps.back())
-	Game.set_ui({"dead": true, "left": "", "right": "", "dialog": {
-		"npcId": "", "title": "You have fallen", "sub": "Floor %d" % floor, "line": line, "notes": [], "modal": true,
-		"buttons": [{"text": "Return to Thornwick", "action": func(): Game.return_to_town()}],
+	var tier := int(exp.get("tier", 1))
+	Expedition.abandon(hero)
+	var line := "The Deep takes you, and your expedition with it: its boons and afflictions are gone. The others drag you back to the Refuge. You keep everything you carry."
+	Game.set_ui({"dead": true, "left": "", "right": "", "overlay": "", "dialog": {
+		"npcId": "", "title": "You have fallen", "sub": "%s · Tier %d" % [String(room.get("name", "")), tier], "line": line, "notes": [], "modal": true,
+		"buttons": [{"text": "Back to the Refuge", "action": func(): Game.return_to_refuge()}],
 	}})
 	Game.commit()
 
 
 # ------------------------------------------------------------ the room
 func _cleared() -> void:
+	if state == "cleared" or state == "looted":
+		return
 	state = "cleared"
 	_title()
-	Game.toast("Floor %d cleared!" % floor, "#6fbf5a")
-	# Town trips from here on keep your place: "Continue" takes you one deeper.
-	Game.hero().resumeFloor = mini(100, floor + 1)
-	Game.commit()
+	var got := Game.room_cleared()
+	if is_boss:
+		Game.toast("The vault is yours. Take the hoard, then leave by the door.", "#d9b26a")
+	elif calm:
+		Game.hero().life = Game.sheet().life
+		Game.reset_flask()
+		Game.toast("The Sanctuary's water closes your wounds.", "#6fd6ff")
+	else:
+		Game.toast("%s cleared!" % String(room.name), "#6fbf5a")
 	var center: Vector2 = zone.get_meta("center")
-	chest = Prop.new()
-	chest.art = "dungeon_chest"
-	chest.action = "chest"
-	chest.display_name = "Chest"
-	chest.block = Vector2i(1, 1)
-	chest.approach_dy = 0.6
-	chest.position = center.round()
-	rt.things.add_child(chest)
-	rt.add_prop(chest)
-	rt.fx.sparkle(center + Vector2(0, -12), Color("#d9b26a"))
+	if not calm:
+		chest = Prop.new()
+		chest.art = "dungeon_chest"
+		chest.action = "chest"
+		chest.display_name = "Chest"
+		chest.block = Vector2i(1, 1)
+		chest.approach_dy = 0.6
+		chest.position = (center + Vector2(0, 48 if is_boss else 0)).round()
+		rt.things.add_child(chest)
+		rt.add_prop(chest)
+		rt.fx.sparkle(chest.position + Vector2(0, -12), Color("#d9b26a"))
 	if door:
 		door.art = "door_open"
 		door.action = "exit"
-		door.display_name = "Stair to Floor %d" % (floor + 1) if floor < 100 else "The Hourglass"
+		door.display_name = "Leave the vault" if is_boss else "Onward (choose the next room)"
 		door.approach_dy = 0.5
 		rt.refresh_prop(door)
 		rt.atmosphere.light_prop(door)
@@ -380,16 +426,12 @@ func _cleared() -> void:
 	portal = Prop.new()
 	portal.art = "town_portal"
 	portal.action = "portal"
-	portal.display_name = "Portal to Thornwick"
+	portal.display_name = "Portal to the Refuge"
 	portal.approach_dy = 0.4
 	portal.position = (entry + Vector2(-64, 0)).round()
 	rt.things.add_child(portal)
 	rt.add_prop(portal)
 	rt.atmosphere.light_prop(portal)
-	if floor >= 100:
-		Game.save.stats.conquered = int(Game.save.stats.get("conquered", 0)) + 1
-		Game.set_ui({"dialog": {"npcId": "", "title": "Dawn", "sub": "Floor 100", "notes": [],
-			"line": "Below the last floor, an hourglass the size of a house. You turn it over. Far above, for the first time in longer than anyone can count, Thornwick sees the sky go grey, then gold."}})
 	Game.commit()
 
 
@@ -402,10 +444,16 @@ func open_chest() -> void:
 	chest.display_name = ""
 	rt.refresh_prop(chest)
 	var sh := Game.sheet()
-	var tc := "chest_boss" if Monsters.is_boss_floor(floor) else "chest"
+	var tc := "chest_boss" if is_boss else "chest"
+	# The room's theme leans its chest (a Rhune Sanctum's is heavy with rhunes);
+	# every 4 Threat adds another roll.
+	var fortune: Dictionary = sh.fortune.duplicate(true)
+	var lean: Dictionary = room.get("chest", {})
+	for k in lean:
+		fortune.seek[k] = float(fortune.seek.get(k, 0)) + float(lean[k])
 	var drops: Array = []
-	for i in 1 + floor / 20:
-		drops.append_array(Loot.roll_treasure(tc, {"ilvl": clampi(floor + 2, 1, 99), "fortune": sh.fortune}))
+	for i in 1 + int(exp.get("threat", 0)) / 4:
+		drops.append_array(Loot.roll_treasure(tc, {"ilvl": clampi(level + 2, 1, 99), "fortune": fortune}))
 	Game.spawn_drops(drops, chest.position + Vector2(0, -8))
 	Game.save.stats.chests = int(Game.save.stats.get("chests", 0)) + 1
 	Game.commit()
@@ -415,10 +463,10 @@ func take_exit() -> void:
 	if state == "fight" or state == "intro":
 		Game.float_text("Sealed until the room is empty.", "#e8e4d8")
 		return
-	if floor >= 100:
-		Game.float_text("There is nowhere deeper.", "#e8e4d8")
+	if exp.get("done", false):
+		Game.finish_expedition()
 		return
-	Game.next_floor()
+	Game.set_ui({"overlay": "map", "dialog": {}})
 
 
 # ----------------------------------------------------------- projectiles
@@ -518,13 +566,14 @@ class Mob extends Node2D:
 	var dir := "south"
 	var state := "spawn" # spawn | chase | windup | recover | dead
 	var st := 0.0
+	var haste := 1.0
 	var cd := 0.5
 	var anim_t := 0.0
 	var flash := 0.0
 	var moving := false
 	var _height := 44.0
 
-	func setup(d: Dictionary, floor: int, champ: bool) -> void:
+	func setup(d: Dictionary, level: int, champ: bool, mods: Dictionary = {}) -> void:
 		def = d
 		boss = d.get("boss", false)
 		champion = champ and not boss
@@ -533,12 +582,15 @@ class Mob extends Node2D:
 			if not Art.char_meta(s).is_empty():
 				sheet = s
 				break
-		var lm := Monsters.life_mult(floor)
-		var dm := Monsters.damage_mult(floor)
-		max_life = float(d.life) * lm * (3.2 if champion else 1.0)
+		# Afflictions: Hardened (life), Savage (damage), Hasted (speed), Ironclad.
+		var lm := Monsters.life_mult(level) * (1.0 + float(mods.get("monsterLife", 0)) / 100.0)
+		var dm := Monsters.damage_mult(level) * (1.0 + float(mods.get("monsterDamage", 0)) / 100.0)
+		haste = 1.0 + float(mods.get("monsterSpeed", 0)) / 100.0
+		var champ_life := 3.2 * (1.0 + float(mods.get("championLife", 0)) / 100.0)
+		max_life = float(d.life) * lm * (champ_life if champion else 1.0)
 		life = max_life
 		damage = [float(d.damage[0]) * dm * (1.5 if champion else 1.0), float(d.damage[1]) * dm * (1.5 if champion else 1.0)]
-		speed = float(d.speed) * (1.15 if champion else 1.0)
+		speed = float(d.speed) * (1.15 if champion else 1.0) * haste
 		spr = Sprite2D.new()
 		spr.centered = false
 		spr.offset = ZoneRuntime.char_offset(sheet)
@@ -566,7 +618,7 @@ class Mob extends Node2D:
 		return "#d9b26a" if boss else ("#7896ff" if champion else "#e8dcc0")
 
 	func subtitle() -> String:
-		return "Floor %d" % arena.floor if not boss else "Warden of floor %d" % arena.floor
+		return "Level %d" % arena.level if not boss else "Warden of the vault · Level %d" % arena.level
 
 	func roll_damage() -> float:
 		return randf_range(damage[0], damage[1])
@@ -604,11 +656,11 @@ class Mob extends Node2D:
 					_chase(delta, ppos)
 			"windup":
 				_face(ppos - position)
-				if st >= float(def.windup):
+				if st >= float(def.windup) / haste:
 					_strike(ppos)
 					state = "recover"
 					st = 0.0
-					cd = float(def.cooldown)
+					cd = float(def.cooldown) / haste
 			"recover":
 				if st >= 0.25:
 					state = "chase"

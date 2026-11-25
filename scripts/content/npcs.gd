@@ -1,9 +1,9 @@
 class_name Npcs
-## The people of Thornwick: a town that has lived the same night for longer
-## than anyone can count. Somewhere under the Sealed Stair an hourglass has
-## stopped; conquer floor 100 and the sand runs again. Until then, everyone
-## helps however they can: identifying, the flask, the forge, trade, luck.
-## Services: identify, codex, flask, smith, trade, gamble, descend.
+## The last of Thornwick, holed up in the Refuge: the undercroft beneath the
+## chapel the town sank into. Below it lies the Deep, chambers that shuffle
+## every night. Maren charts expeditions through it; each ends at a Warden's
+## vault. Everyone helps however they can: identifying, the flask, the forge,
+## trade, luck. Services: identify, codex, flask, smith, trade, gamble, expedition.
 ##
 ## Npc: {id, name, title, sprite (character sheet name), services, greeting, chatter}
 
@@ -19,11 +19,11 @@ static func all() -> Array:
 				"title": "Lorekeeper",
 				"sprite": "npc_lore",
 				"services": ["identify", "codex"],
-				"greeting": ["Bring me everything that hums. I read it for nothing. What else would I spend the night on?", "Another night, another descent. Show me what you found."],
+				"greeting": ["Bring me everything that hums. I read it for nothing. What else would I do down here?", "Back from the Deep? Show me what you found."],
 				"chatter": [
-					"Every rhune is a word. I have spent this one night learning to pronounce eleven of them. Several thousand times.",
+					"Every rhune is a word. I have learned to pronounce eleven of them. Down here there is time.",
 					"Unidentified, it is a mystery. Identified, it is usually a disappointment. That is scholarship.",
-					"The Stair goes down a hundred floors. I counted. I had time.",
+					"Rhune Sanctums sing if you stand still. Clear one and the rhunes come easier for the rest of the expedition.",
 				],
 			},
 			{
@@ -34,8 +34,8 @@ static func all() -> Array:
 				"services": ["flask"],
 				"greeting": ["Your flask. Give it here. No, don't smell it first.", "You're bleeding on my herbs again. Same blood as yesterday, I'd wager."],
 				"chatter": [
-					"The flask refills itself. Don't ask me how; ask the hourglass, when you find it.",
-					"Bring me back from deeper down and I'll brew it stronger. Floor twenty. Floor fifty. I've done it before. You don't remember.",
+					"The flask refills itself. Don't ask me how. Ask a Warden, if one ever talks.",
+					"Finish a Tier 4 expedition and I'll brew it stronger. Tier 11, stronger still.",
 				],
 			},
 			{
@@ -44,11 +44,11 @@ static func all() -> Array:
 				"title": "Smith",
 				"sprite": "npc_smith",
 				"services": ["smith"],
-				"greeting": ["Hammer's hot. Always is. It never gets the chance to cool.", "Plain gear with empty holes is worth more than you think. Ask me why."],
+				"greeting": ["Hammer's hot. Down here it's the only warm thing.", "Plain gear with empty holes is worth more than you think. Ask me why."],
 				"chatter": [
 					"Three of the same rhune in my crucible and you get the next one up. Don't ask how. I don't know how.",
 					"Magic items can't take a Rhuneword. Too much talking already.",
-					"I've forged the same horseshoe four thousand times. It's a very good horseshoe.",
+					"Armories down there are full of old steel. Bring me the good pieces, sell me the rest.",
 				],
 			},
 			{
@@ -57,10 +57,10 @@ static func all() -> Array:
 				"title": "Trader",
 				"sprite": "npc_trader",
 				"services": ["trade"],
-				"greeting": ["Buying, selling, browsing? My stock changes every time the night does. Which is always.", "Everything has a price. Most of it is reasonable."],
+				"greeting": ["Buying, selling, browsing? My stock changes with every expedition you come back from.", "Everything has a price. Most of it is reasonable."],
 				"chatter": [
-					"I'll buy anything you drag up the Stair. Varn reads it for free, so read it first.",
-					"Gold is the only thing that still adds up in this town.",
+					"I'll buy anything you drag up from the Deep. Varn reads it for free, so read it first.",
+					"Treasuries down there spill coin. Greedy ones bite back. Price of business.",
 				],
 			},
 			{
@@ -70,18 +70,20 @@ static func all() -> Array:
 				"sprite": "npc_gambler",
 				"services": ["gamble"],
 				"greeting": ["Sealed goods! Could be anything! Legally, it's mostly something!", "Feeling lucky? I am. Same luck every night."],
-				"chatter": ["One in a hundred is legendary. Or one in fifty. I lose count. Then the night resets and I count again."],
+				"chatter": ["One in a hundred is legendary. Or one in fifty. I lose count."],
 			},
 			{
 				"id": "maren",
 				"name": "Captain Maren",
-				"title": "Warden of the Stair",
+				"title": "Cartographer of the Deep",
 				"sprite": "npc_captain",
-				"services": ["descend"],
-				"greeting": ["You're going down again. Good. Someone has to.", "Floor one, or where you left off? Every fifth floor, the way back down remembers you."],
+				"services": ["expedition"],
+				"greeting": ["The Deep shifted again last night. I have a fresh map. Pick your way.", "Greedy rooms pay better and bite harder. Choose your path like you mean it."],
 				"chatter": [
-					"Every room down there seals until it's empty. Empty it. Then the chest. Then the next stair.",
-					"Every tenth floor something guards the way. It has an hourglass where its heart should be.",
+					"Every room seals until it's empty. Empty it, take the chest, then pick the next room on the map.",
+					"Stack too many afflictions and the vault will eat you. Take too few risks and you'll come back with junk.",
+					"A Sanctuary lifts your newest affliction. Worth a detour when the map turns ugly.",
+					"Beat a Warden and I can chart you a harder tier. Harder tiers, better loot.",
 				],
 			},
 		]

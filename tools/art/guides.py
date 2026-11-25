@@ -131,7 +131,78 @@ def statue():
     return im
 
 
+def table(w, h, legs=True, cloth=None):
+    im, d = canvas(w, h)
+    box(d, 4, h // 3, w - 5, h // 3 + 10, WOOD, (186, 160, 120, 255), 4)   # top + front edge
+    if cloth:
+        d.rectangle((10, h // 3, w - 11, h // 3 + 4), fill=cloth)
+    if legs:
+        for x in (7, w - 11):
+            d.rectangle((x, h // 3 + 10, x + 3, h - 4), fill=WOOD, outline=DARK)
+    return im
+
+
+def slab(w, h, top_h, fill=FRONT):
+    im, d = canvas(w, h)
+    box(d, 6, h - top_h - 18, w - 7, h - 4, fill, TOP, 5)
+    return im, d
+
+
+def weapon_rack():
+    im, d = canvas(48, 48)
+    d.rectangle((6, 14, 41, 18), fill=WOOD, outline=DARK)
+    d.rectangle((6, 38, 41, 44), fill=WOOD, outline=DARK)
+    for x in (10, 18, 26, 34):
+        d.rectangle((x, 4, x + 2, 40), fill=IRON, outline=DARK)
+    return im
+
+
+def gold_pile():
+    im, d = canvas(48, 32)
+    d.chord((4, 6, 43, 50), 180, 360, fill=GOLD, outline=DARK)
+    return im
+
+
+def altar():
+    im, d = slab(64, 48, 14)
+    for x in (14, 48):
+        d.rectangle((x, 12, x + 3, 22), fill=(220, 210, 180, 255), outline=DARK)
+    d.rectangle((26, 18, 39, 23), fill=(200, 190, 160, 255), outline=DARK)
+    return im
+
+
+def reliquary():
+    im, d = canvas(48, 64)
+    d.rectangle((8, 8, 39, 60), fill=WOOD, outline=DARK)
+    d.polygon([(8, 8), (24, 1), (39, 8)], fill=WOOD, outline=DARK)
+    d.rectangle((14, 16, 33, 44), fill=(150, 200, 220, 255), outline=DARK)
+    return im
+
+
+def rune_stone():
+    im, d = canvas(48, 64)
+    d.polygon([(14, 60), (12, 12), (24, 3), (36, 12), (34, 60)], fill=FRONT, outline=DARK)
+    for y in (20, 32, 44):
+        d.line((20, y, 28, y + 5), fill=(120, 200, 230, 255), width=2)
+    return im
+
+
+def holy_basin():
+    im, d = canvas(48, 48)
+    d.rectangle((18, 24, 29, 44), fill=FRONT, outline=DARK)
+    d.rectangle((8, 14, 39, 24), fill=FRONT, outline=DARK)
+    d.rectangle((11, 14, 36, 17), fill=(190, 220, 230, 255))
+    return im
+
+
 GUIDES = {
+    "weapon_rack": weapon_rack,
+    "gold_pile": gold_pile,
+    "altar": altar,
+    "reliquary": reliquary,
+    "map_table": lambda: table(64, 48, cloth=(210, 196, 160, 255)),
+    "rune_stone": rune_stone,
+    "holy_basin": holy_basin,
     "statue": statue,
     "pillar": pillar,
     "dungeon_chest": lambda: chest(),

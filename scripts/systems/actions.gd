@@ -16,7 +16,7 @@ static func grid_of(kind: String) -> Dictionary:
 		return Grid.make(HeroData.INV_W, HeroData.INV_H, hero.inventory)
 	if kind == "crucible":
 		return Grid.make(HeroData.CRUCIBLE_W, HeroData.CRUCIBLE_H, hero.crucible)
-	return Grid.make(HeroData.STASH_W, HeroData.STASH_H, Game.save.stash)
+	return Grid.make(HeroData.STASH_W, HeroData.STASH_H, Game.stash())
 
 
 static func _find_uid(items: Array, uid: String) -> Dictionary:
@@ -149,7 +149,7 @@ static func identify_all() -> int:
 	for it in all:
 		if it is Dictionary and identify(it):
 			n += 1
-	for it in Game.save.stash:
+	for it in Game.stash():
 		if identify(it):
 			n += 1
 	Game.commit()

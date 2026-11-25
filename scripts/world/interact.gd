@@ -48,32 +48,36 @@ static func npc_service(npc_id: String, service: String) -> void:
 			var notes := ["Your %s: restores %d life, refills in %ss." % [fl.name, int(fl.heal), UiKit.fmt_num(snappedf(fl.cooldown, 0.1))]]
 			if int(fl.tier) < CharacterSheet.FLASK_TIERS.size() - 1:
 				var nxt: Dictionary = CharacterSheet.FLASK_TIERS[int(fl.tier) + 1]
-				notes.append("Reach floor %d and I'll brew you a %s." % [int(nxt.floor), nxt.name])
+				notes.append("Finish a Tier %d expedition and I'll brew you a %s." % [int(nxt.tier), nxt.name])
 			Game.set_ui({"dialog": {"npcId": npc_id, "title": def.name, "sub": def.title, "line": "There. Full, and you're patched up. Off you go.", "notes": notes}})
 			Game.commit()
-		"descend":
-			descend_dialog(def.name, def.title)
+		"expedition":
+			expedition_dialog(def.name, def.title)
 
 
-## The descent picker: floor 1 and every 5th floor you've reached.
-static func descend_dialog(title := "The Sealed Stair", sub := "") -> void:
+## The map table: continue the expedition in progress, or chart a new one.
+static func expedition_dialog(title := "The Map Table", sub := "") -> void:
+	var hero := Game.hero()
 	var buttons: Array = []
-	var resume := Game.resume_floor()
-	if resume > 1:
-		buttons.append({"text": "Continue: Floor %d" % resume, "action": func(): Game.enter_dungeon(resume)})
-	# Floor 1 and the four deepest checkpoints (deep runs would list twenty).
-	var cps: Array = Game.checkpoints()
-	var shown: Array = [1]
-	for i in range(maxi(1, cps.size() - 4), cps.size()):
-		shown.append(cps[i])
-	for f in shown:
-		var fl: int = f
-		if fl != resume:
-			buttons.append({"text": "Floor %d" % fl, "action": func(): Game.enter_dungeon(fl)})
-	var best := int(Game.hero().get("bestFloor", 0))
-	var line := "A hundred floors down, an hourglass has stopped. Each room seals until it's empty. Where do you start?"
-	if best > 0:
-		line += " (Deepest so far: floor %d. Fall, and you start again from a checkpoint.)" % best
+	var line: String
+	if Expedition.active(hero):
+		var e: Dictionary = hero.expedition
+		line = "Tier %d, %d of %d rooms cleared, Threat %d. The way on is marked." % [int(e.tier), int(e.rooms), Expeditions.STEPS + 1, int(e.threat)]
+		buttons.append({"text": "Open the map", "action": func(): Game.set_ui({"overlay": "map", "dialog": {}})})
+		buttons.append({"text": "Abandon it", "action": func():
+			Game.abandon_expedition()
+			_say(title, "Burned. Boons and afflictions with it. Chart a fresh one when you're ready.", sub)})
+	else:
+		var top := Expedition.max_tier(hero)
+		line = "Six rooms and a Warden's vault, your path through them. Greedy rooms pay double and bring afflictions; every affliction raises Threat, and Threat raises the loot. Which tier?"
+		var tiers: Array = []
+		for t in [top, top - 1, top - 2, 1]:
+			if t >= 1 and not t in tiers:
+				tiers.append(t)
+		for t in tiers:
+			var tier: int = t
+			buttons.append({"text": "Tier %d%s" % [tier, " (new)" if tier == top and tier > int(hero.get("bestTier", 0)) else ""],
+				"action": func(): Game.start_expedition(tier)})
 	_say(title, line, sub, buttons)
 
 
@@ -85,13 +89,10 @@ static func on_world_interact(t: Dictionary) -> void:
 			match t.action:
 				"stash":
 					Game.set_ui({"left": "stash", "right": "inventory", "dialog": {}})
-				"stair":
-					descend_dialog()
+				"stair", "map":
+					expedition_dialog()
 				"statue":
-					if String(t.name).begins_with("Statue"):
-						_say("Aldra Thornwick", "\"She held the gate for nine days with a lantern and a bad temper.\" The lantern is still lit. It has been lit for the same nine days, over and over.")
-					else:
-						Game.toast(t.name)
+					Game.toast(t.name)
 				"chest":
 					if Arena.current:
 						Arena.current.open_chest()
@@ -99,4 +100,4 @@ static func on_world_interact(t: Dictionary) -> void:
 					if Arena.current:
 						Arena.current.take_exit()
 				"portal":
-					Game.return_to_town()
+					Game.return_to_refuge()

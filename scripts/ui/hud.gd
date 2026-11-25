@@ -36,10 +36,10 @@ func _ready() -> void:
 	add_child(_bar)
 
 	_zone = UiKit.vbox(0)
-	_zone_title = UiKit.shadowed(UiKit.label("Thornwick", "head", UiKit.GOLD))
+	_zone_title = UiKit.shadowed(UiKit.label("The Refuge", "head", UiKit.GOLD))
 	_zone_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_zone.add_child(_zone_title)
-	_zone_sub = UiKit.shadowed(UiKit.label("TOWN · SAFE", "label", UiKit.DIM))
+	_zone_sub = UiKit.shadowed(UiKit.label("SAFE", "label", UiKit.DIM))
 	_zone_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_zone.add_child(_zone_sub)
 	add_child(_zone)
@@ -93,7 +93,7 @@ func _flask_tip() -> Array:
 	lines.append("Ready - press Q" if Game.flask_fraction() >= 1.0 else "Refilling...")
 	if int(fl.tier) < CharacterSheet.FLASK_TIERS.size() - 1:
 		var nxt: Dictionary = CharacterSheet.FLASK_TIERS[int(fl.tier) + 1]
-		lines.append("Mother Ysolde brews a %s once you reach floor %d." % [String(nxt.name).replace(" Rejuvenation Flask", ""), int(nxt.floor)])
+		lines.append("Mother Ysolde brews a %s once you finish a Tier %d expedition." % [String(nxt.name).replace(" Rejuvenation Flask", ""), int(nxt.tier)])
 	return [fl.name, lines]
 
 
@@ -138,10 +138,10 @@ func _on_ui(keys: Array) -> void:
 			_plate.add_child(v)
 		_place_plate.call_deferred()
 	if "zone_title" in keys or "zone_sub" in keys:
-		_zone_title.text = Game.ui.get("zone_title", "Thornwick")
+		_zone_title.text = Game.ui.get("zone_title", "The Refuge")
 		_zone_sub.text = String(Game.ui.get("zone_sub", "")).to_upper()
 		_layout.call_deferred()
-	if "left" in keys or "right" in keys or "location" in keys:
+	if "left" in keys or "right" in keys or "location" in keys or "overlay" in keys or "room" in keys:
 		_rebuild_bar()
 
 
@@ -184,7 +184,14 @@ func _rebuild_bar() -> void:
 	var row := UiKit.hbox(3)
 	row.add_child(UiKit.label(" Lv %d" % int(hero.level), "t10", UiKit.PARCH))
 	row.add_child(UiKit.label("  %sg" % UiKit.fmt_int(int(hero.gold)), "t10", UiKit.GOLD))
-	row.add_child(UiKit.label("  Best floor %d" % int(hero.get("bestFloor", 0)), "t10", UiKit.DIM))
+	var exp := Game.expedition()
+	if Expedition.active(hero):
+		var exp_tip := UiKit.label("  T%d · Threat %d" % [int(exp.tier), int(exp.threat)], "t10", UiKit.BAD if int(exp.threat) > 0 else UiKit.DIM)
+		exp_tip.mouse_filter = Control.MOUSE_FILTER_STOP
+		exp_tip.gui_input.connect(func(e): if e is InputEventMouseMotion: UiTip.text(exp_tip, "Expedition", MapPanel.summary_lines(Game.expedition())))
+		row.add_child(exp_tip)
+	else:
+		row.add_child(UiKit.label("  Best tier %d" % int(hero.get("bestTier", 0)), "t10", UiKit.DIM))
 	row.add_child(UiKit.spacer())
 	var ui := Game.ui
 	var unspent := int(hero.attrPoints) > 0
@@ -194,8 +201,10 @@ func _rebuild_bar() -> void:
 		["Codex", "L", ui.left == "codex", func(): _toggle_left("codex")],
 		["Opts", "O", ui.left == "options", func(): _toggle_left("options")],
 	]
-	if ui.get("location", "town") == "dungeon":
-		buttons.append(["Town", "T", false, func(): Game.return_to_town()])
+	if Expedition.active(hero):
+		buttons.append(["Map", "M", ui.get("overlay", "") == "map", func(): Game.set_ui({"overlay": "" if Game.ui.overlay == "map" else "map", "dialog": {}})])
+	if ui.get("location", "refuge") == "room":
+		buttons.append(["Refuge", "T", false, func(): Game.return_to_refuge()])
 	if Platform.dev_tools:
 		buttons.append(["Lab", "`", ui.left == "lab", func(): _toggle_left("lab")])
 	var btns := UiKit.hbox(2)

@@ -1,9 +1,14 @@
 # Dungeon of Rhune (Godot 4.7, GDScript)
 
-The game: ONE town (Thornwick, a hub) and ONE dungeon (the Sealed Stair, floors 1-100, one sealed
-arena room per floor: waves, then a chest, then the stair down). Gear is the whole build: no
-classes, no skills, no skill trees, no mana, no potions (one rejuvenation flask on a cooldown).
-Levels only give attribute points. Keep it that way unless asked; "we'll build it out later".
+The game: ALL DUNGEON. You start in the Refuge (a plain dungeon hall: the townsfolk, the stash,
+Maren's map table). Expeditions: a branching map (6 steps of 2-3 rooms + the Warden's vault) you
+pick your way through; each room is one sealed arena (waves, then a chest) whose type grants a
+stacking boon for the expedition; greedy rooms double it but add stacking afflictions (Threat
+feeds the loot); boons/afflictions synergize. Beating the Warden opens the next tier (no floors,
+no floor 100). Death loses the expedition, not your items. Modes: Season/Eternal x Trade/SSF,
+one stash per pair, hero roster; trading is planned. Gear is the whole build: no classes, no
+skills, no skill trees, no mana, no potions (one rejuvenation flask on a cooldown). Levels only
+give attribute points. Keep it that way unless asked; "we'll build it out later".
 
 Ships on **Steam** (Godot desktop exports + optional GodotSteam GDExtension) and the **web**
 (Godot Web export). There is no RUN.game, no Electron, no npm anymore. Never re-add them.
@@ -14,8 +19,9 @@ Ships on **Steam** (Godot desktop exports + optional GodotSteam GDExtension) and
   are actions), Compatibility renderer, nearest filtering, pixel snapping, NO stretch mode,
   `[rhune] steam/app_id` (0 = no Steam), custom user dir "Dungeon of Rhune".
 - **scripts/main.gd** (scenes/main.tscn): boot → loading screen (warms every texture via
-  `Art.warm`) → menu → playing. While playing, the zone follows `Game.ui.location`: town →
-  thornwick.tscn; dungeon → `ArenaBuilder.build(floor)` + an `Arena`. Owns World (zone +
+  `Art.warm`) → menu (hero roster; new hero picks realm + mode) → playing. While playing, the zone
+  follows `Game.ui.location`: refuge → `ArenaBuilder.build_refuge()`; room → `ArenaBuilder.
+  build_room(expedition, node)` + an `Arena` (`Game.ui.room` = node id). Owns World (zone +
   ZoneRuntime) and the UI CanvasLayer
   (scaled by `View.ui_scale`, root Control sized `View.ui_size`). Sets
   `Viewport.oversampling_override = ui_scale`. Flushes the save on focus loss and window close.
@@ -23,45 +29,55 @@ Ships on **Steam** (Godot desktop exports + optional GodotSteam GDExtension) and
   `platform.gd` (Steam via `Engine.get_singleton("Steam")`, fullscreen, quit, achievements,
   `dev_tools`), `art.gd` (art_meta.json, character frames, tile coords, cached textures),
   `game.gd` (the session: `save`, `commit()`, `flush()`, `sheet()`, `ui` + `set_ui()`, toasts,
-  the flask (`drink_flask`, `flask_fraction`, on the game `clock`), travel (`enter_dungeon`,
-  `next_floor`, `return_to_town`, `resume_floor` = Continue (floor after the last clear; 0 after a
-  death), `checkpoints`), world bridge signals `drops_requested` / `float_text_requested`).
+  the flask (`drink_flask`, `flask_fraction`, on the game `clock`), expeditions (`expedition()`,
+  `start_expedition`, `enter_room`, `room_cleared`, `finish_expedition`, `abandon_expedition`,
+  `return_to_refuge`), roster (`roster`, `select_hero`, `add_hero`, `delete_hero`), the stash
+  (`stash()` / `stash_key()`: one per realm:mode), world bridge signals `drops_requested` /
+  `float_text_requested`).
+- **scripts/content/expeditions.gd** (ROOMS, BOONS, AFFLICTIONS, SYNERGIES, DREADS, THREAT_*)
+  + **scripts/systems/expedition.gd** (generate (seeded), options/enter/complete, hero_stats
+  (fed into CharacterSheet), monster_mods (fed into Arena/Mob), level_of (tier*4 + step),
+  start/finish/abandon). State is plain JSON on `hero.expedition`. **scripts/content/seasons.gd**:
+  realms (CURRENT season, eternal), modes (trade/ssf), `migrate()` for ended seasons.
 - **scripts/content/**: pure data (static funcs + static var caches). **scripts/systems/**:
   rules (static funcs). Port of the old TS with the SAME dictionary keys (camelCase:
   `baseId`, `uniqueValues`...) so saves are unchanged. `Rng` is mulberry32, bit-identical to the
   TS build.
-- **scenes/world/thornwick.tscn**: the hub, BUILT by tools/godot/build_thornwick.gd (compact,
-  Rogue-Encampment style: stash by the campfire, the Stair north, each NPC at their own door;
-  re-run it after layout changes) and editable in the editor (Ground TileMapLayer with
-  terrains, Decals, Things y-sorted, Items, Blockers, Spawn). Node types in **scripts/world/**:
-  `Prop` (art/block/action/approach_dy, anchored at the visible base), `NpcSpot`, `Blocker`,
+- Zones are built in code (no hand-made scenes): Ground + Shade TileMapLayers, Decals, Things
+  (y-sorted), Items, Blockers, Spawn. Node types in **scripts/world/**: `Prop`
+  (art/block/action/approach_dy, anchored at the visible base; put a base on a tile line when
+  it has an action, or its approach point lands in its own footprint), `NpcSpot`, `Blocker`,
   `Zone` (root: zone_name, level, ambient, fog_density, hero_light).
-- **scripts/world/arena_builder.gd** builds a dungeon floor as a Zone at runtime: an
-  axis-aligned room shape (hall with bays / cross / court with stone islands; never diagonal
+- **scripts/world/arena_builder.gd** builds the Refuge and every room as a Zone at runtime: an
+  axis-aligned shape (refuge / hall with bays / cross / court with stone islands; never diagonal
   walls), drawn top-down oblique from `assets/art/tiles/dungeon_walls.png` (made by
   `tools/art/dungeon_walls.py`: flagstone floor, dark wall caps with a lit rim, a 2-tile brick face
-  on every wall with floor below it, a Shade layer of wall shadow on the floor), torches, pillars,
-  spawn circles, door;
-  **arena.gd** runs it (waves, Mob AI (straight at the hero when clear, else the nav flow field
+  on every wall with floor below it, a Shade layer of wall shadow on the floor), then dressed by
+  the room type (wall art between the torches, tall props on the shoulders / flanking the door in
+  a court, low props scattered, a 2x floor sigil in the room colour, spawn circles, door);
+  **arena.gd** runs a room (waves (Swarming/Relentless), Mob AI (straight at the hero when clear, else the nav flow field
   `ZoneNav.flow_to/flow_step`), projectiles (collide on the same feet line the shooters' thin
-  line-of-sight checks), every hit both ways, XP/drops, death, the chest, the exit). Monster
-  numbers and floor scaling: scripts/content/monsters.gd (tuned with campaign_test.gd).
+  line-of-sight checks), every hit both ways (Embers/Frostbite add elemental shares), XP/drops,
+  death (loses the expedition), the chest (leaned by room type, +1 roll per 4 Threat), the exit
+  (opens the map; the vault's finishes the expedition); a Sanctuary clears on entry). Monster
+  numbers and level scaling: scripts/content/monsters.gd (tuned with campaign_test.gd).
   `ground_items.gd`: loot is never drawn as the item: name label + unshaded floor ring + beam
   sized by tier (`TIERS`), spark flight, landing burst, light for rare+.
 - **scripts/world/zone_runtime.gd**: brings a Zone to life (nav from terrain + footprints +
   blockers, player, NPCs, ground loot, hover/click, camera, the hero's attacks: walk into range,
   swing timed by attack speed, `Arena.player_attack` at 55% of the swing). `interact.gd`: what
-  using things does (dialogs, panels, the Stair, chest, exit, portal). `atmosphere.gd`: the look at runtime (dusk
+  using things does (dialogs, panels, the map table / Deep Gate, chest, exit, portal). `atmosphere.gd`: the look at runtime (dusk
   CanvasModulate, a flickering PointLight2D per glow cluster from art_meta, unshaded glow
   sprites, pixel-snapped fog shader, embers, vignette CanvasLayer). Loot labels and float text
   live on an `Overlay` CanvasLayer (follows the camera) so the tint never dims them.
 - **scripts/ui/**: all UI built in code. `ui_kit.gd` (palette, fonts, 9-slice pixel frames,
   widget factories), `ui_panel.gd` (base window: rebuilds its body on `Game.changed`, deferred),
-  `playing_ui.gd` (panel slots + hotkeys), `hud.gd`, `main_menu.gd`, `grid_view.gd`,
+  `playing_ui.gd` (panel slots, the full overlay (`Game.ui.overlay` = "map" → `panels/
+  map_panel.gd`), hotkeys incl. M map, T refuge), `hud.gd`, `main_menu.gd`, `grid_view.gd`,
   `item_icon.gd`, `ui_tip.gd` + `item_tooltip.gd`, `panels/`.
 - **assets/**: `art/` (packed by tools/art/pack.py + art_meta.json; `art/glow/` = each prop's
   light-emitting pixels, `glow` clusters in art_meta), `fonts/` (re-gridded pixel fonts, see its
-  README), `tiles/terrain.tres` (built by tools/godot/build_tileset.gd), icon.
+  README), icon.
 - **tests/test_systems.tscn**: rules tests. **tools/godot/**: builders + test drivers.
 - **export_presets.cfg**: Windows Desktop, Linux, macOS, Web → `builds/` (ignored).
   **steam/**: SteamPipe templates. **STEAM.md**: the release guide.
@@ -102,12 +118,13 @@ Ships on **Steam** (Godot desktop exports + optional GodotSteam GDExtension) and
 
 ## What to Modify
 
-- **New zone** → new scene with a `Zone` root (copy thornwick.tscn's layer layout), loaded from
-  main.gd (`ZONE_SCENE`; zone switching comes with the Wilds).
+- **New room type** → an entry in `Expeditions.ROOMS` (+ its boon in BOONS); dressing comes from
+  its `wall`/`props`/`color`. New afflictions/synergies/dreads are data there too. Re-run
+  `tools/godot/room_shots.gd` to look at it; run the campaign bot to check balance.
 - **New art** → prompt in `tools/art/spec.py`, run `gen.py` (use `--only x --variants 3` and pick
   from out/candidates/) then `pack.py` (writes assets/art + art_meta.json + glow). New props
   appear in a Prop's `art` picker. LOOK: grim gothic high fantasy at dusk; everything in the
-  world is forced onto `spec.PALETTE` (keep it that way, it's what makes the town cohere). The
+  world is forced onto `spec.PALETTE` (keep it that way, it's what makes the world cohere). The
   lamplight/fire/rune palette colours are for things that emit light: the packer turns them into
   lights. PERSPECTIVE: top-down oblique like Chronicon / a 2D Diablo: floors seen from above,
   everything standing seen from the front with a sliver of top, NEVER an isometric corner view.
@@ -128,18 +145,18 @@ Ships on **Steam** (Godot desktop exports + optional GodotSteam GDExtension) and
 
 - `godot --headless --path . --import` clean (no SCRIPT ERROR); `godot --headless --path . -s
   tools/godot/smoke.gd` loads every script (`SMOKE bad=0`).
-- `godot --headless --path . res://tests/test_systems.tscn` → `RESULT 221/221`.
+- `godot --headless --path . res://tests/test_systems.tscn` → `RESULT 270/270`.
 - `xvfb-run -a -s "-screen 0 1600x900x24" godot --path . --audio-driver Dummy --resolution
   1600x900 -s tools/godot/run.gd -- res://tools/godot/play_test.gd` → `PLAYTEST OK` (includes
-  "every NPC and usable object is reachable").
+  "every NPC and usable object is reachable", chart → click a room on the map → fight → T).
 - Screenshots: same with `res://tools/godot/shots.gd <out_dir>` (also try 1366x768 → UI 1.5x);
-  `res://tools/godot/tour.gd <out_dir>` walks the town and shoots each landmark at play zoom.
-- Dungeon: same with `res://tools/godot/dungeon_test.gd [out_dir] [floor]` → a bot clears two
-  floors, opens the chests and takes the stair → `DUNGEON OK`.
+  `res://tools/godot/room_shots.gd <out_dir> [types]` shoots the Refuge, every room type, the map.
+- Dungeon: same with `res://tools/godot/dungeon_test.gd [out_dir] [tier]` → a bot charts an
+  expedition and clears two rooms picked off the map → `DUNGEON OK`.
 - Balance: `godot --headless --path . --fixed-fps 60 --audio-driver Dummy -s tools/godot/run.gd --
-  res://tools/godot/campaign_test.gd 15` → a gear-managing bot plays floors 1-15 (one line per
-  floor) → `CAMPAIGN OK` (expect level 15-18, 0-2 deaths, 14-20 game minutes (a person takes
-  longer), danger from floor 7; it's random, so run 3-4 in parallel after touching monsters.gd,
-  monster AI, XP, loot or room shapes).
+  res://tools/godot/campaign_test.gd 4 [max_deaths] [greed]` → a gear-managing bot plays
+  expeditions through Tier 4 (one line per room, one per expedition) → `CAMPAIGN OK` (expect
+  20-25 game minutes, level 21-25, 0-1 deaths, usually at the first Warden after a greedy path;
+  it's random, so run 3 in parallel after touching monsters.gd, expeditions.gd, AI, XP or loot).
 - `godot --headless --path . --export-pack "Linux" builds/pck/rhune.pck` then
   `godot --main-pack builds/pck/rhune.pck` boots to the menu (checks export filters).
